@@ -394,6 +394,60 @@
             display: flex;
             gap: 8px;
             flex-wrap: wrap;
+            justify-content: flex-end;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #f0f0f0;
+        }
+        .project-card-actions .btn {
+            font-size: 13px;
+            padding: 6px 16px;
+            border-radius: 6px;
+            font-weight: 500;
+            transition: all .15s;
+        }
+        .project-card-actions .btn:hover {
+            opacity: .85;
+            transform: translateY(-1px);
+        }
+        .btn-preview { background: #e6f4ff; color: #0958d9; border: 1px solid #91caff; }
+        .btn-feedback { background: #fff7e6; color: #d46b08; border: 1px solid #ffd591; }
+        .btn-confirm { background: #f6ffed; color: #389e0d; border: 1px solid #b7eb8f; }
+        .btn-confirmed { background: #f6ffed; color: #389e0d; border: none; font-weight: 600; cursor: default; }
+        .report-status-tag {
+            display: inline-block;
+            font-size: 12px;
+            padding: 3px 10px;
+            border-radius: 10px;
+            font-weight: 500;
+            margin-right: 8px;
+        }
+        /* ===== Report Modal Extras ===== */
+        .modal-icon {
+            text-align: center;
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+        .modal-desc {
+            font-size: 14px;
+            color: #666;
+            line-height: 1.7;
+            margin-bottom: 18px;
+        }
+        .modal-desc strong {
+            color: #333;
+        }
+        .confirm-check {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            margin: 14px 0;
+            font-size: 13px;
+            color: #555;
+        }
+        .confirm-check input[type='checkbox'] {
+            margin-top: 2px;
+            flex-shrink: 0;
         }
 
         /* ===== Feedback Item ===== */
@@ -836,6 +890,72 @@
     </div>
 </div>
 
+<!-- ===== Modal: 报告反馈 ===== -->
+<div class="modal-overlay" id="report-feedback-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>✍️ 报告修正意见</h3>
+            <button class="modal-close" onclick="closeReportFeedbackModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="modal-desc">
+                请详细描述您对报告的修正意见，我们将尽快处理并重新出具报告。
+            </div>
+            <div class="form-group">
+                <label>问题类型</label>
+                <select id="rf-type">
+                    <option value="数据有误">数据有误</option>
+                    <option value="格式问题">格式问题</option>
+                    <option value="信息缺失">信息缺失</option>
+                    <option value="其他">其他</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>详细说明 <span style="color:#ff4d4f;">*</span></label>
+                <textarea id="rf-content" rows="5" placeholder="请详细描述需要修正的内容，例如：\n• 第X页第X行检测数据与实际不符\n• 委托单位名称有误…"></textarea>
+            </div>
+            <div class="form-group">
+                <label>联系方式（选填）</label>
+                <input type="text" id="rf-contact" placeholder="手机号或微信，方便我们确认细节">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-default" onclick="closeReportFeedbackModal()">取消</button>
+            <button class="btn btn-primary" onclick="submitReportFeedback()">提交反馈</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== Modal: 确认报告 ===== -->
+<div class="modal-overlay" id="confirm-report-modal">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>✅ 确认检测报告</h3>
+            <button class="modal-close" onclick="closeConfirmReportModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="modal-icon">📝</div>
+            <div class="modal-desc">
+                <strong>您即将确认本报告无误。</strong><br><br>
+                确认后，检测中心将打印并出具正式检测报告（加盖公章）。<br>
+                正式报告出具后将无法再次修改。
+            </div>
+            <div class="form-group">
+                <label>附言（选填）</label>
+                <textarea id="cr-remark" rows="3" placeholder="如有其他说明可在此填写，例如报告份数、邮寄地址等"></textarea>
+            </div>
+            <div class="confirm-check">
+                <input type="checkbox" id="cr-agree">
+                <span>我已仔细核对报告内容，确认检测数据、项目信息均无误，同意出具正式报告。</span>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-default" onclick="closeConfirmReportModal()">再看看</button>
+            <button class="btn btn-primary" id="cr-submit-btn" onclick="submitConfirmReport()" disabled>确认无误，出具报告</button>
+        </div>
+    </div>
+</div>
+
 <!-- ===== Tab Switch (minimal inline, no business logic) ===== -->
 <script>
 (function(){
@@ -854,7 +974,7 @@
 </script>
 
 <!-- ===== Business JS ===== -->
-<script src="/static/customer.js?v=20260515a"></script>
+<script src="/static/customer.js?v=20260515b"></script>
 
 </body>
 </html>

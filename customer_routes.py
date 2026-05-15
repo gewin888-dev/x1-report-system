@@ -621,6 +621,8 @@ def register_customer_routes(app):
     def customer_confirm_report(project_id):
         """客户确认报告无误，同意出具正式报告"""
         client_name = current_user.client_name or ''
+        data = request.get_json(silent=True) or {}
+        remark = (data.get('remark') or '').strip()
         conn = _get_x1_data_conn()
         try:
             project = conn.execute(
@@ -635,9 +637,12 @@ def register_customer_routes(app):
                 return jsonify({'success': False, 'error': '当前状态不允许确认'}), 400
 
             now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            confirm_content = '客户确认报告无误，同意出具正式报告'
+            if remark:
+                confirm_content += f'\n附言：{remark}'
             conn.execute(
                 "INSERT INTO report_feedback (project_id, client_name, action, content, created_at) VALUES (?,?,?,?,?)",
-                (project_id, client_name, 'confirm', '客户确认报告无误，同意出具正式报告', now)
+                (project_id, client_name, 'confirm', confirm_content, now)
             )
             # 状态推进到“客户已确认”
             conn.execute(
@@ -647,7 +652,7 @@ def register_customer_routes(app):
             conn.commit()
 
             from monitor import log_action
-            log_action(client_name, '客户确认报告', f'project_id={project_id}', '')
+            log_action(client_name, '客户确认报告', f'project_id={project_id}', remark[:200])
 
             return jsonify({'success': True, 'message': '报告已确认，将安排打印出具正式报告'})
         finally:

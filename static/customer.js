@@ -256,12 +256,12 @@
         var isConfirmed = (rptStatus === '客户已确认' || rptStatus === '已发送客户');
         var reportBtns = '';
         if (canFeedback) {
-          reportBtns = ' <a href="/customer/api/projects/' + p.id + '/preview_pdf" target="_blank" class="btn btn-sm" style="font-size:12px;padding:4px 12px;background:#e6f4ff;color:#0958d9;border:1px solid #91caff;text-decoration:none;">🔍 预览报告</a>'
-            + ' <button class="btn btn-sm" style="font-size:12px;padding:4px 12px;background:#fff7e6;color:#d46b08;border:1px solid #ffd591;" onclick="openReportFeedback(' + p.id + ')">✍️ 报告反馈</button>'
-            + ' <button class="btn btn-sm" style="font-size:12px;padding:4px 12px;background:#f6ffed;color:#389e0d;border:1px solid #b7eb8f;" onclick="confirmReport(' + p.id + ')">✅ 确认报告</button>';
+          reportBtns = '<button class="btn btn-preview" onclick="previewReport(' + p.id + ')">🔍 预览报告</button>'
+            + '<button class="btn btn-feedback" onclick="openReportFeedback(' + p.id + ')">✍️ 报告反馈</button>'
+            + '<button class="btn btn-confirm" onclick="openConfirmReport(' + p.id + ')">✅ 确认报告</button>';
         } else if (isConfirmed) {
-          reportBtns = ' <a href="/customer/api/projects/' + p.id + '/preview_pdf" target="_blank" class="btn btn-sm" style="font-size:12px;padding:4px 12px;background:#e6f4ff;color:#0958d9;border:1px solid #91caff;text-decoration:none;">🔍 查看报告</a>'
-            + ' <span style="font-size:12px;color:#389e0d;font-weight:600;">✅ 已确认</span>';
+          reportBtns = '<button class="btn btn-preview" onclick="previewReport(' + p.id + ')">🔍 查看报告</button>'
+            + '<span class="btn btn-confirmed">✅ 已确认</span>';
         }
 
         return '<div class="project-card">'
@@ -275,7 +275,10 @@
           + '<span>下单日期：' + escapeHtml((p.created_at || '').slice(0, 10)) + '</span>'
           + '</div>'
           + renderProgressBar(p)
-          + '<div class="project-card-actions">' + urgeBtns + reportBtns + '</div>'
+          + '<div class="project-card-actions" style="justify-content:space-between;">'
+          + '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + urgeBtns + '</div>'
+          + '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + reportBtns + '</div>'
+          + '</div>'
           + '</div>';
       }).join('');
     }).catch(function () {});
@@ -323,25 +326,88 @@
 
   /* ========== 报告反馈 & 确认 ========== */
 
-  window.openReportFeedback = function (projectId) {
-    var content = prompt('请输入您对报告的修正意见：');
-    if (!content || !content.trim()) return;
-    api('POST', '/customer/api/projects/' + projectId + '/report_feedback', { content: content.trim() })
-      .then(function (d) {
-        alert(d.message || '反馈已提交');
-        loadProjects();
+  /* --- 预览报告 --- */
+  var _currentReportProjectId = null;
+
+  window.previewReport = function (projectId) {
+    // 先用 HEAD 请求检查 PDF 是否存在
+    fetch('/customer/api/projects/' + projectId + '/preview_pdf', { method: 'HEAD', credentials: 'same-origin' })
+      .then(function (r) {
+        if (r.ok) {
+          window.open('/customer/api/projects/' + projectId + '/preview_pdf', '_blank');
+        } else {
+          showToast('报告正在生成中，请稍后再试', 'info');
+        }
       })
-      .catch(function (e) { showToast(e.message || '反馈提交失败', 'error'); });
+      .catch(function () { showToast('无法连接服务器，请检查网络', 'error'); });
   };
 
-  window.confirmReport = function (projectId) {
-    if (!confirm('确认报告无误，同意打印出具正式报告？\n\n确认后将无法撤回。')) return;
-    api('POST', '/customer/api/projects/' + projectId + '/confirm_report')
+  /* --- 报告反馈弹窗 --- */
+  window.openReportFeedback = function (projectId) {
+    _currentReportProjectId = projectId;
+    document.getElementById('rf-type').value = '数据有误';
+    document.getElementById('rf-content').value = '';
+    document.getElementById('rf-contact').value = '';
+    document.getElementById('report-feedback-modal').classList.add('show');
+  };
+
+  window.closeReportFeedbackModal = function () {
+    document.getElementById('report-feedback-modal').classList.remove('show');
+    _currentReportProjectId = null;
+  };
+
+  window.submitReportFeedback = function () {
+    var content = (document.getElementById('rf-content').value || '').trim();
+    if (!content) { showToast('请填写详细说明', 'error'); return; }
+    var feedbackType = (document.getElementById('rf-type').value || '');
+    var contact = (document.getElementById('rf-contact').value || '').trim();
+    var fullContent = '【' + feedbackType + '】' + content + (contact ? '\n联系方式：' + contact : '');
+    api('POST', '/customer/api/projects/' + _currentReportProjectId + '/report_feedback', { content: fullContent })
       .then(function (d) {
-        alert(d.message || '报告已确认');
+        closeReportFeedbackModal();
+        showToast(d.message || '反馈已提交，我们将尽快处理', 'success');
         loadProjects();
       })
-      .catch(function (e) { showToast(e.message || '确认失败', 'error'); });
+      .catch(function (e) { showToast(e.message || '提交失败，请重试', 'error'); });
+  };
+
+  /* --- 确认报告弹窗 --- */
+  window.openConfirmReport = function (projectId) {
+    _currentReportProjectId = projectId;
+    document.getElementById('cr-remark').value = '';
+    document.getElementById('cr-agree').checked = false;
+    document.getElementById('cr-submit-btn').disabled = true;
+    document.getElementById('confirm-report-modal').classList.add('show');
+  };
+
+  window.closeConfirmReportModal = function () {
+    document.getElementById('confirm-report-modal').classList.remove('show');
+    _currentReportProjectId = null;
+  };
+
+  // 勾选协议后才能提交
+  document.addEventListener('DOMContentLoaded', function () {
+    var cb = document.getElementById('cr-agree');
+    if (cb) {
+      cb.addEventListener('change', function () {
+        document.getElementById('cr-submit-btn').disabled = !cb.checked;
+      });
+    }
+  });
+
+  window.submitConfirmReport = function () {
+    if (!document.getElementById('cr-agree').checked) {
+      showToast('请先勾选确认协议', 'error');
+      return;
+    }
+    var remark = (document.getElementById('cr-remark').value || '').trim();
+    api('POST', '/customer/api/projects/' + _currentReportProjectId + '/confirm_report', { remark: remark })
+      .then(function (d) {
+        closeConfirmReportModal();
+        showToast(d.message || '报告已确认，将安排打印出具正式报告', 'success');
+        loadProjects();
+      })
+      .catch(function (e) { showToast(e.message || '确认失败，请重试', 'error'); });
   };
 
   /* ========== 投诉建议 ========== */
