@@ -14,15 +14,15 @@
 <body>
     <div class="header">
         <div class="header-main header-main-inline">
-            <div class="header-inline-toprow">
-                <div style="display:flex;align-items:center;gap:10px;">
-                    <img src="/static/logo.png" alt="普迪检测" style="height:40px;width:auto;">
-                    <span style="font-size:18px;font-weight:700;color:#fff;">普迪检测</span>
+            <div class="header-inline-toprow" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:nowrap;">
+                <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
+                    <img src="/static/logo.png" alt="普迪检测" style="height:36px;width:auto;">
+                    <span style="font-size:16px;font-weight:700;color:#fff;white-space:nowrap;">普迪检测</span>
                 </div>
-                <div class="header-actions header-actions-inline" style="display:flex;align-items:center;gap:12px;">
-                    <span class="user-info user-info-inline" style="font-size:13px;margin:0;">检测员：<span id="currentUser"></span> <span style="font-size:11px;color:#999;">{{ version }}</span><span id="syncBadge" style="display:none;background:#f44336;color:white;padding:2px 8px;border-radius:10px;font-size:11px;margin-left:6px;">离线</span><span id="pendingCount" style="display:none;background:#ff9800;color:white;padding:2px 8px;border-radius:10px;font-size:11px;margin-left:4px;cursor:pointer;" onclick="syncPendingRecords()">0</span></span>
-                    <a href="/admin" class="admin-link" onclick="return handleAdminEntry(event)">⚙️后台</a>
-                    <a href="/logout" class="logout">退出</a>
+                <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;font-size:11px;color:#ccc;white-space:nowrap;">
+                    <span>检测员：<span id="currentUser"></span> {{ version }}</span><span id="syncBadge" style="display:none;background:#f44336;color:white;padding:1px 6px;border-radius:8px;font-size:10px;">离线</span><span id="pendingCount" style="display:none;background:#ff9800;color:white;padding:1px 6px;border-radius:8px;font-size:10px;cursor:pointer;" onclick="syncPendingRecords()">0</span>
+                    <a href="/admin" class="admin-link" onclick="return handleAdminEntry(event)" style="font-size:12px;">⚙️后台</a>
+                    <a href="/logout" class="logout" style="font-size:12px;">退出</a>
                 </div>
             </div>
         </div>
