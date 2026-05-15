@@ -530,7 +530,7 @@ _INSPECTION_STAGE_ORDER = {
 _REPORT_STATUS_ORDER = {
     '未开始': 0, '': 0,
     '编制中': 1, '审核中': 2, '待修改': 2, '待出具': 3,
-    '已出具': 4, '已发送客户': 5,
+    '已出具': 4, '待客户确认': 5, '客户已确认': 6, '已发送客户': 7,
 }
 
 
@@ -5828,7 +5828,7 @@ def api_list_compat():
 
 
 def _try_advance_on_export(export_payload):
-    """导出报告成功后，尝试推进已存在项目的状态到 检测完成 + 已出具。"""
+    """导出报告成功后，尝试推进已存在项目的状态到 检测完成 + 待客户确认。"""
     try:
         project_info = export_payload.get('project', {}) or {}
         project_name = (project_info.get('project_name') or '').strip()
@@ -5847,7 +5847,7 @@ def _try_advance_on_export(export_payload):
             _auto_advance_project_stage(
                 row['id'],
                 target_inspection='检测完成',
-                target_report='已出具'
+                target_report='待客户确认'
             )
     except Exception:
         pass

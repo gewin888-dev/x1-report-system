@@ -95,6 +95,18 @@ def init_customer_tables():
             )
         """)
 
+        # report_feedback 表（客户报告反馈/确认）
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS report_feedback (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                project_id INTEGER NOT NULL,
+                client_name TEXT NOT NULL,
+                action TEXT NOT NULL,
+                content TEXT DEFAULT '',
+                created_at TEXT NOT NULL
+            )
+        """)
+
         # 增量迁移：business_projects 增加 source 字段
         try:
             conn.execute("ALTER TABLE business_projects ADD COLUMN source TEXT DEFAULT ''")
@@ -526,5 +538,117 @@ def register_customer_routes(app):
             ))
             conn.commit()
             return jsonify({'success': True, 'message': '反馈已提交，感谢您的宝贵意见'})
+        finally:
+            conn.close()
+
+    # ============================================================
+    # 报告反馈 & 确认
+    # ============================================================
+
+    @app.route('/customer/api/projects/<int:project_id>/report_feedback', methods=['GET'])
+    @customer_required
+    def customer_get_report_feedback(project_id):
+        """获取某项目的报告反馈历史"""
+        client_name = current_user.client_name or ''
+        conn = _get_x1_data_conn()
+        try:
+            # 校验项目归属
+            project = conn.execute(
+                "SELECT * FROM business_projects WHERE id=? AND client_name=?",
+                (project_id, client_name)
+            ).fetchone()
+            if not project:
+                return jsonify({'success': False, 'error': '项目不存在'}), 404
+
+            rows = conn.execute(
+                "SELECT * FROM report_feedback WHERE project_id=? AND client_name=? ORDER BY created_at DESC",
+                (project_id, client_name)
+            ).fetchall()
+            items = [{
+                'id': r['id'],
+                'action': r['action'],
+                'content': r['content'],
+                'created_at': r['created_at'],
+            } for r in rows]
+            return jsonify({'success': True, 'items': items, 'report_status': project['report_status'] or ''})
+        finally:
+            conn.close()
+
+    @app.route('/customer/api/projects/<int:project_id>/report_feedback', methods=['POST'])
+    @customer_required
+    def customer_submit_report_feedback(project_id):
+        """客户提交报告修正意见，状态回退到“待修改”"""
+        client_name = current_user.client_name or ''
+        data = request.get_json(silent=True) or {}
+        content = (data.get('content') or '').strip()
+        if not content:
+            return jsonify({'success': False, 'error': '请填写反馈内容'}), 400
+
+        conn = _get_x1_data_conn()
+        try:
+            project = conn.execute(
+                "SELECT * FROM business_projects WHERE id=? AND client_name=?",
+                (project_id, client_name)
+            ).fetchone()
+            if not project:
+                return jsonify({'success': False, 'error': '项目不存在'}), 404
+
+            rs = (project['report_status'] or '').strip()
+            if rs not in ('已出具', '待客户确认', '已发送客户'):
+                return jsonify({'success': False, 'error': '当前状态不允许反馈'}), 400
+
+            now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            conn.execute(
+                "INSERT INTO report_feedback (project_id, client_name, action, content, created_at) VALUES (?,?,?,?,?)",
+                (project_id, client_name, 'feedback', content, now)
+            )
+            # 状态回退到“待修改”
+            conn.execute(
+                "UPDATE business_projects SET report_status=?, updated_at=? WHERE id=?",
+                ('待修改', now, project_id)
+            )
+            conn.commit()
+
+            from monitor import log_action
+            log_action(client_name, '客户报告反馈', f'project_id={project_id}', content[:100])
+
+            return jsonify({'success': True, 'message': '反馈已提交，报告将进入修改流程'})
+        finally:
+            conn.close()
+
+    @app.route('/customer/api/projects/<int:project_id>/confirm_report', methods=['POST'])
+    @customer_required
+    def customer_confirm_report(project_id):
+        """客户确认报告无误，同意出具正式报告"""
+        client_name = current_user.client_name or ''
+        conn = _get_x1_data_conn()
+        try:
+            project = conn.execute(
+                "SELECT * FROM business_projects WHERE id=? AND client_name=?",
+                (project_id, client_name)
+            ).fetchone()
+            if not project:
+                return jsonify({'success': False, 'error': '项目不存在'}), 404
+
+            rs = (project['report_status'] or '').strip()
+            if rs not in ('已出具', '待客户确认', '已发送客户'):
+                return jsonify({'success': False, 'error': '当前状态不允许确认'}), 400
+
+            now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            conn.execute(
+                "INSERT INTO report_feedback (project_id, client_name, action, content, created_at) VALUES (?,?,?,?,?)",
+                (project_id, client_name, 'confirm', '客户确认报告无误，同意出具正式报告', now)
+            )
+            # 状态推进到“客户已确认”
+            conn.execute(
+                "UPDATE business_projects SET report_status=?, updated_at=? WHERE id=?",
+                ('客户已确认', now, project_id)
+            )
+            conn.commit()
+
+            from monitor import log_action
+            log_action(client_name, '客户确认报告', f'project_id={project_id}', '')
+
+            return jsonify({'success': True, 'message': '报告已确认，将安排打印出具正式报告'})
         finally:
             conn.close()

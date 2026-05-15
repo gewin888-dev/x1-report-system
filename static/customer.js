@@ -34,17 +34,18 @@
 
   /* ========== 进度条 ========== */
 
-  var STEPS = ['待审核', '已派单', '检测中', '报告编制中', '已出报告', '已发送'];
+  var STEPS = ['待审核', '已派单', '检测中', '报告编制中', '已出报告', '待确认', '已确认'];
 
   function getStepIndex(project) {
     // 根据 report_status / inspection_stage 推断当前步骤
     var rs = (project.report_status || '').toLowerCase();
     var is_ = (project.inspection_stage || '').toLowerCase();
 
-    // 第6步: 已发送
-    if (rs === '已发送' || rs === '已发送客户' || rs === 'sent') return 5;
-    // 第5步: 已出报告
-    if (rs === '已出报告' || rs === '已出具' || rs === 'completed' || rs === 'done') return 4;
+    // 第7步: 已确认（客户已确认 / 已发送客户）
+    if (rs === '客户已确认' || rs === '已发送客户' || rs === '已发送' || rs === 'sent') return 6;
+    // 第6步: 待确认（已出具 / 待客户确认）
+    if (rs === '待客户确认' || rs === '已出报告' || rs === '已出具' || rs === 'completed' || rs === 'done') return 5;
+    // 第5步: 报告编制中 (deprecated step index, now step 4)
     // 第4步: 报告编制中
     if (rs === '报告编制中' || rs === '编制中' || rs === '审核中' || rs === '待修改' || rs === '待出具' || rs === 'drafting' || is_ === '报告编制中') return 3;
     // 第3步: 检测中 (含补测)
@@ -249,6 +250,18 @@
           + '🧾 催发票</button>'
           + (urgedInvoice ? '<span style="font-size:11px;color:#ff7a00;margin-left:2px;">已催</span>' : '');
 
+        // 报告反馈/确认按钮：仅在报告已出具/待客户确认 时显示
+        var rptStatus = (p.report_status || '').trim();
+        var canFeedback = (rptStatus === '已出具' || rptStatus === '待客户确认');
+        var isConfirmed = (rptStatus === '客户已确认' || rptStatus === '已发送客户');
+        var reportBtns = '';
+        if (canFeedback) {
+          reportBtns = ' <button class="btn btn-sm" style="font-size:12px;padding:4px 12px;background:#fff7e6;color:#d46b08;border:1px solid #ffd591;" onclick="openReportFeedback(' + p.id + ')">✍️ 报告反馈</button>'
+            + ' <button class="btn btn-sm" style="font-size:12px;padding:4px 12px;background:#f6ffed;color:#389e0d;border:1px solid #b7eb8f;" onclick="confirmReport(' + p.id + ')">\u2705 确认报告</button>';
+        } else if (isConfirmed) {
+          reportBtns = ' <span style="font-size:12px;color:#389e0d;font-weight:600;">✅ 已确认</span>';
+        }
+
         return '<div class="project-card">'
           + '<div class="project-card-header">'
           + '<span class="project-name">' + escapeHtml(p.project_name || '') + '</span>'
@@ -260,7 +273,7 @@
           + '<span>下单日期：' + escapeHtml((p.created_at || '').slice(0, 10)) + '</span>'
           + '</div>'
           + renderProgressBar(p)
-          + '<div class="project-card-actions">' + urgeBtns + '</div>'
+          + '<div class="project-card-actions">' + urgeBtns + reportBtns + '</div>'
           + '</div>';
       }).join('');
     }).catch(function () {});
@@ -304,6 +317,29 @@
         loadProjects();
       })
       .catch(function () { showToast('催单失败，请重试', 'error'); });
+  };
+
+  /* ========== 报告反馈 & 确认 ========== */
+
+  window.openReportFeedback = function (projectId) {
+    var content = prompt('请输入您对报告的修正意见：');
+    if (!content || !content.trim()) return;
+    api('POST', '/customer/api/projects/' + projectId + '/report_feedback', { content: content.trim() })
+      .then(function (d) {
+        alert(d.message || '反馈已提交');
+        loadProjects();
+      })
+      .catch(function (e) { showToast(e.message || '反馈提交失败', 'error'); });
+  };
+
+  window.confirmReport = function (projectId) {
+    if (!confirm('确认报告无误，同意打印出具正式报告？\n\n确认后将无法撤回。')) return;
+    api('POST', '/customer/api/projects/' + projectId + '/confirm_report')
+      .then(function (d) {
+        alert(d.message || '报告已确认');
+        loadProjects();
+      })
+      .catch(function (e) { showToast(e.message || '确认失败', 'error'); });
   };
 
   /* ========== 投诉建议 ========== */
