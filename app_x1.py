@@ -2178,6 +2178,27 @@ def create_project_task():
     if not project_row:
         return jsonify({'success': False, 'error': '项目不存在'}), 404
 
+    # ── 派单可用性检查 ──
+    stage = project_row['inspection_stage'] or ''
+    rpt_st = project_row['report_status'] or ''
+    done_stages = ('已完结', '已关闭')
+    done_reports = ('客户已确认', '已发送客户')
+    if stage in done_stages and rpt_st in done_reports:
+        return jsonify({'success': False, 'error': '项目已完结，无法继续派单'}), 400
+
+    task_type_req = payload.get('task_type') or 'inspection'
+    conn_chk = get_x1_data_conn()
+    try:
+        active_tasks = conn_chk.execute(
+            "SELECT COUNT(*) as cnt FROM project_tasks "
+            "WHERE project_id=? AND task_type=? AND task_status IN ('pending_assign','assigned','accepted','in_progress')",
+            (payload['project_id'], task_type_req)
+        ).fetchone()
+        if active_tasks and active_tasks['cnt'] > 0:
+            return jsonify({'success': False, 'error': f'该项目已有进行中的同类任务（{active_tasks["cnt"]}个），请等现有任务完成或取消后再派单'}), 400
+    finally:
+        conn_chk.close()
+
     task_name = payload.get('task_name') or ''
     if not task_name:
         base_name = (project_row['project_name'] or '项目').strip()

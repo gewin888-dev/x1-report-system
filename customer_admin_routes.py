@@ -398,20 +398,31 @@ def register_customer_admin_routes(app):
         if not client_name:
             return jsonify({'success': False, 'error': '缺少客户名称'}), 400
 
+        force = data.get('force', False)
+
         conn = _get_x1_conn()
         try:
-            # 检查是否有关联项目
+            # 检查关联项目
             row = conn.execute(
                 "SELECT COUNT(*) as cnt FROM business_projects WHERE client_name = ?",
                 (client_name,)
             ).fetchone()
             project_count = row['cnt'] if row else 0
 
-            if project_count > 0:
+            if project_count > 0 and not force:
                 return jsonify({
                     'success': False,
-                    'error': f'该客户关联 {project_count} 个项目，不能直接删除。请先处理关联项目。'
+                    'error': f'该客户关联 {project_count} 个项目',
+                    'has_projects': True,
+                    'project_count': project_count
                 }), 400
+
+            if project_count > 0 and force:
+                # 强制删除：关联项目的 client_name 清空
+                conn.execute(
+                    "UPDATE business_projects SET client_name = '' WHERE client_name = ?",
+                    (client_name,)
+                )
 
             # 删除 profile
             conn.execute("DELETE FROM client_profiles WHERE client_name = ?", (client_name,))
@@ -420,6 +431,10 @@ def register_customer_admin_routes(app):
             # 删除反馈记录
             conn.execute("DELETE FROM client_feedback WHERE client_name = ?", (client_name,))
             conn.commit()
-            return jsonify({'success': True, 'message': f'客户 {client_name} 已删除'})
+
+            msg = f'客户 {client_name} 已删除'
+            if project_count > 0:
+                msg += f'（{project_count} 个关联项目已解除绑定）'
+            return jsonify({'success': True, 'message': msg})
         finally:
             conn.close()

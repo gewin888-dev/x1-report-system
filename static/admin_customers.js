@@ -486,20 +486,34 @@ function submitCustomerCreate() {
 
 /* ========== 12. 删除客户 ========== */
 function deleteCustomer(clientName) {
-  if (!confirm('确认删除客户「' + clientName + '」？\n\n⚠️ 有关联项目的客户不允许删除。')) return;
+  if (!confirm('确认删除客户「' + clientName + '」？')) return;
+  _doDeleteCustomer(clientName, false);
+}
+
+function _doDeleteCustomer(clientName, force) {
   fetch('/admin/api/customer_management/delete', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ client_name: clientName })
+    body: JSON.stringify({ client_name: clientName, force: force })
   })
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      if (!d.success) throw new Error(d.error || '删除失败');
-      if (typeof showToast === 'function') showToast('客户已删除', 'success');
-      // 如在详情页则回到列表
-      var detailView = document.getElementById('customer-detail-view');
-      if (detailView && detailView.style.display !== 'none') backToCustomerList();
-      else loadCustomerList();
+    .then(function(r) { return r.json().then(function(d) { return { status: r.status, data: d }; }); })
+    .then(function(res) {
+      if (res.data.success) {
+        if (typeof showToast === 'function') showToast(res.data.message || '客户已删除', 'success');
+        var detailView = document.getElementById('customer-detail-view');
+        if (detailView && detailView.style.display !== 'none') backToCustomerList();
+        else loadCustomerList();
+        return;
+      }
+      // 有关联项目：二次确认强制删除
+      if (res.data.has_projects) {
+        var cnt = res.data.project_count || 0;
+        if (confirm('该客户关联 ' + cnt + ' 个项目。\n\n强制删除将解除项目关联（项目不会被删除，仅清空客户字段）。\n\n确认强制删除？')) {
+          _doDeleteCustomer(clientName, true);
+        }
+        return;
+      }
+      throw new Error(res.data.error || '删除失败');
     })
     .catch(function(err) {
       if (typeof showToast === 'function') showToast(err.message || '删除失败', 'error');
