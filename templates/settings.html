@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>系统设置 - X1</title>
+  <style>
+    body{margin:0;background:#f5f7fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#222}
+    .wrap{max-width:1200px;margin:0 auto;padding:24px}
+    .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:16px;flex-wrap:wrap}
+    .head h1{margin:0;font-size:24px}.muted{color:#888;font-size:13px}
+    .group{border:1px solid #eaeaea;border-radius:14px;background:#fff;margin-bottom:16px;overflow:hidden}
+    .group summary{cursor:pointer;padding:14px 16px;font-weight:700;background:#fafafa}
+    .items{padding:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px}
+    .item{border:1px solid #eee;border-radius:12px;padding:14px;background:#fff;display:flex;flex-direction:column;gap:10px}
+    .item.readonly{background:#fcfcfc}
+    .label{font-weight:600;margin-bottom:2px}
+    .desc{font-size:12px;color:#999;line-height:1.5;margin-top:2px}
+    .meta{font-size:12px;color:#999;margin-top:2px}
+    .readonly-value{font-size:14px;color:#333;line-height:1.6;word-break:break-all}
+    input[type=text],input[type=number],select{width:100%;box-sizing:border-box;padding:9px 10px;border:1px solid #d9d9d9;border-radius:8px;background:#fff}
+    input[disabled],select[disabled]{background:#f5f5f5;color:#888;cursor:not-allowed}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .btn{border:1px solid #d9d9d9;background:#fff;border-radius:8px;padding:8px 12px;cursor:pointer}
+    .btn.primary{background:#1677ff;color:#fff;border-color:#1677ff}
+    .btn.success{background:#16a34a;color:#fff;border-color:#16a34a}
+    .btn[disabled]{opacity:.55;cursor:not-allowed}
+    .item-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .item-status{font-size:12px;color:#666;min-height:18px}
+    .item.editing{border-color:#bdd3ff;box-shadow:0 0 0 3px rgba(22,119,255,.08)}
+    .toolbar-note{font-size:12px;color:#666}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div>
+      <h1>系统设置</h1>
+      <div class="muted">基础信息只读；可修改项按单项编辑、单项保存，避免全局误操作。</div>
+    </div>
+    <div class="row">
+      <button class="btn" onclick="runPathProbe()">路径巡检</button>
+      <button class="btn" onclick="runBackupNow()">立即备份</button>
+      <span class="toolbar-note">每个配置项单独修改、单独保存</span>
+    </div>
+  </div>
+  <div id="settings-root"></div>
+</div>
+<script>
+let settingsGroups={};
+function esc(v){return String(v==null?'':v).replace(/[&<>\"]/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]));}
+function loadSettings(){fetch('/admin/api/settings').then(r=>r.json()).then(d=>{settingsGroups=d.groups||{};renderSettings();});}
+function renderSettings(){
+  const root=document.getElementById('settings-root'); let h='';
+  Object.keys(settingsGroups).forEach(key=>{
+    const g=settingsGroups[key];
+    h += '<details class="group"'+(key==='basic'?' open':'')+'><summary>'+esc(g.title||key)+'</summary><div class="items">';
+    (g.items||[]).forEach((item,idx)=>{
+      const itemId = `${key}__${idx}`;
+      const isEditable = !!item.key;
+      if(isEditable){
+        const val=item.value;
+        const restartNote = item.requires_restart ? '保存后需重启服务生效' : '保存后即时生效';
+        const updatedMeta = [item.updated_by ? ('最近修改：'+item.updated_by) : '', item.updated_at ? item.updated_at : ''].filter(Boolean).join(' · ');
+        const isPathItem = String(item.key||'').startsWith('paths.');
+        let field='';
+        if(item.type==='bool') field='<label class="row"><input type="checkbox" data-key="'+esc(item.key)+'" data-item-id="'+itemId+'" data-restart="'+(item.requires_restart?'1':'0')+'" '+(val?'checked':'')+' disabled> <span>'+(val?'已开启':'已关闭')+'</span></label>';
+        else if(item.type==='int') field='<input type="number" data-key="'+esc(item.key)+'" data-item-id="'+itemId+'" data-restart="'+(item.requires_restart?'1':'0')+'" value="'+esc(val)+'" disabled>';
+        else field='<input type="text" data-key="'+esc(item.key)+'" data-item-id="'+itemId+'" data-restart="'+(item.requires_restart?'1':'0')+'" value="'+esc(val)+'" disabled>';
+        const pathActions = isPathItem ? (
+          '<button class="btn" onclick="browsePathForItem(\''+itemId+'\')">浏览</button>'+
+          '<button class="btn" onclick="createDirForItem(\''+itemId+'\')">创建目录</button>'+
+          '<button class="btn" onclick="probePathForItem(\''+itemId+'\')">巡检</button>'
+        ) : '';
+        h += '<div class="item" id="item-'+itemId+'">'
+          + '<div class="label">'+esc(item.label)+'</div>'
+          + field
+          + '<div class="desc">'+esc(item.description||'')+'</div>'
+          + '<div class="meta">'+restartNote+'</div>'
+          + (updatedMeta ? '<div class="meta">'+esc(updatedMeta)+'</div>' : '')
+          + '<div class="item-actions">'
+          +   '<button class="btn" data-edit-btn="'+itemId+'" onclick="enableItemEdit(\''+itemId+'\')">修改</button>'
+          +   '<button class="btn success" data-save-btn="'+itemId+'" onclick="saveSingleItem(\''+itemId+'\')" disabled>保存</button>'
+          +   '<button class="btn" data-cancel-btn="'+itemId+'" onclick="cancelItemEdit(\''+itemId+'\')" disabled>取消</button>'
+          +   pathActions
+          + '</div>'
+          + '<div class="item-status" id="status-'+itemId+'"></div>'
+          + '</div>';
+      }else{
+        h += '<div class="item readonly"><div class="label">'+esc(item.label)+'</div><div class="readonly-value">'+esc(item.value||'-')+'</div><div class="desc">'+esc(item.description||'')+'</div></div>';
+      }
+    });
+    h += '</div></details>';
+  });
+  root.innerHTML=h;
+}
+function getItemField(itemId){return document.querySelector('[data-item-id="'+itemId+'"]');}
+function setItemStatus(itemId,msg,color){const el=document.getElementById('status-'+itemId); if(el){el.textContent=msg||''; el.style.color=color||'#666';}}
+function enableItemEdit(itemId){
+  const card=document.getElementById('item-'+itemId); const field=getItemField(itemId); if(!field) return;
+  card.classList.add('editing'); field.disabled=false; field.dataset.originalValue = field.type==='checkbox' ? String(!!field.checked) : field.value;
+  const editBtn=document.querySelector('[data-edit-btn="'+itemId+'"]');
+  const saveBtn=document.querySelector('[data-save-btn="'+itemId+'"]');
+  const cancelBtn=document.querySelector('[data-cancel-btn="'+itemId+'"]');
+  if(editBtn) editBtn.disabled=true; if(saveBtn) saveBtn.disabled=false; if(cancelBtn) cancelBtn.disabled=false;
+  setItemStatus(itemId,'已进入修改模式','#1677ff');
+  if(field.focus) field.focus();
+}
+function cancelItemEdit(itemId){
+  const card=document.getElementById('item-'+itemId); const field=getItemField(itemId); if(!field) return;
+  if(field.type==='checkbox') field.checked = field.dataset.originalValue === 'true'; else field.value = field.dataset.originalValue || field.value;
+  field.disabled=true; card.classList.remove('editing');
+  const editBtn=document.querySelector('[data-edit-btn="'+itemId+'"]');
+  const saveBtn=document.querySelector('[data-save-btn="'+itemId+'"]');
+  const cancelBtn=document.querySelector('[data-cancel-btn="'+itemId+'"]');
+  if(editBtn) editBtn.disabled=false; if(saveBtn) saveBtn.disabled=true; if(cancelBtn) cancelBtn.disabled=true;
+  setItemStatus(itemId,'已取消修改','#999');
+}
+function saveSingleItem(itemId){
+  const field=getItemField(itemId); if(!field) return;
+  const key=field.getAttribute('data-key');
+  const value=field.type==='checkbox' ? !!field.checked : field.value;
+  const needsRestart = field.getAttribute('data-restart') === '1';
+  setItemStatus(itemId,'保存中...','#666');
+  fetch('/admin/api/settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({updates:{[key]:value}})})
+    .then(r=>r.json())
+    .then(d=>{
+      if(d && d.success){
+        field.disabled=true;
+        field.dataset.originalValue = field.type==='checkbox' ? String(!!field.checked) : field.value;
+        document.getElementById('item-'+itemId)?.classList.remove('editing');
+        const editBtn=document.querySelector('[data-edit-btn="'+itemId+'"]');
+        const saveBtn=document.querySelector('[data-save-btn="'+itemId+'"]');
+        const cancelBtn=document.querySelector('[data-cancel-btn="'+itemId+'"]');
+        if(editBtn) editBtn.disabled=false; if(saveBtn) saveBtn.disabled=true; if(cancelBtn) cancelBtn.disabled=true;
+        setItemStatus(itemId, needsRestart ? '保存成功，需要重启服务后生效' : '保存成功，已即时生效', needsRestart ? '#d97706' : '#16a34a');
+        loadSettings();
+      }else{
+        setItemStatus(itemId,'保存失败','#dc2626');
+      }
+    })
+    .catch(()=>setItemStatus(itemId,'保存失败','#dc2626'));
+}
+
+function browsePathForItem(itemId){
+  const field=getItemField(itemId); if(!field) return;
+  const current = field.type==='checkbox' ? '' : field.value;
+  const encoded = encodeURIComponent(current || '');
+  fetch('/admin/api/settings/browse_path?path='+encoded)
+    .then(r=>r.json())
+    .then(d=>{
+      if(!d.success){ alert(d.error || '读取目录失败'); return; }
+      const entries = (d.entries||[]).map(x=>`${x.name}${x.writable ? '' : '（只读）'}`).join('\n') || '（当前目录下无可见子目录）';
+      alert(`当前目录：\n${d.current_path}\n\n可选子目录：\n${entries}`);
+    })
+    .catch(()=>alert('读取目录失败'));
+}
+
+function createDirForItem(itemId){
+  const field=getItemField(itemId); if(!field) return;
+  const basePath = field.value || '';
+  const name = prompt('请输入要创建的子目录名称');
+  if(!name) return;
+  fetch('/admin/api/settings/create_subdir',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({base_path:basePath,name})
+  }).then(r=>r.json()).then(d=>{
+    if(d.success){
+      setItemStatus(itemId,'目录已创建：'+d.path,'#16a34a');
+    }else{
+      setItemStatus(itemId,d.error || '创建目录失败','#dc2626');
+    }
+  }).catch(()=>setItemStatus(itemId,'创建目录失败','#dc2626'));
+}
+
+function probePathForItem(itemId){
+  const field=getItemField(itemId); if(!field) return;
+  const path = field.value || '';
+  fetch('/admin/api/settings/browse_path?path='+encodeURIComponent(path))
+    .then(r=>r.json())
+    .then(d=>{
+      if(!d.success){ setItemStatus(itemId,d.error || '巡检失败','#dc2626'); return; }
+      setItemStatus(itemId,'路径可访问：'+d.current_path,'#1677ff');
+    })
+    .catch(()=>setItemStatus(itemId,'巡检失败','#dc2626'));
+}
+function runPathProbe(){fetch('/admin/api/settings/path_probe',{method:'POST'}).then(r=>r.json()).then(d=>alert((d.results||[]).map(x=>`${x.label}\n${x.path}\n存在:${x.exists} 可读:${x.readable} 可写:${x.writable}`).join('\n\n')));}
+function runBackupNow(){fetch('/admin/api/settings/backup_now',{method:'POST'}).then(r=>r.json()).then(d=>alert(d.success?('备份完成:\n'+d.backup_file):'备份失败'));}
+loadSettings();
+</script>
+</body>
+</html>

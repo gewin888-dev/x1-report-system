@@ -1,0 +1,16 @@
+{
+  "admin": {
+    "password_plain": "admin123",
+    "display_name": "系统管理员",
+    "role": "admin",
+    "department": "检测部",
+    "created": "2026-04-29 22:14:58"
+  },
+  "slx": {
+    "password_plain": "123456",
+    "display_name": "宋霖霞",
+    "role": "supervisor",
+    "department": "检测部",
+    "created": "2026-04-30 15:27:37"
+  }
+}

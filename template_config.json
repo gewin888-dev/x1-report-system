@@ -1,0 +1,25 @@
+{
+  "custom_mappings": {
+    "生物安全/洁净工作台检测报告模板.docx": {
+      "1": "appearance",
+      "2": "appearance",
+      "3": "_skip",
+      "4": "_skip",
+      "5": "_skip",
+      "6": "hepa_leak",
+      "7": "wind_speed",
+      "8": "wind_uniformity",
+      "9": "particle",
+      "10": "particle_05",
+      "11": "particle_05",
+      "12": "particle_5",
+      "13": "particle_5",
+      "14": "settling",
+      "15": "_skip",
+      "16": "illumination",
+      "17": "noise"
+    }
+  },
+  "active_templates": {},
+  "version": "T1.4"
+}

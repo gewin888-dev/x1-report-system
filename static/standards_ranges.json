@@ -1,0 +1,3370 @@
+{
+  "GB 50333-2013": {
+    "operating_room": {
+      "Ⅰ级（百级）": {
+        "wind_speed": {
+          "range": "0.20～0.25",
+          "unit": "m/s"
+        },
+        "wind_uniformity": {
+          "range": "≤0.24",
+          "unit": ""
+        },
+        "pressure": {
+          "range": "5～20",
+          "unit": "Pa"
+        },
+        "particle": {
+          "range_op": "≥0.5μm≤3520, ≥5μm≤29",
+          "range_surr": "≥0.5μm≤35200, ≥5μm≤293",
+          "unit": "粒/m³"
+        },
+        "particle_door": {
+          "range": "≥0.5μm≤35200, ≥5μm≤293",
+          "unit": "粒/m³"
+        },
+        "temperature": {
+          "range": "21～25",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "30～60",
+          "unit": "%"
+        },
+        "noise": {
+          "range": "≤51",
+          "unit": "dB(A)"
+        },
+        "illumination_min": {
+          "range": "≥350",
+          "unit": "lx"
+        },
+        "illumination_uniformity": {
+          "range": "≥0.7",
+          "unit": ""
+        },
+        "bacteria": {
+          "range_op": "≤0.2",
+          "range_surr": "≤0.4",
+          "unit": "cfu/皿"
+        },
+        "illumination": {
+          "range": "≥300",
+          "unit": "lx"
+        },
+        "temp_diff": {
+          "range": "≤2",
+          "unit": "℃"
+        }
+      },
+      "Ⅱ级（千级）": {
+        "airchange": {
+          "range": "≥24",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "5～15",
+          "unit": "Pa"
+        },
+        "particle": {
+          "range_op": "≥0.5μm≤35200, ≥5μm≤293",
+          "range_surr": "≥0.5μm≤352000, ≥5μm≤2930",
+          "unit": "粒/m³"
+        },
+        "temperature": {
+          "range": "21～25",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "30～60",
+          "unit": "%"
+        },
+        "noise": {
+          "range": "≤49",
+          "unit": "dB(A)"
+        },
+        "illumination_min": {
+          "range": "≥350",
+          "unit": "lx"
+        },
+        "illumination_uniformity": {
+          "range": "≥0.7",
+          "unit": ""
+        },
+        "bacteria": {
+          "range_op": "≤0.75",
+          "range_surr": "≤1.5",
+          "unit": "cfu/皿"
+        },
+        "illumination": {
+          "range": "≥300",
+          "unit": "lx"
+        },
+        "temp_diff": {
+          "range": "≤2",
+          "unit": "℃"
+        }
+      },
+      "Ⅲ级（万级）": {
+        "airchange": {
+          "range": "≥18",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "5～10",
+          "unit": "Pa"
+        },
+        "particle": {
+          "range_op": "≥0.5μm≤352000, ≥5μm≤2930",
+          "range_surr": "≥0.5μm≤3520000, ≥5μm≤29300",
+          "unit": "粒/m³"
+        },
+        "temperature": {
+          "range": "21～25",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "30～60",
+          "unit": "%"
+        },
+        "noise": {
+          "range": "≤49",
+          "unit": "dB(A)"
+        },
+        "illumination_min": {
+          "range": "≥350",
+          "unit": "lx"
+        },
+        "illumination_uniformity": {
+          "range": "≥0.7",
+          "unit": ""
+        },
+        "bacteria": {
+          "range_op": "≤2",
+          "range_surr": "≤4",
+          "unit": "cfu/皿"
+        },
+        "illumination": {
+          "range": "≥300",
+          "unit": "lx"
+        },
+        "temp_diff": {
+          "range": "≤2",
+          "unit": "℃"
+        }
+      },
+      "Ⅳ级（十万级）": {
+        "airchange": {
+          "range": "≥12",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "≥5",
+          "unit": "Pa"
+        },
+        "particle": {
+          "range": "3520000＞0.5μm≤11120000, 29300＞5μm≤92500",
+          "unit": "粒/m³"
+        },
+        "temperature": {
+          "range": "21～25",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "30～60",
+          "unit": "%"
+        },
+        "noise": {
+          "range": "≤49",
+          "unit": "dB(A)"
+        },
+        "illumination_min": {
+          "range": "≥350",
+          "unit": "lx"
+        },
+        "illumination_uniformity": {
+          "range": "≥0.7",
+          "unit": ""
+        },
+        "bacteria": {
+          "range": "≤6",
+          "unit": "cfu/皿"
+        },
+        "illumination": {
+          "range": "≥300",
+          "unit": "lx"
+        },
+        "temp_diff": {
+          "range": "≤2",
+          "unit": "℃"
+        }
+      }
+    },
+    "eye_operating_room": {
+      "Ⅰ级（百级）": {
+        "wind_speed": {
+          "range": "0.15～0.20",
+          "unit": "m/s"
+        },
+        "wind_uniformity": {
+          "range": "≤0.24",
+          "unit": ""
+        },
+        "pressure": {
+          "range": "5～20",
+          "unit": "Pa"
+        },
+        "particle": {
+          "range_op": "≥0.5μm≤3520, ≥5μm≤29",
+          "range_surr": "≥0.5μm≤352000, ≥5μm≤2930",
+          "unit": "粒/m³"
+        },
+        "particle_door": {
+          "range": "≥0.5μm≤352000, ≥5μm≤2930",
+          "unit": "粒/m³"
+        },
+        "temperature": {
+          "range": "21～25",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "30～60",
+          "unit": "%"
+        },
+        "noise": {
+          "range": "≤51",
+          "unit": "dB(A)"
+        },
+        "illumination_min": {
+          "range": "≥350",
+          "unit": "lx"
+        },
+        "illumination_uniformity": {
+          "range": "≥0.7",
+          "unit": ""
+        },
+        "bacteria": {
+          "range_op": "≤0.2",
+          "range_surr": "≤0.4",
+          "unit": "cfu/皿"
+        }
+      },
+      "Ⅱ级（千级）": {
+        "airchange": {
+          "range": "≥24",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "5～20",
+          "unit": "Pa"
+        },
+        "particle": {
+          "range_op": "≥0.5μm≤35200, ≥5μm≤293",
+          "range_surr": "≥0.5μm≤3520000, ≥5μm≤29300",
+          "unit": "粒/m³"
+        },
+        "temperature": {
+          "range": "21～25",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "30～60",
+          "unit": "%"
+        },
+        "noise": {
+          "range": "≤49",
+          "unit": "dB(A)"
+        },
+        "illumination_min": {
+          "range": "≥350",
+          "unit": "lx"
+        },
+        "illumination_uniformity": {
+          "range": "≥0.7",
+          "unit": ""
+        },
+        "bacteria": {
+          "range_op": "≤0.75",
+          "range_surr": "≤1.5",
+          "unit": "cfu/皿"
+        }
+      },
+      "Ⅲ级（万级）": {
+        "airchange": {
+          "range": "≥18",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "5～20",
+          "unit": "Pa"
+        },
+        "particle": {
+          "range_op": "≥0.5μm≤352000, ≥5μm≤2930",
+          "range_surr": "≥0.5μm≤35200000, ≥5μm≤293000",
+          "unit": "粒/m³"
+        },
+        "temperature": {
+          "range": "21～25",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "30～60",
+          "unit": "%"
+        },
+        "noise": {
+          "range": "≤49",
+          "unit": "dB(A)"
+        },
+        "illumination_min": {
+          "range": "≥350",
+          "unit": "lx"
+        },
+        "illumination_uniformity": {
+          "range": "≥0.7",
+          "unit": ""
+        },
+        "bacteria": {
+          "range_op": "≤2",
+          "range_surr": "≤4",
+          "unit": "cfu/皿"
+        }
+      },
+      "Ⅳ级（十万级）": {
+        "airchange": {
+          "range": "≥12",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "5～20",
+          "unit": "Pa"
+        },
+        "particle": {
+          "range": "3520000＞0.5μm≤11120000, 29300＞5μm≤92500",
+          "unit": "粒/m³"
+        },
+        "temperature": {
+          "range": "21～25",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "30～60",
+          "unit": "%"
+        },
+        "noise": {
+          "range": "≤49",
+          "unit": "dB(A)"
+        },
+        "illumination_min": {
+          "range": "≥350",
+          "unit": "lx"
+        },
+        "illumination_uniformity": {
+          "range": "≥0.7",
+          "unit": ""
+        },
+        "bacteria": {
+          "range": "≤6",
+          "unit": "cfu/皿"
+        }
+      }
+    },
+    "auxiliary_room": {
+      "需要无菌操作的特殊用房": {
+        "wind_speed": {
+          "range": "0.20～0.25"
+        },
+        "temperature": {
+          "range": "21～25"
+        },
+        "humidity": {
+          "range": "30～60"
+        },
+        "noise": {
+          "range": "≤51"
+        },
+        "illumination_min": {
+          "range": "≥350"
+        },
+        "bacteria": {
+          "range": "≤0.75"
+        }
+      },
+      "体外循环室": {
+        "airchange": {
+          "range": "≥12"
+        },
+        "temperature": {
+          "range": "21～27"
+        },
+        "humidity": {
+          "range": "≤60"
+        },
+        "noise": {
+          "range": "≤60"
+        },
+        "work_illumination": {
+          "range": "≥150"
+        },
+        "bacteria": {
+          "range": "≤2"
+        }
+      },
+      "手术室前室": {
+        "airchange": {
+          "range": "≥8"
+        },
+        "temperature": {
+          "range": "21～27"
+        },
+        "humidity": {
+          "range": "≤60"
+        },
+        "noise": {
+          "range": "≤60"
+        },
+        "illumination_main": {
+          "range": "300～500"
+        },
+        "illumination_aux": {
+          "range": "200～300"
+        },
+        "illumination_min": {
+          "range": "≥200"
+        },
+        "bacteria": {
+          "range": "≤6"
+        }
+      },
+      "刷手间": {
+        "airchange": {
+          "range": "≥8"
+        },
+        "temperature": {
+          "range": "21～27"
+        },
+        "humidity": {
+          "range": "≤60"
+        },
+        "noise": {
+          "range": "≤55"
+        },
+        "work_illumination": {
+          "range": "≥150"
+        },
+        "bacteria": {
+          "range": "≤2"
+        }
+      },
+      "术前准备室": {
+        "airchange": {
+          "range": "≥18"
+        },
+        "temperature": {
+          "range": "21～25"
+        },
+        "humidity": {
+          "range": "≤60"
+        },
+        "noise": {
+          "range": "≤50"
+        },
+        "illumination_min": {
+          "range": "≥150"
+        },
+        "bacteria": {
+          "range": "≤2"
+        }
+      },
+      "护士站": {
+        "airchange": {
+          "range": "≥10"
+        },
+        "temperature": {
+          "range": "21～27"
+        },
+        "humidity": {
+          "range": "≤60"
+        },
+        "noise": {
+          "range": "≤55"
+        },
+        "illumination_min": {
+          "range": "≥150"
+        },
+        "bacteria": {
+          "range": "≤2"
+        }
+      },
+      "无菌物品存放室": {
+        "airchange": {
+          "range": "≥10"
+        },
+        "temperature": {
+          "range": "≤27"
+        },
+        "humidity": {
+          "range": "≤60"
+        },
+        "noise": {
+          "range": "≤60"
+        },
+        "illumination_min": {
+          "range": "≥150"
+        },
+        "bacteria": {
+          "range": "≤2"
+        }
+      },
+      "预麻室": {
+        "airchange": {
+          "range": "≥10"
+        },
+        "temperature": {
+          "range": "23～26"
+        },
+        "humidity": {
+          "range": "30～60"
+        },
+        "noise": {
+          "range": "≤55"
+        },
+        "illumination_min": {
+          "range": "≥150"
+        },
+        "bacteria": {
+          "range": "≤2"
+        }
+      },
+      "精密仪器室": {
+        "airchange": {
+          "range": "≥10"
+        },
+        "temperature": {
+          "range": "≤27"
+        },
+        "humidity": {
+          "range": "≤60"
+        },
+        "noise": {
+          "range": "≤60"
+        },
+        "illumination_min": {
+          "range": "≥150"
+        },
+        "bacteria": {
+          "range": "≤2"
+        }
+      },
+      "洁净区走廊": {
+        "airchange": {
+          "range": "≥8"
+        },
+        "temperature": {
+          "range": "21～27"
+        },
+        "humidity": {
+          "range": "≤60"
+        },
+        "noise": {
+          "range": "≤52"
+        },
+        "illumination_min": {
+          "range": "≥150"
+        },
+        "bacteria": {
+          "range": "≤2"
+        }
+      },
+      "恢复室": {
+        "airchange": {
+          "range": "≥8"
+        },
+        "temperature": {
+          "range": "22～26"
+        },
+        "humidity": {
+          "range": "25～60"
+        },
+        "noise": {
+          "range": "≤48"
+        },
+        "illumination_main": {
+          "range": "300～500"
+        },
+        "illumination_aux": {
+          "range": "200～300"
+        },
+        "illumination_min": {
+          "range": "≥200"
+        },
+        "bacteria": {
+          "range": "≤2"
+        }
+      }
+    }
+  },
+  "GB 50591-2010": {
+    "_universal": {
+      "ISO 5": {
+        "particle": {
+          "range": "≥0.5μm≤3520, ≥5μm≤29"
+        }
+      },
+      "ISO 6": {
+        "particle": {
+          "range": "≥0.5μm≤35200, ≥5μm≤293"
+        }
+      },
+      "ISO 7": {
+        "particle": {
+          "range": "≥0.5μm≤352000, ≥5μm≤2930"
+        }
+      },
+      "ISO 8": {
+        "particle": {
+          "range": "≥0.5μm≤3520000, ≥5μm≤29300"
+        }
+      },
+      "ISO 9": {
+        "particle": {
+          "range": "≥0.5μm≤35200000, ≥5μm≤293000"
+        }
+      },
+      "Ⅰ级（百级）": {
+        "particle": {
+          "range_op": "≥0.5μm≤3520, ≥5μm≤29",
+          "range_surr": "≥0.5μm≤35200, ≥5μm≤293"
+        }
+      },
+      "Ⅱ级（千级）": {
+        "particle": {
+          "range_op": "≥0.5μm≤35200, ≥5μm≤293",
+          "range_surr": "≥0.5μm≤352000, ≥5μm≤2930"
+        }
+      },
+      "Ⅲ级（万级）": {
+        "particle": {
+          "range_op": "≥0.5μm≤352000, ≥5μm≤2930",
+          "range_surr": "≥0.5μm≤3520000, ≥5μm≤29300"
+        }
+      },
+      "Ⅳ级（十万级）": {
+        "particle": {
+          "range": "≥0.5μm≤3520000, ≥5μm≤29300"
+        }
+      },
+      "Ⅰ级（百级）食品": {
+        "particle": {
+          "range": "≥0.5μm≤3520, ≥5μm≤29"
+        }
+      },
+      "Ⅱ级（万级）": {
+        "particle": {
+          "range": "≥0.5μm≤352000, ≥5μm≤2930"
+        }
+      },
+      "Ⅲ级（十万级）": {
+        "particle": {
+          "range": "≥0.5μm≤3520000, ≥5μm≤29300"
+        }
+      },
+      "Ⅳ级（三十万级）": {
+        "particle": {
+          "range": "≥0.5μm≤35200000, ≥5μm≤293000"
+        }
+      },
+      "A级": {
+        "particle": {
+          "range": "≥0.5μm≤3520, ≥5μm≤20"
+        }
+      },
+      "B级": {
+        "particle": {
+          "range": "≥0.5μm≤3520, ≥5μm≤29"
+        }
+      },
+      "C级": {
+        "particle": {
+          "range": "≥0.5μm≤352000, ≥5μm≤2900"
+        }
+      },
+      "D级": {
+        "particle": {
+          "range": "≥0.5μm≤3520000, ≥5μm≤29000"
+        }
+      },
+      "_default": {
+        "hepa_leak": {
+          "range": "≤0.01%"
+        }
+      }
+    },
+    "operating_room": {
+      "Ⅰ级（百级）": {
+        "hepa_leak": {
+          "range": "≤0.01%",
+          "unit": "%"
+        }
+      },
+      "Ⅱ级（千级）": {
+        "hepa_leak": {
+          "range": "≤0.01%",
+          "unit": "%"
+        }
+      },
+      "Ⅲ级（万级）": {
+        "hepa_leak": {
+          "range": "≤0.01%",
+          "unit": "%"
+        }
+      },
+      "Ⅳ级（十万级）": {
+        "hepa_leak": {
+          "range": "≤0.01%",
+          "unit": "%"
+        }
+      }
+    },
+    "eye_operating_room": {
+      "Ⅰ级（百级）": {
+        "hepa_leak": {
+          "range": "≤0.01%",
+          "unit": "%"
+        }
+      },
+      "Ⅱ级（千级）": {
+        "hepa_leak": {
+          "range": "≤0.01%",
+          "unit": "%"
+        }
+      },
+      "Ⅲ级（万级）": {
+        "hepa_leak": {
+          "range": "≤0.01%",
+          "unit": "%"
+        }
+      },
+      "Ⅳ级（十万级）": {
+        "hepa_leak": {
+          "range": "≤0.01%",
+          "unit": "%"
+        }
+      }
+    },
+    "clean_function_room": {
+      "Ⅰ级（百级）": {
+        "hepa_leak": {
+          "range": "≤0.01%",
+          "unit": "%"
+        }
+      },
+      "Ⅱ级（千级）": {
+        "hepa_leak": {
+          "range": "≤0.01%",
+          "unit": "%"
+        }
+      },
+      "Ⅲ级（万级）": {
+        "hepa_leak": {
+          "range": "≤0.01%",
+          "unit": "%"
+        }
+      },
+      "Ⅳ级（十万级）": {
+        "hepa_leak": {
+          "range": "≤0.01%",
+          "unit": "%"
+        }
+      }
+    },
+    "bsl": {
+      "ISO 5": {
+        "particle": {
+          "range": "≥0.5μm≤3520, ≥5μm≤29"
+        }
+      },
+      "ISO 6": {
+        "particle": {
+          "range": "≥0.5μm≤35200, ≥5μm≤293"
+        }
+      },
+      "ISO 7": {
+        "particle": {
+          "range": "≥0.5μm≤352000, ≥5μm≤2930"
+        }
+      },
+      "ISO 8": {
+        "particle": {
+          "range": "≥0.5μm≤3520000, ≥5μm≤29300"
+        }
+      },
+      "ISO 9": {
+        "particle": {
+          "range": "≥0.5μm≤35200000, ≥5μm≤293000"
+        }
+      }
+    },
+    "food_workshop": {
+      "Ⅰ级（百级）食品": {
+        "particle": {
+          "range": "≥0.5μm≤3520, ≥5μm≤29"
+        }
+      },
+      "Ⅱ级（万级）": {
+        "particle": {
+          "range": "≥0.5μm≤352000, ≥5μm≤2930"
+        }
+      },
+      "Ⅲ级（十万级）": {
+        "particle": {
+          "range": "≥0.5μm≤3520000, ≥5μm≤29300"
+        }
+      },
+      "Ⅳ级（三十万级）": {
+        "particle": {
+          "range": "≥0.5μm≤35200000, ≥5μm≤293000"
+        }
+      }
+    },
+    "gmp_workshop": {
+      "A级": {
+        "particle": {
+          "range": "≥0.5μm≤3520, ≥5μm≤20"
+        }
+      },
+      "B级": {
+        "particle": {
+          "range": "≥0.5μm≤3520, ≥5μm≤29"
+        }
+      },
+      "C级": {
+        "particle": {
+          "range": "≥0.5μm≤352000, ≥5μm≤2900"
+        }
+      },
+      "D级": {
+        "particle": {
+          "range": "≥0.5μm≤3520000, ≥5μm≤29000"
+        }
+      }
+    },
+    "electronics_workshop": {
+      "ISO 5": {
+        "particle": {
+          "range": "≥0.5μm≤3520, ≥5μm≤29"
+        }
+      },
+      "ISO 6": {
+        "particle": {
+          "range": "≥0.5μm≤35200, ≥5μm≤293"
+        }
+      },
+      "ISO 7": {
+        "particle": {
+          "range": "≥0.5μm≤352000, ≥5μm≤2930"
+        }
+      },
+      "ISO 8": {
+        "particle": {
+          "range": "≥0.5μm≤3520000, ≥5μm≤29300"
+        }
+      },
+      "ISO 9": {
+        "particle": {
+          "range": "≥0.5μm≤35200000, ≥5μm≤293000"
+        }
+      }
+    },
+    "auxiliary_room": {
+      "需要无菌操作的特殊用房": {
+        "hepa_leak": {
+          "range": "≤0.01%"
+        }
+      },
+      "体外循环室": {
+        "hepa_leak": {
+          "range": "≤0.01%"
+        }
+      },
+      "手术室前室": {
+        "hepa_leak": {
+          "range": "≤0.01%"
+        }
+      },
+      "刷手间": {
+        "hepa_leak": {
+          "range": "≤0.01%"
+        }
+      },
+      "术前准备室": {
+        "hepa_leak": {
+          "range": "≤0.01%"
+        }
+      },
+      "护士站": {
+        "hepa_leak": {
+          "range": "≤0.01%"
+        }
+      },
+      "无菌物品存放室": {
+        "hepa_leak": {
+          "range": "≤0.01%"
+        }
+      },
+      "预麻室": {
+        "hepa_leak": {
+          "range": "≤0.01%"
+        }
+      },
+      "精密仪器室": {
+        "hepa_leak": {
+          "range": "≤0.01%"
+        }
+      },
+      "洁净区走廊": {
+        "hepa_leak": {
+          "range": "≤0.01%"
+        }
+      },
+      "恢复室": {
+        "hepa_leak": {
+          "range": "≤0.01%"
+        }
+      }
+    },
+    "laminar_hood": {
+      "_default": {
+        "avg_speed": {
+          "range": "0.36～0.54",
+          "unit": "m/s"
+        },
+        "speed_uniformity": {
+          "range": "≤0.20",
+          "unit": ""
+        },
+        "hepa_leak": {
+          "range": "≤0.01",
+          "unit": "%"
+        },
+        "airflow_pattern": {
+          "range": "气流垂直向下、无旋涡",
+          "unit": ""
+        }
+      }
+    }
+  },
+  "GB 50346-2011": {
+    "bsl": {
+      "ISO-5": {
+        "particle": {
+          "range": "≥0.5μm≤3520, ≥5μm≤29",
+          "unit": "粒/m³"
+        },
+        "wind_speed": {
+          "range": "0.2～0.4",
+          "unit": "m/s"
+        },
+        "pressure": {
+          "range": "-10～-15",
+          "unit": "Pa"
+        },
+        "temperature": {
+          "range": "18～27",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "30～70",
+          "unit": "%"
+        },
+        "noise": {
+          "range": "≤65",
+          "unit": "dB(A)"
+        },
+        "illumination": {
+          "range": "≥300",
+          "unit": "lx"
+        },
+        "settling": {
+          "range": "≤1",
+          "unit": "cfu/皿"
+        },
+        "floating": {
+          "range": "≤5",
+          "unit": "cfu/m³"
+        }
+      },
+      "ISO-6": {
+        "particle": {
+          "range": "≥0.5μm≤35200, ≥5μm≤293",
+          "unit": "粒/m³"
+        },
+        "airchange": {
+          "range": "50～60",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "-10～-15",
+          "unit": "Pa"
+        },
+        "temperature": {
+          "range": "18～27",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "30～70",
+          "unit": "%"
+        },
+        "noise": {
+          "range": "≤60",
+          "unit": "dB(A)"
+        },
+        "illumination": {
+          "range": "≥300",
+          "unit": "lx"
+        },
+        "settling": {
+          "range": "≤1",
+          "unit": "cfu/皿"
+        },
+        "floating": {
+          "range": "≤5",
+          "unit": "cfu/m³"
+        }
+      },
+      "ISO-7": {
+        "particle": {
+          "range": "≥0.5μm≤352000, ≥5μm≤2930",
+          "unit": "粒/m³"
+        },
+        "airchange": {
+          "range": "≥15",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "-10～-15",
+          "unit": "Pa"
+        },
+        "temperature": {
+          "range": "18～27",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "30～70",
+          "unit": "%"
+        },
+        "noise": {
+          "range": "≤60",
+          "unit": "dB(A)"
+        },
+        "illumination": {
+          "range": "≥300",
+          "unit": "lx"
+        },
+        "settling": {
+          "range": "≤3",
+          "unit": "cfu/皿"
+        },
+        "floating": {
+          "range": "≤100",
+          "unit": "cfu/m³"
+        }
+      },
+      "ISO-8": {
+        "particle": {
+          "range": "≥0.5μm≤3520000, ≥5μm≤29300",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "-10～-15",
+          "unit": "Pa"
+        },
+        "airchange": {
+          "range": "≥12",
+          "unit": "次/h"
+        },
+        "temperature": {
+          "range": "18～27",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "30～70",
+          "unit": "%"
+        },
+        "noise": {
+          "range": "≤60",
+          "unit": "dB(A)"
+        },
+        "illumination": {
+          "range": "≥300",
+          "unit": "lx"
+        },
+        "settling": {
+          "range": "≤10",
+          "unit": "cfu/皿"
+        },
+        "floating": {
+          "range": "≤500",
+          "unit": "cfu/m³"
+        }
+      },
+      "ISO-9": {
+        "particle": {
+          "range": "≥0.5μm≤35200000, ≥5μm≤293000",
+          "unit": "粒/m³"
+        },
+        "airchange": {
+          "range": "≥10",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "-10～-15",
+          "unit": "Pa"
+        },
+        "temperature": {
+          "range": "18～27",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "30～70",
+          "unit": "%"
+        },
+        "noise": {
+          "range": "≤60",
+          "unit": "dB(A)"
+        },
+        "illumination": {
+          "range": "≥300",
+          "unit": "lx"
+        },
+        "settling": {
+          "range": "≤10",
+          "unit": "cfu/皿"
+        },
+        "floating": {
+          "range": "≤500",
+          "unit": "cfu/m³"
+        }
+      }
+    }
+  },
+  "GB 50457-2019": {
+    "gmp_workshop": {
+      "A级": {
+        "particle": {
+          "range": "≥0.5μm≤3520, ≥5μm≤20",
+          "unit": "粒/m³"
+        },
+        "wind_speed": {
+          "range": "0.36～0.54",
+          "unit": "m/s"
+        },
+        "pressure": {
+          "range": "≥10",
+          "unit": "Pa"
+        },
+        "noise": {
+          "range": "≤65",
+          "unit": "dB(A)"
+        },
+        "illumination_main_room": {
+          "range": "≥300",
+          "unit": "lx"
+        },
+        "illumination_aux_room": {
+          "range": "≥200",
+          "unit": "lx"
+        }
+      },
+      "B级": {
+        "particle": {
+          "range": "≥0.5μm≤3520, ≥5μm≤29",
+          "unit": "粒/m³"
+        },
+        "airchange": {
+          "range": "40～60",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "≥10",
+          "unit": "Pa"
+        },
+        "noise": {
+          "range": "≤60",
+          "unit": "dB(A)"
+        },
+        "illumination_main_room": {
+          "range": "≥300",
+          "unit": "lx"
+        },
+        "illumination_aux_room": {
+          "range": "≥200",
+          "unit": "lx"
+        }
+      },
+      "C级": {
+        "particle": {
+          "range": "≥0.5μm≤352000, ≥5μm≤2900",
+          "unit": "粒/m³"
+        },
+        "airchange": {
+          "range": "20～40",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "≥10",
+          "unit": "Pa"
+        },
+        "temperature": {
+          "range": "20～24",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "45～60",
+          "unit": "%"
+        },
+        "noise": {
+          "range": "≤60",
+          "unit": "dB(A)"
+        },
+        "illumination_main_room": {
+          "range": "≥300",
+          "unit": "lx"
+        },
+        "illumination_aux_room": {
+          "range": "≥200",
+          "unit": "lx"
+        }
+      },
+      "D级": {
+        "particle": {
+          "range": "≥0.5μm≤3520000, ≥5μm≤29000",
+          "unit": "粒/m³"
+        },
+        "airchange": {
+          "range": "10～20",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "≥10",
+          "unit": "Pa"
+        },
+        "noise": {
+          "range": "≤60",
+          "unit": "dB(A)"
+        },
+        "illumination_main_room": {
+          "range": "≥300",
+          "unit": "lx"
+        },
+        "illumination_aux_room": {
+          "range": "≥200",
+          "unit": "lx"
+        }
+      }
+    },
+    "veterinary_gmp_workshop": {
+      "A级": {
+        "particle": {
+          "range": "≥0.5μm≤3520, ≥5μm≤20",
+          "unit": "粒/m³"
+        },
+        "wind_speed": {
+          "range": "0.36～0.54",
+          "unit": "m/s"
+        },
+        "pressure": {
+          "range": "≥10",
+          "unit": "Pa"
+        },
+        "noise": {
+          "range": "≤65",
+          "unit": "dB(A)"
+        },
+        "illumination_main_room": {
+          "range": "≥300",
+          "unit": "lx"
+        },
+        "illumination_aux_room": {
+          "range": "≥200",
+          "unit": "lx"
+        }
+      },
+      "B级": {
+        "particle": {
+          "range": "≥0.5μm≤3520, ≥5μm≤29",
+          "unit": "粒/m³"
+        },
+        "airchange": {
+          "range": "40～60",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "≥10",
+          "unit": "Pa"
+        },
+        "noise": {
+          "range": "≤60",
+          "unit": "dB(A)"
+        },
+        "illumination_main_room": {
+          "range": "≥300",
+          "unit": "lx"
+        },
+        "illumination_aux_room": {
+          "range": "≥200",
+          "unit": "lx"
+        }
+      },
+      "C级": {
+        "particle": {
+          "range": "≥0.5μm≤352000, ≥5μm≤2900",
+          "unit": "粒/m³"
+        },
+        "airchange": {
+          "range": "20～40",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "≥10",
+          "unit": "Pa"
+        },
+        "noise": {
+          "range": "≤60",
+          "unit": "dB(A)"
+        },
+        "illumination_main_room": {
+          "range": "≥300",
+          "unit": "lx"
+        },
+        "illumination_aux_room": {
+          "range": "≥200",
+          "unit": "lx"
+        }
+      },
+      "D级": {
+        "particle": {
+          "range": "≥0.5μm≤3520000, ≥5μm≤29000",
+          "unit": "粒/m³"
+        },
+        "airchange": {
+          "range": "10～20",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "≥10",
+          "unit": "Pa"
+        },
+        "noise": {
+          "range": "≤60",
+          "unit": "dB(A)"
+        },
+        "illumination_main_room": {
+          "range": "≥300",
+          "unit": "lx"
+        },
+        "illumination_aux_room": {
+          "range": "≥200",
+          "unit": "lx"
+        }
+      }
+    }
+  },
+  "GMP 2010": {
+    "gmp_workshop": {
+      "A级": {
+        "particle": {
+          "range": "≥0.5μm≤3520, ≥5μm≤20",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "≥10",
+          "unit": "Pa"
+        },
+        "settling": {
+          "range": "≤1",
+          "unit": "cfu/皿"
+        },
+        "floating": {
+          "range": "≤5",
+          "unit": "cfu/m³"
+        }
+      },
+      "B级": {
+        "particle": {
+          "range": "≥0.5μm≤3520, ≥5μm≤29",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "≥10",
+          "unit": "Pa"
+        },
+        "settling": {
+          "range": "≤1",
+          "unit": "cfu/皿"
+        },
+        "floating": {
+          "range": "≤5",
+          "unit": "cfu/m³"
+        }
+      },
+      "C级": {
+        "particle": {
+          "range": "≥0.5μm≤352000, ≥5μm≤2900",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "≥5",
+          "unit": "Pa"
+        },
+        "temperature": {
+          "range": "18～26",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "45～65",
+          "unit": "%"
+        },
+        "settling": {
+          "range": "≤3",
+          "unit": "cfu/皿"
+        },
+        "floating": {
+          "range": "≤100",
+          "unit": "cfu/m³"
+        }
+      },
+      "D级": {
+        "particle": {
+          "range": "≥0.5μm≤3520000, ≥5μm≤29000",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "≥5",
+          "unit": "Pa"
+        },
+        "settling": {
+          "range": "≤10",
+          "unit": "cfu/皿"
+        },
+        "floating": {
+          "range": "≤500",
+          "unit": "cfu/m³"
+        }
+      }
+    }
+  },
+  "GB 50687-2011": {
+    "food_workshop": {
+      "Ⅰ级（百级）": {
+        "particle": {
+          "range": "≥0.5μm≤3520, ≥5μm≤29",
+          "unit": "粒/m³"
+        },
+        "wind_speed": {
+          "range": "0.20～0.50",
+          "unit": "m/s"
+        },
+        "pressure": {
+          "range": "≥10",
+          "unit": "Pa"
+        },
+        "noise": {
+          "range": "≤65",
+          "unit": "dB(A)"
+        },
+        "illumination_general_processing": {
+          "range": "≥200"
+        },
+        "illumination_mixed_processing": {
+          "range": "≥500"
+        },
+        "illumination_non_processing": {
+          "range": "≥100"
+        },
+        "temperature": {
+          "range": "20～25",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "30～65",
+          "unit": "%"
+        },
+        "settling": {
+          "range": "≤0.2",
+          "unit": "cfu/皿"
+        },
+        "floating": {
+          "range": "≤5",
+          "unit": "cfu/m³"
+        }
+      },
+      "Ⅱ级（万级）": {
+        "particle": {
+          "range": "≥0.5μm≤352000, ≥5μm≤2930",
+          "unit": "粒/m³"
+        },
+        "airchange": {
+          "range": "≥20",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "≥5",
+          "unit": "Pa"
+        },
+        "noise": {
+          "range": "≤60",
+          "unit": "dB(A)"
+        },
+        "illumination_general_processing": {
+          "range": "≥200"
+        },
+        "illumination_mixed_processing": {
+          "range": "≥500"
+        },
+        "illumination_non_processing": {
+          "range": "≥100"
+        },
+        "temperature": {
+          "range": "20～25",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "30～65",
+          "unit": "%"
+        },
+        "settling": {
+          "range": "≤1.5",
+          "unit": "cfu/皿"
+        },
+        "floating": {
+          "range": "≤50",
+          "unit": "cfu/m³"
+        }
+      },
+      "Ⅲ级（十万级）": {
+        "particle": {
+          "range": "≥0.5μm≤3520000, ≥5μm≤29300",
+          "unit": "粒/m³"
+        },
+        "airchange": {
+          "range": "≥15",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "≥5",
+          "unit": "Pa"
+        },
+        "noise": {
+          "range": "≤60",
+          "unit": "dB(A)"
+        },
+        "illumination_general_processing": {
+          "range": "≥200"
+        },
+        "illumination_mixed_processing": {
+          "range": "≥500"
+        },
+        "illumination_non_processing": {
+          "range": "≥100"
+        },
+        "temperature": {
+          "range": "18～26",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "30～70",
+          "unit": "%"
+        },
+        "settling": {
+          "range": "≤4",
+          "unit": "cfu/皿"
+        },
+        "floating": {
+          "range": "≤150",
+          "unit": "cfu/m³"
+        }
+      },
+      "Ⅳ级（三十万级）": {
+        "particle": {
+          "range": "≥0.5μm≤35200000, ≥5μm≤293000",
+          "unit": "粒/m³"
+        },
+        "airchange": {
+          "range": "≥10",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "≥5",
+          "unit": "Pa"
+        },
+        "noise": {
+          "range": "≤60",
+          "unit": "dB(A)"
+        },
+        "illumination_general_processing": {
+          "range": "≥200"
+        },
+        "illumination_mixed_processing": {
+          "range": "≥500"
+        },
+        "illumination_non_processing": {
+          "range": "≥100"
+        },
+        "temperature": {
+          "range": "18～26",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "30～70",
+          "unit": "%"
+        },
+        "settling": {
+          "range": "",
+          "unit": "cfu/皿"
+        },
+        "floating": {
+          "range": "≤500",
+          "unit": "cfu/m³"
+        }
+      }
+    }
+  },
+  "GB 50472-2008": {
+    "electronics_workshop": {
+      "ISO 5": {
+        "particle": {
+          "range": "≥0.5μm≤3520, ≥5μm≤29",
+          "unit": "粒/m³"
+        },
+        "wind_speed": {
+          "range": "0.20～0.45",
+          "unit": "m/s"
+        },
+        "pressure": {
+          "range": "≥5",
+          "unit": "Pa"
+        },
+        "noise": {
+          "range": "≤65",
+          "unit": "dB(A)"
+        },
+        "illumination_main": {
+          "range": "300～500",
+          "unit": "lx"
+        },
+        "illumination_aux": {
+          "range": "200～300",
+          "unit": "lx"
+        },
+        "temperature": {
+          "range": "22～24",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "45～65",
+          "unit": "%"
+        }
+      },
+      "ISO 6": {
+        "particle": {
+          "range": "≥0.5μm≤35200, ≥5μm≤293",
+          "unit": "粒/m³"
+        },
+        "airchange": {
+          "range": "50～60",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "≥5",
+          "unit": "Pa"
+        },
+        "noise": {
+          "range": "≤60",
+          "unit": "dB(A)"
+        },
+        "illumination_main": {
+          "range": "300～500",
+          "unit": "lx"
+        },
+        "illumination_aux": {
+          "range": "200～300",
+          "unit": "lx"
+        },
+        "temperature": {
+          "range": "21～25",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "45～65",
+          "unit": "%"
+        }
+      },
+      "ISO 7": {
+        "particle": {
+          "range": "≥0.5μm≤352000, ≥5μm≤2930",
+          "unit": "粒/m³"
+        },
+        "airchange": {
+          "range": "15～25",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "≥5",
+          "unit": "Pa"
+        },
+        "noise": {
+          "range": "≤60",
+          "unit": "dB(A)"
+        },
+        "illumination_main": {
+          "range": "300～500",
+          "unit": "lx"
+        },
+        "illumination_aux": {
+          "range": "200～300",
+          "unit": "lx"
+        },
+        "temperature": {
+          "range": "22～26",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "45～65",
+          "unit": "%"
+        }
+      },
+      "ISO 8": {
+        "particle": {
+          "range": "≥0.5μm≤3520000, ≥5μm≤29300",
+          "unit": "粒/m³"
+        },
+        "airchange": {
+          "range": "10～15",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "≥5",
+          "unit": "Pa"
+        },
+        "noise": {
+          "range": "≤60",
+          "unit": "dB(A)"
+        },
+        "illumination_main": {
+          "range": "300～500",
+          "unit": "lx"
+        },
+        "illumination_aux": {
+          "range": "200～300",
+          "unit": "lx"
+        },
+        "temperature": {
+          "range": "22～26",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "45～70",
+          "unit": "%"
+        }
+      },
+      "ISO 9": {
+        "particle": {
+          "range": "≥0.5μm≤35200000, ≥5μm≤293000",
+          "unit": "粒/m³"
+        },
+        "airchange": {
+          "range": "10～15",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "≥5",
+          "unit": "Pa"
+        },
+        "noise": {
+          "range": "≤60",
+          "unit": "dB(A)"
+        },
+        "illumination_main": {
+          "range": "300～500",
+          "unit": "lx"
+        },
+        "illumination_aux": {
+          "range": "200～300",
+          "unit": "lx"
+        },
+        "temperature": {
+          "range": "22～26",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "45～70",
+          "unit": "%"
+        }
+      }
+    }
+  },
+  "GB 50073-2013": {
+    "bsl": {
+      "ISO-5": {
+        "particle": {
+          "range": "≥0.5μm≤3520, ≥5μm≤29",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "≥5",
+          "unit": "Pa"
+        }
+      },
+      "ISO-6": {
+        "particle": {
+          "range": "≥0.5μm≤35200, ≥5μm≤293",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "≥5",
+          "unit": "Pa"
+        }
+      },
+      "ISO-7": {
+        "particle": {
+          "range": "≥0.5μm≤352000, ≥5μm≤2930",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "≥5",
+          "unit": "Pa"
+        }
+      },
+      "ISO-8": {
+        "particle": {
+          "range": "≥0.5μm≤3520000, ≥5μm≤29300",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "≥5",
+          "unit": "Pa"
+        }
+      },
+      "ISO-9": {
+        "particle": {
+          "range": "≥0.5μm≤35200000, ≥5μm≤293000",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "≥5",
+          "unit": "Pa"
+        }
+      }
+    },
+    "electronics_workshop": {
+      "ISO 5": {
+        "particle": {
+          "range": "≥0.5μm≤3520, ≥5μm≤29",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "≥5",
+          "unit": "Pa"
+        }
+      },
+      "ISO 6": {
+        "particle": {
+          "range": "≥0.5μm≤35200, ≥5μm≤293",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "≥5",
+          "unit": "Pa"
+        }
+      },
+      "ISO 7": {
+        "particle": {
+          "range": "≥0.5μm≤352000, ≥5μm≤2930",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "≥5",
+          "unit": "Pa"
+        }
+      },
+      "ISO 8": {
+        "particle": {
+          "range": "≥0.5μm≤3520000, ≥5μm≤29300",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "≥5",
+          "unit": "Pa"
+        }
+      },
+      "ISO 9": {
+        "particle": {
+          "range": "≥0.5μm≤35200000, ≥5μm≤293000",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "≥5",
+          "unit": "Pa"
+        }
+      }
+    },
+    "gmp_workshop": {
+      "A级": {
+        "particle": {
+          "range": "≥0.5μm≤3520, ≥5μm≤20",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "≥5",
+          "unit": "Pa"
+        }
+      },
+      "B级": {
+        "particle": {
+          "range": "≥0.5μm≤3520, ≥5μm≤29",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "≥5",
+          "unit": "Pa"
+        }
+      },
+      "C级": {
+        "particle": {
+          "range": "≥0.5μm≤352000, ≥5μm≤2900",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "≥5",
+          "unit": "Pa"
+        }
+      },
+      "D级": {
+        "particle": {
+          "range": "≥0.5μm≤3520000, ≥5μm≤29000",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "≥5",
+          "unit": "Pa"
+        }
+      }
+    }
+  },
+  "GB/T 35428-2017": {
+    "negative_pressure": {
+      "_default": {
+        "airchange": {
+          "range": "10～15",
+          "unit": "次/h"
+        },
+        "airchange_clean": {
+          "range": "6～10",
+          "unit": "次/h"
+        },
+        "exhaust_speed": {
+          "range": "≤1.5"
+        },
+        "hepa_leak": {
+          "range": "≤0.01%",
+          "unit": "%"
+        },
+        "pressure": {
+          "range": "-5～-10",
+          "unit": "Pa"
+        },
+        "airflow_direction": {
+          "range": "由清洁区→半污染区→污染区",
+          "unit": ""
+        },
+        "temperature": {
+          "range": "20～26",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "30～70",
+          "unit": "%"
+        },
+        "noise": {
+          "range": "≤50",
+          "unit": "dB(A)"
+        },
+        "illumination": {
+          "range": "≥50",
+          "unit": "lx"
+        },
+        "bacteria": {
+          "range": "≤6",
+          "unit": "cfu/皿"
+        },
+        "surface_bacteria": {
+          "range": "≤10"
+        }
+      }
+    }
+  },
+  "WS/T 368-2012": {
+    "negative_pressure": {
+      "_default": {
+        "bacteria": {
+          "range": "≤4",
+          "unit": "cfu/(5min·9cm平皿)"
+        }
+      }
+    },
+    "clean_function_room": {
+      "Ⅲ级（万级）": {
+        "airchange": {
+          "range": "≥10",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "5～10",
+          "unit": "Pa"
+        },
+        "hepa_leak": {
+          "range": "≤0.01%",
+          "unit": "%"
+        },
+        "particle": {
+          "range": "≥0.5μm≤352000, ≥5μm≤2930",
+          "unit": "粒/m³"
+        },
+        "noise": {
+          "range": "≤55",
+          "unit": "dB(A)"
+        },
+        "illumination": {
+          "range": "≥50",
+          "unit": "lx"
+        },
+        "settling": {
+          "range": "≤4",
+          "unit": "cfu/皿"
+        },
+        "floating": {
+          "range": "≤500",
+          "unit": "cfu/m³"
+        }
+      },
+      "Ⅳ级（十万级）": {
+        "airchange": {
+          "range": "≥12",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "≥5",
+          "unit": "Pa"
+        },
+        "hepa_leak": {
+          "range": "≤0.01%",
+          "unit": "%"
+        },
+        "particle": {
+          "range": "≥0.5μm≤3520000, ≥5μm≤29300",
+          "unit": "粒/m³"
+        },
+        "noise": {
+          "range": "≤60",
+          "unit": "dB(A)"
+        },
+        "settling": {
+          "range": "≤5",
+          "unit": "cfu/皿"
+        },
+        "floating": {
+          "range": "≤500",
+          "unit": "cfu/m³"
+        },
+        "illumination": {
+          "range": "≥150",
+          "unit": "lx"
+        }
+      }
+    }
+  },
+  "GB 14925-2023": {
+    "animal_room": {
+      "普通环境": {
+        "airchange": {
+          "range": "≥8",
+          "unit": "次/h"
+        },
+        "cage_airspeed": {
+          "range": "≤0.2"
+        },
+        "temperature": {
+          "range": "20～26",
+          "unit": "℃"
+        },
+        "temp_diff": {
+          "range": "≤4",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "30～70",
+          "unit": "%"
+        },
+        "noise": {
+          "range": "≤60",
+          "unit": "dB(A)"
+        },
+        "work_illumination": {
+          "range": "≥150",
+          "unit": "lx"
+        },
+        "settling": {
+          "range": "",
+          "unit": "cfu/皿"
+        }
+      },
+      "屏障环境": {
+        "airchange": {
+          "range": "≥15",
+          "unit": "次/h"
+        },
+        "cage_airspeed": {
+          "range": "≤0.2"
+        },
+        "pressure": {
+          "range": "≥10",
+          "unit": "Pa"
+        },
+        "hepa_leak": {
+          "range": "≤0.01%",
+          "unit": "%"
+        },
+        "particle": {
+          "range": "35200＜0.5μm≤352000，293＜5μm≤2930",
+          "unit": "粒/m³"
+        },
+        "temperature": {
+          "range": "20～26",
+          "unit": "℃"
+        },
+        "temp_diff": {
+          "range": "≤4",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "30～70",
+          "unit": "%"
+        },
+        "noise": {
+          "range": "≤60",
+          "unit": "dB(A)"
+        },
+        "work_illumination": {
+          "range": "≥150",
+          "unit": "lx"
+        },
+        "animal_illumination": {
+          "range": "100～200"
+        },
+        "settling": {
+          "range": "≤3",
+          "unit": "cfu/皿"
+        }
+      },
+      "屏障环境洁净辅房": {
+        "洁物储存室": {
+          "particle": {
+            "range": "35200＜0.5μm≤352000，293＜5μm≤2930"
+          },
+          "airchange": {
+            "range": "≥15"
+          },
+          "pressure": {
+            "range": "≥10"
+          },
+          "temperature_aux": {
+            "range": "18～28"
+          },
+          "humidity_aux": {
+            "range": "≤70"
+          },
+          "noise": {
+            "range": "≤60"
+          },
+          "illumination_min": {
+            "range": "≥150"
+          }
+        },
+        "灭菌后室/区": {
+          "particle": {
+            "range": "35200＜0.5μm≤352000，293＜5μm≤2930"
+          },
+          "airchange": {
+            "range": "≥15"
+          },
+          "pressure": {
+            "range": "≥10"
+          },
+          "temperature_aux": {
+            "range": "18～28"
+          },
+          "humidity_aux": {
+            "range": "≤70"
+          },
+          "noise": {
+            "range": "≤60"
+          },
+          "illumination_min": {
+            "range": "≥150"
+          }
+        },
+        "洁净走廊": {
+          "particle": {
+            "range": "35200＜0.5μm≤352000，293＜5μm≤2930"
+          },
+          "airchange": {
+            "range": "≥15"
+          },
+          "pressure": {
+            "range": "≥10"
+          },
+          "temperature_aux": {
+            "range": "18～28"
+          },
+          "humidity_aux": {
+            "range": "≤70"
+          },
+          "noise": {
+            "range": "≤60"
+          },
+          "illumination_min": {
+            "range": "≥150"
+          }
+        },
+        "污物走廊": {
+          "particle": {
+            "range": "352000＜0.5μm≤3520000，2930＜5μm≤29300"
+          },
+          "airchange": {
+            "range": "≥10"
+          },
+          "pressure": {
+            "range": "≥5"
+          },
+          "temperature_aux": {
+            "range": "18～28"
+          },
+          "humidity_aux": {
+            "range": "—"
+          },
+          "noise": {
+            "range": "≤60"
+          },
+          "illumination_min": {
+            "range": "≥150"
+          }
+        },
+        "缓冲间": {
+          "particle": {
+            "range": "352000＜0.5μm≤3520000，2930＜5μm≤29300"
+          },
+          "airchange": {
+            "range": "≥10"
+          },
+          "pressure": {
+            "range": "≥5"
+          },
+          "temperature_aux": {
+            "range": "18～28"
+          },
+          "humidity_aux": {
+            "range": "—"
+          },
+          "noise": {
+            "range": "≤60"
+          },
+          "illumination_min": {
+            "range": "≥150"
+          }
+        },
+        "二更": {
+          "particle": {
+            "range": "35200＜0.5μm≤352000，293＜5μm≤2930"
+          },
+          "airchange": {
+            "range": "≥15"
+          },
+          "pressure": {
+            "range": "≥10"
+          },
+          "temperature_aux": {
+            "range": "18～28"
+          },
+          "humidity_aux": {
+            "range": "≤70"
+          },
+          "noise": {
+            "range": "≤60"
+          },
+          "illumination_min": {
+            "range": "≥150"
+          }
+        },
+        "清洗消毒室": {
+          "particle": {
+            "range": "—"
+          },
+          "airchange": {
+            "range": "≥4"
+          },
+          "pressure": {
+            "range": "—"
+          },
+          "temperature_aux": {
+            "range": "18～28"
+          },
+          "humidity_aux": {
+            "range": "—"
+          },
+          "noise": {
+            "range": "≤60"
+          },
+          "illumination_min": {
+            "range": "≥150"
+          }
+        },
+        "一更": {
+          "particle": {
+            "range": "—"
+          },
+          "airchange": {
+            "range": ""
+          },
+          "pressure": {
+            "range": "—"
+          },
+          "temperature_aux": {
+            "range": "18～28"
+          },
+          "humidity_aux": {
+            "range": "—"
+          },
+          "noise": {
+            "range": "≤60"
+          },
+          "illumination_min": {
+            "range": "≥100"
+          }
+        }
+      },
+      "隔离环境": {
+        "airchange": {
+          "range": "≥20",
+          "unit": "次/h"
+        },
+        "cage_airspeed": {
+          "range": "≤0.2"
+        },
+        "pressure": {
+          "range": "≥50",
+          "unit": "Pa"
+        },
+        "hepa_leak": {
+          "range": "≤0.01%",
+          "unit": "%"
+        },
+        "particle": {
+          "range": "352＜0.5μm≤3520，83＜1μm≤832",
+          "unit": "粒/m³"
+        },
+        "particle_negative": {
+          "range": "35200＜0.5μm≤352000，293＜5μm≤2930"
+        },
+        "temperature": {
+          "range": "20～26",
+          "unit": "℃"
+        },
+        "temp_diff": {
+          "range": "≤4",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "30～70",
+          "unit": "%"
+        },
+        "noise": {
+          "range": "≤60",
+          "unit": "dB(A)"
+        },
+        "work_illumination": {
+          "range": "≥150",
+          "unit": "lx"
+        },
+        "animal_illumination": {
+          "range": "100～200"
+        },
+        "settling": {
+          "range": "≤0",
+          "unit": "cfu/皿"
+        }
+      }
+    }
+  },
+  "国家卫生健康委办公厅": {
+    "clean_function_room": {
+      "Ⅲ级（万级）": {
+        "airchange": {
+          "range": "≥25",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "5～10",
+          "unit": "Pa"
+        },
+        "hepa_leak": {
+          "range": "≤0.01%",
+          "unit": "%"
+        },
+        "particle": {
+          "range": "≥0.5μm≤350000, ≥5μm≤2000",
+          "unit": "粒/m³"
+        },
+        "temperature": {
+          "range": "18～26",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "35～75",
+          "unit": "%"
+        },
+        "noise": {
+          "range": "≤60",
+          "unit": "dB(A)"
+        },
+        "illumination": {
+          "range": "≥300",
+          "unit": "lx"
+        },
+        "settling": {
+          "range": "≤3",
+          "unit": "cfu/皿"
+        }
+      },
+      "Ⅳ级（十万级）": {
+        "airchange": {
+          "range": "≥15",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "≥10",
+          "unit": "Pa"
+        },
+        "hepa_leak": {
+          "range": "≤0.01%",
+          "unit": "%"
+        },
+        "particle": {
+          "range": "≥0.5μm≤3500000, ≥5μm≤20000",
+          "unit": "粒/m³"
+        },
+        "temperature": {
+          "range": "18～26",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "35～75",
+          "unit": "%"
+        },
+        "noise": {
+          "range": "≤60",
+          "unit": "dB(A)"
+        },
+        "illumination": {
+          "range": "≥300",
+          "unit": "lx"
+        },
+        "settling": {
+          "range": "≤10",
+          "unit": "cfu/皿"
+        }
+      }
+    }
+  },
+  "GB17405-1998": {
+    "food_workshop": {
+      "Ⅳ级（十万级）": {
+        "particle": {
+          "range": "≥0.5μm≤3520000, ≥5μm≤29300",
+          "unit": "粒/m³"
+        },
+        "airchange": {
+          "range": "≥15",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "≥5",
+          "unit": "Pa"
+        },
+        "temperature": {
+          "range": "18～26",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "≤65",
+          "unit": "%"
+        }
+      }
+    }
+  },
+  "保健食品生产许可审查细则": {
+    "food_workshop": {
+      "Ⅳ级（十万级）": {
+        "particle": {
+          "range": "≥0.5μm≤3520000, ≥5μm≤29300",
+          "unit": "粒/m³"
+        },
+        "airchange": {
+          "range": "≥15",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "≥5",
+          "unit": "Pa"
+        },
+        "temperature": {
+          "range": "18～26",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "≤65",
+          "unit": "%"
+        }
+      }
+    }
+  },
+  "GB 41918-2022": {
+    "bsc": {
+      "_default": {
+        "appearance": {
+          "range": "柜体表面无明显划伤、锈斑、压痕，表面光洁，外形平整规矩；说明功能的文字和图形符号标志应正确、清晰、端正、牢固；焊接应牢固，焊接表面应光滑",
+          "unit": ""
+        },
+        "alarm_interlock": {
+          "range": "安全柜前窗开启高度超过或低于前窗操作口标称高度时，声音报警器报警，联锁系统启动。当开启高度回到标称高度，报警声音和联锁系统应自动解除",
+          "unit": ""
+        },
+        "downflow_speed": {
+          "range": "0.25～0.5",
+          "unit": "m/s"
+        },
+        "speed_uniformity": {
+          "range": "≤0.2",
+          "unit": ""
+        },
+        "airflow_pattern": {
+          "range": "安全柜工作区内的气流应向下，应不产生旋涡和向上气流且无死点；气流应不从安全柜中逸出；安全柜前窗操作口整个周边气流应向内，无向外逸出的气流；安全柜的前窗操作口流入气流应不进入工作区",
+          "unit": ""
+        },
+        "hepa_integrity": {
+          "range": "≤0.01%",
+          "unit": "%"
+        },
+        "particle": {
+          "range": "≥0.5μm≤3520, ≥5μm≤29",
+          "unit": "粒/m³"
+        },
+        "noise": {
+          "range": "≤67",
+          "unit": "dB(A)"
+        },
+        "illumination": {
+          "range": "平均≥650",
+          "unit": "lx"
+        },
+        "illumination_min": {
+          "range": "≥430",
+          "unit": "lx"
+        },
+        "uv_intensity": {
+          "range": "≥253.7",
+          "unit": "μW/cm²"
+        }
+      }
+    }
+  },
+  "JG/T 292-2010": {
+    "clean_bench": {
+      "_default": {
+        "appearance": {
+          "range": "箱体表面、工作区侧壁及台面应无划伤、压痕，表面应光洁，外形应平整规则；机箱焊接牢固且表面光滑，不应有烧穿、漏孔、裂缝、焊疤残留或残渣等",
+          "unit": ""
+        },
+        "function": {
+          "range": "前窗开启与关闭应轻便，在行程范围内滑动应顺畅，并不应有明显的左右或前后晃动现象；开关、按键的操作应灵活可靠；洁净工作台正常工作状态时，不应有明显的机振声",
+          "unit": ""
+        },
+        "hepa_leak": {
+          "range": "≤0.01%",
+          "unit": "%"
+        },
+        "avg_speed": {
+          "range": "0.20～0.5",
+          "unit": "m/s"
+        },
+        "speed_uniformity": {
+          "range": "≤0.2",
+          "unit": ""
+        },
+        "particle": {
+          "range": "≥0.5μm≤3520, ≥5μm≤29",
+          "unit": "粒/m³"
+        },
+        "airflow_state": {
+          "range": "气流流线应垂直于台面，不得有死角和回流",
+          "unit": ""
+        },
+        "settling": {
+          "range": "≤0.5",
+          "unit": "cfu/皿"
+        },
+        "noise": {
+          "range": "≤68",
+          "unit": "dB(A)"
+        },
+        "illumination": {
+          "range": "≥300",
+          "unit": "lx"
+        }
+      }
+    }
+  },
+  "DB32/T972-2006": {
+    "ivc": {
+      "_default": {
+        "airflow_speed": {
+          "range": "≤0.2",
+          "unit": "m/s"
+        },
+        "airchange": {
+          "range": "≥20",
+          "unit": "次/h"
+        },
+        "airtightness": {
+          "range": "≥5min",
+          "unit": ""
+        },
+        "hepa_integrity": {
+          "range": "≤0.01%",
+          "unit": "%"
+        }
+      }
+    }
+  },
+  "农业农村部令2020年第3号": {
+    "veterinary_gmp_workshop": {
+      "A级": {
+        "particle": {
+          "range": "≥0.5μm≤3520, ≥5μm≤20",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "≥10",
+          "unit": "Pa"
+        },
+        "temperature": {
+          "range": "18～26",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "45～65",
+          "unit": "%"
+        },
+        "settling": {
+          "range": "≤1",
+          "unit": "cfu/皿"
+        },
+        "floating": {
+          "range": "≤1",
+          "unit": "cfu/m³"
+        }
+      },
+      "B级": {
+        "particle": {
+          "range": "≥0.5μm≤3520, ≥5μm≤29",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "≥10",
+          "unit": "Pa"
+        },
+        "temperature": {
+          "range": "18～26",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "45～65",
+          "unit": "%"
+        },
+        "settling": {
+          "range": "≤3",
+          "unit": "cfu/皿"
+        },
+        "floating": {
+          "range": "≤10",
+          "unit": "cfu/m³"
+        }
+      },
+      "C级": {
+        "particle": {
+          "range": "≥0.5μm≤352000, ≥5μm≤2900",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "≥10",
+          "unit": "Pa"
+        },
+        "temperature": {
+          "range": "18～26",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "45～65",
+          "unit": "%"
+        },
+        "settling": {
+          "range": "≤5",
+          "unit": "cfu/皿"
+        },
+        "floating": {
+          "range": "≤100",
+          "unit": "cfu/m³"
+        }
+      },
+      "D级": {
+        "particle": {
+          "range": "≥0.5μm≤3520000, ≥5μm≤29000",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "≥10",
+          "unit": "Pa"
+        },
+        "temperature": {
+          "range": "18～26",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "45～65",
+          "unit": "%"
+        },
+        "settling": {
+          "range": "≤10",
+          "unit": "cfu/皿"
+        },
+        "floating": {
+          "range": "≤200",
+          "unit": "cfu/m³"
+        }
+      }
+    }
+  },
+  "DB15/T4291-2026": {
+    "animal_room": {
+      "_default": {
+        "airchange": {
+          "range": "≥15",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "≥10",
+          "unit": "Pa"
+        },
+        "temperature": {
+          "range": "10～28",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "20～70",
+          "unit": "%"
+        },
+        "noise": {
+          "range": "≤60",
+          "unit": "dB(A)"
+        },
+        "illumination": {
+          "range": "≥150",
+          "unit": "lx"
+        }
+      }
+    }
+  },
+  "WS 310.1-2016": {
+    "clean_function_room": {
+      "Ⅲ级（万级）": {
+        "airchange": {
+          "range": "≥10",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "5～10",
+          "unit": "Pa"
+        },
+        "hepa_leak": {
+          "range": "≤0.01%",
+          "unit": "%"
+        },
+        "particle": {
+          "range": "≥0.5μm≤352000, ≥5μm≤2930",
+          "unit": "粒/m³"
+        },
+        "temperature": {
+          "range": "22～26",
+          "unit": "℃"
+        },
+        "noise": {
+          "range": "≤55",
+          "unit": "dB(A)"
+        },
+        "illumination": {
+          "range": "≥50",
+          "unit": "lx"
+        },
+        "settling": {
+          "range": "≤4",
+          "unit": "cfu/皿"
+        },
+        "floating": {
+          "range": "≤500",
+          "unit": "cfu/m³"
+        }
+      },
+      "Ⅳ级（十万级）": {
+        "airchange": {
+          "range": "≥12",
+          "unit": "次/h"
+        },
+        "pressure": {
+          "range": "≥5",
+          "unit": "Pa"
+        },
+        "hepa_leak": {
+          "range": "≤0.01%",
+          "unit": "%"
+        },
+        "particle": {
+          "range": "≥0.5μm≤3520000, ≥5μm≤29300",
+          "unit": "粒/m³"
+        },
+        "temperature": {
+          "range": "22～26",
+          "unit": "℃"
+        },
+        "noise": {
+          "range": "≤60",
+          "unit": "dB(A)"
+        },
+        "settling": {
+          "range": "≤5",
+          "unit": "cfu/皿"
+        },
+        "floating": {
+          "range": "≤500",
+          "unit": "cfu/m³"
+        },
+        "illumination": {
+          "range": "≥150",
+          "unit": "lx"
+        }
+      }
+    }
+  },
+  "农业农村部公告第292号": {
+    "veterinary_gmp_workshop": {
+      "A级": {
+        "particle": {
+          "range": "≥0.5μm≤3520, ≥5μm≤20",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "≥10",
+          "unit": "Pa"
+        },
+        "temperature": {
+          "range": "18～26",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "45～65",
+          "unit": "%"
+        },
+        "settling": {
+          "range": "≤1",
+          "unit": "cfu/皿"
+        },
+        "floating": {
+          "range": "≤1",
+          "unit": "cfu/m³"
+        },
+        "wind_speed": {
+          "range": "0.36～0.54",
+          "unit": "m/s"
+        },
+        "wind_uniformity": {
+          "range": "≤0.25",
+          "unit": ""
+        }
+      },
+      "B级": {
+        "particle": {
+          "range": "≥0.5μm≤3520, ≥5μm≤29",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "≥10",
+          "unit": "Pa"
+        },
+        "temperature": {
+          "range": "18～26",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "45～65",
+          "unit": "%"
+        },
+        "settling": {
+          "range": "≤5",
+          "unit": "cfu/皿"
+        },
+        "floating": {
+          "range": "≤10",
+          "unit": "cfu/m³"
+        }
+      },
+      "C级": {
+        "particle": {
+          "range": "≥0.5μm≤352000, ≥5μm≤2900",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "≥10",
+          "unit": "Pa"
+        },
+        "temperature": {
+          "range": "18～26",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "45～65",
+          "unit": "%"
+        },
+        "settling": {
+          "range": "≤50",
+          "unit": "cfu/皿"
+        },
+        "floating": {
+          "range": "≤100",
+          "unit": "cfu/m³"
+        }
+      },
+      "D级": {
+        "particle": {
+          "range": "≥0.5μm≤3520000, ≥5μm≤29000",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "≥10",
+          "unit": "Pa"
+        },
+        "temperature": {
+          "range": "18～26",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "45～65",
+          "unit": "%"
+        },
+        "settling": {
+          "range": "≤100",
+          "unit": "cfu/皿"
+        },
+        "floating": {
+          "range": "≤200",
+          "unit": "cfu/m³"
+        }
+      }
+    }
+  },
+  "农业农村部公告第389号": {
+    "veterinary_gmp_workshop": {
+      "A级": {
+        "particle": {
+          "range": "≥0.5μm≤3520, ≥5μm≤20",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "≥10",
+          "unit": "Pa"
+        },
+        "temperature": {
+          "range": "20～24",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "45～60",
+          "unit": "%"
+        },
+        "noise": {
+          "range": "≤65",
+          "unit": "dB(A)"
+        },
+        "illumination": {
+          "range": "≥300",
+          "unit": "lx"
+        },
+        "wind_speed": {
+          "range": "0.36～0.54",
+          "unit": "m/s"
+        },
+        "wind_uniformity": {
+          "range": "≤0.25",
+          "unit": ""
+        }
+      },
+      "B级": {
+        "particle": {
+          "range": "≥0.5μm≤3520, ≥5μm≤29",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "≥10",
+          "unit": "Pa"
+        },
+        "temperature": {
+          "range": "20～24",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "45～60",
+          "unit": "%"
+        },
+        "noise": {
+          "range": "≤65",
+          "unit": "dB(A)"
+        },
+        "illumination": {
+          "range": "≥300",
+          "unit": "lx"
+        }
+      },
+      "C级": {
+        "particle": {
+          "range": "≥0.5μm≤352000, ≥5μm≤2900",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "≥10",
+          "unit": "Pa"
+        },
+        "temperature": {
+          "range": "20～24",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "45～60",
+          "unit": "%"
+        },
+        "noise": {
+          "range": "≤65",
+          "unit": "dB(A)"
+        },
+        "illumination": {
+          "range": "≥300",
+          "unit": "lx"
+        }
+      },
+      "D级": {
+        "particle": {
+          "range": "≥0.5μm≤3520000, ≥5μm≤29000",
+          "unit": "粒/m³"
+        },
+        "pressure": {
+          "range": "≥5",
+          "unit": "Pa"
+        },
+        "temperature": {
+          "range": "20～24",
+          "unit": "℃"
+        },
+        "humidity": {
+          "range": "45～60",
+          "unit": "%"
+        },
+        "noise": {
+          "range": "≤65",
+          "unit": "dB(A)"
+        },
+        "illumination": {
+          "range": "≥300",
+          "unit": "lx"
+        }
+      }
+    }
+  },
+  "GB/T 16294-2010": {
+    "bsl": {
+      "ISO-5": {
+        "settling": {
+          "range": "≤1",
+          "unit": "cfu/皿"
+        }
+      },
+      "ISO-6": {
+        "settling": {
+          "range": "≤1",
+          "unit": "cfu/皿"
+        }
+      },
+      "ISO-7": {
+        "settling": {
+          "range": "≤3",
+          "unit": "cfu/皿"
+        }
+      },
+      "ISO-8": {
+        "settling": {
+          "range": "≤10",
+          "unit": "cfu/皿"
+        }
+      },
+      "ISO-9": {
+        "settling": {
+          "range": "≤10",
+          "unit": "cfu/皿"
+        }
+      }
+    },
+    "gmp_workshop": {
+      "A级": {
+        "settling": {
+          "range": "≤1",
+          "unit": "cfu/皿"
+        }
+      },
+      "B级": {
+        "settling": {
+          "range": "≤1",
+          "unit": "cfu/皿"
+        }
+      },
+      "C级": {
+        "settling": {
+          "range": "≤3",
+          "unit": "cfu/皿"
+        }
+      },
+      "D级": {
+        "settling": {
+          "range": "≤10",
+          "unit": "cfu/皿"
+        }
+      }
+    },
+    "veterinary_gmp_workshop": {
+      "A级": {
+        "settling": {
+          "range": "≤1",
+          "unit": "cfu/皿"
+        }
+      },
+      "B级": {
+        "settling": {
+          "range": "≤1",
+          "unit": "cfu/皿"
+        }
+      },
+      "C级": {
+        "settling": {
+          "range": "≤3",
+          "unit": "cfu/皿"
+        }
+      },
+      "D级": {
+        "settling": {
+          "range": "≤10",
+          "unit": "cfu/皿"
+        }
+      }
+    },
+    "food_workshop": {
+      "Ⅰ级（百级）": {
+        "settling": {
+          "range": "≤1",
+          "unit": "cfu/皿"
+        }
+      },
+      "Ⅱ级（万级）": {
+        "settling": {
+          "range": "≤3",
+          "unit": "cfu/皿"
+        }
+      },
+      "Ⅲ级（十万级）": {
+        "settling": {
+          "range": "≤10",
+          "unit": "cfu/皿"
+        }
+      },
+      "Ⅳ级（三十万级）": {
+        "settling": {
+          "range": "≤10",
+          "unit": "cfu/皿"
+        }
+      }
+    }
+  },
+  "GB/T 16293-2010": {
+    "bsl": {
+      "ISO-5": {
+        "floating": {
+          "range": "≤5",
+          "unit": "cfu/m³"
+        }
+      },
+      "ISO-6": {
+        "floating": {
+          "range": "≤5",
+          "unit": "cfu/m³"
+        }
+      },
+      "ISO-7": {
+        "floating": {
+          "range": "≤100",
+          "unit": "cfu/m³"
+        }
+      },
+      "ISO-8": {
+        "floating": {
+          "range": "≤500",
+          "unit": "cfu/m³"
+        }
+      },
+      "ISO-9": {
+        "floating": {
+          "range": "≤500",
+          "unit": "cfu/m³"
+        }
+      }
+    },
+    "gmp_workshop": {
+      "A级": {
+        "floating": {
+          "range": "≤5",
+          "unit": "cfu/m³"
+        }
+      },
+      "B级": {
+        "floating": {
+          "range": "≤5",
+          "unit": "cfu/m³"
+        }
+      },
+      "C级": {
+        "floating": {
+          "range": "≤100",
+          "unit": "cfu/m³"
+        }
+      },
+      "D级": {
+        "floating": {
+          "range": "≤500",
+          "unit": "cfu/m³"
+        }
+      }
+    },
+    "veterinary_gmp_workshop": {
+      "A级": {
+        "floating": {
+          "range": "≤5",
+          "unit": "cfu/m³"
+        }
+      },
+      "B级": {
+        "floating": {
+          "range": "≤5",
+          "unit": "cfu/m³"
+        }
+      },
+      "C级": {
+        "floating": {
+          "range": "≤100",
+          "unit": "cfu/m³"
+        }
+      },
+      "D级": {
+        "floating": {
+          "range": "≤500",
+          "unit": "cfu/m³"
+        }
+      }
+    },
+    "food_workshop": {
+      "Ⅰ级（百级）": {
+        "floating": {
+          "range": "≤1",
+          "unit": "cfu/m³"
+        }
+      },
+      "Ⅱ级（万级）": {
+        "floating": {
+          "range": "≤10",
+          "unit": "cfu/m³"
+        }
+      },
+      "Ⅲ级（十万级）": {
+        "floating": {
+          "range": "≤100",
+          "unit": "cfu/m³"
+        }
+      },
+      "Ⅳ级（三十万级）": {
+        "floating": {
+          "range": "≤500",
+          "unit": "cfu/m³"
+        }
+      }
+    }
+  },
+  "JG/T 382-2012": {
+    "pass_box": {
+      "_default": {
+        "appearance": {
+          "range": "外形应平整光洁，表面色泽均匀、无明显划伤、锈斑、压痕；说明功能的文字和图形符号标志应正确、清晰、端正、牢固；外部配件位置应合理，接头、管道封堵应可靠",
+          "unit": ""
+        },
+        "door_interlock": {
+          "range": "打开传递窗任意一端的门，则另一端门不能打开；当传递窗断电或门的自锁功能失灵时，两端门应能手动开启",
+          "unit": ""
+        },
+        "particle": {
+          "range": "≥0.5μm≤352000, ≥5μm≤2930",
+          "unit": "粒/m³"
+        },
+        "noise": {
+          "range": "≤68",
+          "unit": "dB(A)"
+        },
+        "hepa_leak": {
+          "range": "≤0.01%",
+          "unit": "%"
+        }
+      },
+      "B1/B2型": {
+        "airchange_b12": {
+          "range": "≥50",
+          "unit": "次/h"
+        }
+      },
+      "B3型": {
+        "airchange_b3": {
+          "range": "≥1000",
+          "unit": "次/h"
+        }
+      }
+    }
+  }
+}

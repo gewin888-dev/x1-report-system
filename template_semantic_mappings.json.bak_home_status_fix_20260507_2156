@@ -1,0 +1,440 @@
+{
+  "pharma.veterinary_gmp_workshop.grade.a": {
+    "semantic_key": "pharma.veterinary_gmp_workshop.grade.a",
+    "allowed_template_keys": [
+      "pharma/veterinary_gmp_workshop/grade/a",
+      "veterinary_gmp_workshop/A"
+    ],
+    "default_template_key": "veterinary_gmp_workshop/A",
+    "updated_at": "2026-05-07 16:33:58",
+    "updated_by": "admin"
+  },
+  "pharma.veterinary_gmp_workshop.grade.b": {
+    "semantic_key": "pharma.veterinary_gmp_workshop.grade.b",
+    "allowed_template_keys": [
+      "pharma/veterinary_gmp_workshop/grade/b",
+      "veterinary_gmp_workshop/B&C"
+    ],
+    "default_template_key": "veterinary_gmp_workshop/B&C",
+    "updated_at": "2026-05-07 16:34:05",
+    "updated_by": "admin"
+  },
+  "pharma.veterinary_gmp_workshop.grade.c": {
+    "semantic_key": "pharma.veterinary_gmp_workshop.grade.c",
+    "allowed_template_keys": [
+      "pharma/veterinary_gmp_workshop/grade/c",
+      "veterinary_gmp_workshop/B&C"
+    ],
+    "default_template_key": "veterinary_gmp_workshop/B&C",
+    "updated_at": "2026-05-07 16:34:09",
+    "updated_by": "admin"
+  },
+  "pharma.veterinary_gmp_workshop.grade.d": {
+    "semantic_key": "pharma.veterinary_gmp_workshop.grade.d",
+    "allowed_template_keys": [
+      "pharma/veterinary_gmp_workshop/grade/d",
+      "veterinary_gmp_workshop/D"
+    ],
+    "default_template_key": "veterinary_gmp_workshop/D",
+    "updated_at": "2026-05-07 16:34:13",
+    "updated_by": "admin"
+  },
+  "pharma.gmp_workshop.grade.a": {
+    "semantic_key": "pharma.gmp_workshop.grade.a",
+    "allowed_template_keys": [
+      "pharma/gmp_workshop/grade/a",
+      "pharma/gmp_workshop/a"
+    ],
+    "default_template_key": "pharma/gmp_workshop/a",
+    "updated_at": "2026-05-07 16:33:17",
+    "updated_by": "admin"
+  },
+  "pharma.gmp_workshop.grade.b": {
+    "semantic_key": "pharma.gmp_workshop.grade.b",
+    "allowed_template_keys": [
+      "pharma/gmp_workshop/grade/b",
+      "pharma/gmp_workshop/b/c"
+    ],
+    "default_template_key": "pharma/gmp_workshop/b/c",
+    "updated_at": "2026-05-07 16:33:24",
+    "updated_by": "admin"
+  },
+  "pharma.gmp_workshop.grade.c": {
+    "semantic_key": "pharma.gmp_workshop.grade.c",
+    "allowed_template_keys": [
+      "pharma/gmp_workshop/grade/c",
+      "pharma/gmp_workshop/b/c"
+    ],
+    "default_template_key": "pharma/gmp_workshop/b/c",
+    "updated_at": "2026-05-07 16:33:28",
+    "updated_by": "admin"
+  },
+  "pharma.gmp_workshop.grade.d": {
+    "semantic_key": "pharma.gmp_workshop.grade.d",
+    "allowed_template_keys": [
+      "pharma/gmp_workshop/grade/d",
+      "pharma/gmp_workshop/d"
+    ],
+    "default_template_key": "pharma/gmp_workshop/d",
+    "updated_at": "2026-05-07 16:33:32",
+    "updated_by": "admin"
+  },
+  "food.food_workshop.grade.1": {
+    "semantic_key": "food.food_workshop.grade.1",
+    "allowed_template_keys": [
+      "food/food_workshop/grade/1",
+      "food/food_workshop/default/1"
+    ],
+    "default_template_key": "food/food_workshop/default/1",
+    "updated_at": "2026-05-07 18:37:31",
+    "updated_by": "admin"
+  },
+  "food.food_workshop.grade.2": {
+    "semantic_key": "food.food_workshop.grade.2",
+    "allowed_template_keys": [
+      "food/food_workshop/grade/2",
+      "food/food_workshop/default/234"
+    ],
+    "default_template_key": "food/food_workshop/default/234",
+    "updated_at": "2026-05-07 18:37:42",
+    "updated_by": "admin"
+  },
+  "food.food_workshop.grade.3": {
+    "semantic_key": "food.food_workshop.grade.3",
+    "allowed_template_keys": [
+      "food/food_workshop/grade/3",
+      "food/food_workshop/default/234"
+    ],
+    "default_template_key": "food/food_workshop/default/234",
+    "updated_at": "2026-05-07 18:37:46",
+    "updated_by": "admin"
+  },
+  "food.food_workshop.grade.4": {
+    "semantic_key": "food.food_workshop.grade.4",
+    "allowed_template_keys": [
+      "food/food_workshop/grade/4",
+      "food/food_workshop/default/234"
+    ],
+    "default_template_key": "food/food_workshop/default/234",
+    "updated_at": "2026-05-07 18:37:49",
+    "updated_by": "admin"
+  },
+  "electronics.electronics_workshop.iso.5": {
+    "semantic_key": "electronics.electronics_workshop.iso.5",
+    "allowed_template_keys": [
+      "electronics/electronics_workshop/iso/5"
+    ],
+    "default_template_key": "electronics/electronics_workshop/iso/5",
+    "updated_at": "2026-05-07 15:17:44",
+    "updated_by": "admin"
+  },
+  "electronics.electronics_workshop.iso.6": {
+    "semantic_key": "electronics.electronics_workshop.iso.6",
+    "allowed_template_keys": [
+      "electronics/electronics_workshop/iso/6"
+    ],
+    "default_template_key": "electronics/electronics_workshop/iso/6",
+    "updated_at": "2026-05-07 15:17:49",
+    "updated_by": "admin"
+  },
+  "electronics.electronics_workshop.iso.7": {
+    "semantic_key": "electronics.electronics_workshop.iso.7",
+    "allowed_template_keys": [
+      "electronics/electronics_workshop/iso/7"
+    ],
+    "default_template_key": "electronics/electronics_workshop/iso/7",
+    "updated_at": "2026-05-07 15:17:54",
+    "updated_by": "admin"
+  },
+  "electronics.electronics_workshop.iso.8": {
+    "semantic_key": "electronics.electronics_workshop.iso.8",
+    "allowed_template_keys": [
+      "electronics/electronics_workshop/iso/8"
+    ],
+    "default_template_key": "electronics/electronics_workshop/iso/8",
+    "updated_at": "2026-05-07 15:17:59",
+    "updated_by": "admin"
+  },
+  "electronics.electronics_workshop.iso.9": {
+    "semantic_key": "electronics.electronics_workshop.iso.9",
+    "allowed_template_keys": [
+      "electronics/electronics_workshop/iso/9"
+    ],
+    "default_template_key": "electronics/electronics_workshop/iso/9",
+    "updated_at": "2026-05-07 15:18:04",
+    "updated_by": "admin"
+  },
+  "hospital.clean_function_room.icu": {
+    "semantic_key": "hospital.clean_function_room.icu",
+    "allowed_template_keys": [
+      "hospital/clean_function_room/icu"
+    ],
+    "default_template_key": "hospital/clean_function_room/icu",
+    "updated_at": "2026-05-07 14:55:58",
+    "updated_by": "admin"
+  },
+  "hospital.clean_function_room.cssd": {
+    "semantic_key": "hospital.clean_function_room.cssd",
+    "allowed_template_keys": [
+      "hospital/clean_function_room/cssd"
+    ],
+    "default_template_key": "hospital/clean_function_room/cssd",
+    "updated_at": "2026-05-07 14:56:05",
+    "updated_by": "admin"
+  },
+  "hospital.clean_function_room.dialysis": {
+    "semantic_key": "hospital.clean_function_room.dialysis",
+    "allowed_template_keys": [
+      "hospital/clean_function_room/dialysis"
+    ],
+    "default_template_key": "hospital/clean_function_room/dialysis",
+    "updated_at": "2026-05-07 14:56:10",
+    "updated_by": "admin"
+  },
+  "hospital.clean_function_room.general": {
+    "semantic_key": "hospital.clean_function_room.general",
+    "allowed_template_keys": [
+      "hospital/clean_function_room/general"
+    ],
+    "default_template_key": "hospital/clean_function_room/general",
+    "updated_at": "2026-05-07 14:56:15",
+    "updated_by": "admin"
+  },
+  "hospital.operating_room.main.level1": {
+    "allowed_template_keys": [
+      "hospital/operating_room/main/level1",
+      "hospital/operating_room/default/1"
+    ],
+    "default_template_key": "hospital/operating_room/default/1",
+    "updated_by": "admin",
+    "updated_at": "2026-05-07 16:38:33",
+    "semantic_key": "hospital.operating_room.main.level1"
+  },
+  "hospital.operating_room.main.level2": {
+    "allowed_template_keys": [
+      "hospital/operating_room/main/level2"
+    ],
+    "default_template_key": "hospital/operating_room/main/level2",
+    "updated_by": "openclaw",
+    "updated_at": "2026-05-07 15:05:00",
+    "semantic_key": "hospital.operating_room.main.level2"
+  },
+  "hospital.operating_room.main.level3": {
+    "allowed_template_keys": [
+      "hospital/operating_room/main/level3"
+    ],
+    "default_template_key": "hospital/operating_room/main/level3",
+    "updated_by": "openclaw",
+    "updated_at": "2026-05-07 15:05:00",
+    "semantic_key": "hospital.operating_room.main.level3"
+  },
+  "hospital.operating_room.main.level4": {
+    "allowed_template_keys": [
+      "hospital/operating_room/main/level4"
+    ],
+    "default_template_key": "hospital/operating_room/main/level4",
+    "updated_by": "openclaw",
+    "updated_at": "2026-05-07 15:05:00",
+    "semantic_key": "hospital.operating_room.main.level4"
+  },
+  "hospital.operating_room.aux.level1": {
+    "allowed_template_keys": [
+      "hospital/operating_room/aux/level1-local5-surround6"
+    ],
+    "default_template_key": "hospital/operating_room/aux/level1-local5-surround6",
+    "updated_by": "openclaw",
+    "updated_at": "2026-05-07 15:05:00",
+    "semantic_key": "hospital.operating_room.aux.level1"
+  },
+  "hospital.operating_room.aux.level2": {
+    "allowed_template_keys": [
+      "hospital/operating_room/aux/level2-iso7"
+    ],
+    "default_template_key": "hospital/operating_room/aux/level2-iso7",
+    "updated_by": "openclaw",
+    "updated_at": "2026-05-07 15:05:00",
+    "semantic_key": "hospital.operating_room.aux.level2"
+  },
+  "hospital.operating_room.aux.level3": {
+    "allowed_template_keys": [
+      "hospital/operating_room/aux/level3-iso8"
+    ],
+    "default_template_key": "hospital/operating_room/aux/level3-iso8",
+    "updated_by": "openclaw",
+    "updated_at": "2026-05-07 15:05:00",
+    "semantic_key": "hospital.operating_room.aux.level3"
+  },
+  "hospital.operating_room.aux.level4": {
+    "allowed_template_keys": [
+      "hospital/operating_room/aux/level4-iso85"
+    ],
+    "default_template_key": "hospital/operating_room/aux/level4-iso85",
+    "updated_by": "openclaw",
+    "updated_at": "2026-05-07 15:05:00",
+    "semantic_key": "hospital.operating_room.aux.level4"
+  },
+  "biosafety.animal_room.normal": {
+    "allowed_template_keys": [
+      "biosafety/animal_room/normal",
+      "biosafety/animal_room/default"
+    ],
+    "default_template_key": "biosafety/animal_room/normal",
+    "updated_by": "admin",
+    "updated_at": "2026-05-07 15:03:49",
+    "semantic_key": "biosafety.animal_room.normal"
+  },
+  "biosafety.animal_room.barrier_main": {
+    "allowed_template_keys": [
+      "biosafety/animal_room/barrier-main",
+      "biosafety/animal_room/default/pz"
+    ],
+    "default_template_key": "biosafety/animal_room/barrier-main",
+    "updated_by": "admin",
+    "updated_at": "2026-05-07 15:03:57",
+    "semantic_key": "biosafety.animal_room.barrier_main"
+  },
+  "biosafety.animal_room.isolation": {
+    "allowed_template_keys": [
+      "biosafety/animal_room/isolation",
+      "biosafety/animal_room/default/gl"
+    ],
+    "default_template_key": "biosafety/animal_room/isolation",
+    "updated_by": "admin",
+    "updated_at": "2026-05-07 15:04:04",
+    "semantic_key": "biosafety.animal_room.isolation"
+  },
+  "biosafety.animal_room.barrier_aux.clean_storage": {
+    "allowed_template_keys": [
+      "biosafety/animal_room/barrier-aux/洁物储存室",
+      "biosafety/animal_room/default/pzf"
+    ],
+    "default_template_key": "biosafety/animal_room/barrier-aux/洁物储存室",
+    "updated_by": "admin",
+    "updated_at": "2026-05-07 15:04:12",
+    "semantic_key": "biosafety.animal_room.barrier_aux.clean_storage"
+  },
+  "biosafety.animal_room.barrier_aux.after_sterilization": {
+    "allowed_template_keys": [
+      "biosafety/animal_room/barrier-aux/灭菌后室区",
+      "biosafety/animal_room/default/pzf"
+    ],
+    "default_template_key": "biosafety/animal_room/barrier-aux/灭菌后室区",
+    "updated_by": "admin",
+    "updated_at": "2026-05-07 15:04:18",
+    "semantic_key": "biosafety.animal_room.barrier_aux.after_sterilization"
+  },
+  "biosafety.animal_room.barrier_aux.clean_corridor": {
+    "allowed_template_keys": [
+      "biosafety/animal_room/barrier-aux/洁净走廊",
+      "biosafety/animal_room/default/pzf"
+    ],
+    "default_template_key": "biosafety/animal_room/barrier-aux/洁净走廊",
+    "updated_by": "admin",
+    "updated_at": "2026-05-07 15:04:26",
+    "semantic_key": "biosafety.animal_room.barrier_aux.clean_corridor"
+  },
+  "biosafety.animal_room.barrier_aux.dirty_corridor": {
+    "allowed_template_keys": [
+      "biosafety/animal_room/barrier-aux/污物走廊",
+      "biosafety/animal_room/default/pzf"
+    ],
+    "default_template_key": "biosafety/animal_room/barrier-aux/污物走廊",
+    "updated_by": "admin",
+    "updated_at": "2026-05-07 15:04:34",
+    "semantic_key": "biosafety.animal_room.barrier_aux.dirty_corridor"
+  },
+  "biosafety.animal_room.barrier_aux.buffer": {
+    "allowed_template_keys": [
+      "biosafety/animal_room/barrier-aux/缓冲间",
+      "biosafety/animal_room/default/pzf"
+    ],
+    "default_template_key": "biosafety/animal_room/barrier-aux/缓冲间",
+    "updated_by": "admin",
+    "updated_at": "2026-05-07 15:04:40",
+    "semantic_key": "biosafety.animal_room.barrier_aux.buffer"
+  },
+  "biosafety.animal_room.barrier_aux.change_room_2": {
+    "allowed_template_keys": [
+      "biosafety/animal_room/barrier-aux/二更",
+      "biosafety/animal_room/default/pzf"
+    ],
+    "default_template_key": "biosafety/animal_room/barrier-aux/二更",
+    "updated_by": "admin",
+    "updated_at": "2026-05-07 15:04:49",
+    "semantic_key": "biosafety.animal_room.barrier_aux.change_room_2"
+  },
+  "biosafety.animal_room.barrier_aux.cleaning_disinfection": {
+    "allowed_template_keys": [
+      "biosafety/animal_room/barrier-aux/清洗消毒室",
+      "biosafety/animal_room/default/pzf"
+    ],
+    "default_template_key": "biosafety/animal_room/barrier-aux/清洗消毒室",
+    "updated_by": "admin",
+    "updated_at": "2026-05-07 15:04:56",
+    "semantic_key": "biosafety.animal_room.barrier_aux.cleaning_disinfection"
+  },
+  "biosafety.animal_room.barrier_aux.change_room_1": {
+    "allowed_template_keys": [
+      "biosafety/animal_room/barrier-aux/一更",
+      "biosafety/animal_room/default/pzf"
+    ],
+    "default_template_key": "biosafety/animal_room/barrier-aux/一更",
+    "updated_by": "admin",
+    "updated_at": "2026-05-07 15:05:13",
+    "semantic_key": "biosafety.animal_room.barrier_aux.change_room_1"
+  },
+  "biosafety.bsl.p2": {
+    "allowed_template_keys": [
+      "biosafety/bsl/p2"
+    ],
+    "default_template_key": "biosafety/bsl/p2",
+    "updated_by": "admin",
+    "updated_at": "2026-05-07 14:59:41",
+    "semantic_key": "biosafety.bsl.p2"
+  },
+  "biosafety.bsl.p3": {
+    "allowed_template_keys": [
+      "biosafety/bsl/p3"
+    ],
+    "default_template_key": "biosafety/bsl/p3",
+    "updated_by": "admin",
+    "updated_at": "2026-05-07 14:59:46",
+    "semantic_key": "biosafety.bsl.p3"
+  },
+  "hospital.operating_room.eye.level1": {
+    "allowed_template_keys": [
+      "hospital/operating_room/main/level1"
+    ],
+    "default_template_key": "hospital/operating_room/main/level1",
+    "updated_by": "openclaw",
+    "updated_at": "2026-05-07 15:05:00",
+    "semantic_key": "hospital.operating_room.eye.level1"
+  },
+  "hospital.operating_room.eye.level2": {
+    "allowed_template_keys": [
+      "hospital/operating_room/main/level2"
+    ],
+    "default_template_key": "hospital/operating_room/main/level2",
+    "updated_by": "openclaw",
+    "updated_at": "2026-05-07 15:05:00",
+    "semantic_key": "hospital.operating_room.eye.level2"
+  },
+  "hospital.operating_room.eye.level3": {
+    "allowed_template_keys": [
+      "hospital/operating_room/main/level3"
+    ],
+    "default_template_key": "hospital/operating_room/main/level3",
+    "updated_by": "openclaw",
+    "updated_at": "2026-05-07 15:05:00",
+    "semantic_key": "hospital.operating_room.eye.level3"
+  },
+  "hospital.operating_room.eye.level4": {
+    "allowed_template_keys": [
+      "hospital/operating_room/main/level4"
+    ],
+    "default_template_key": "hospital/operating_room/main/level4",
+    "updated_by": "openclaw",
+    "updated_at": "2026-05-07 15:05:00",
+    "semantic_key": "hospital.operating_room.eye.level4"
+  }
+}

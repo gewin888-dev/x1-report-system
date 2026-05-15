@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>系统监控 - X1 检测系统</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif;background:#f0f2f5;color:#333}
+.container{max-width:1400px;margin:0 auto;padding:20px}
+.header{background:#fff;padding:20px;border-radius:8px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.header h1{font-size:24px;margin-bottom:8px}
+.header p{color:#666;font-size:14px}
+.card{background:#fff;border-radius:8px;padding:20px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.card h2{font-size:18px;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #1890ff}
+.info-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.info-item{padding:12px;background:#fafafa;border-radius:4px}
+.info-item label{display:block;font-size:13px;color:#666;margin-bottom:4px}
+.info-item value{display:block;font-size:15px;font-weight:600;color:#333;word-break:break-all}
+.back-link{display:inline-block;margin-bottom:16px;color:#1890ff;text-decoration:none;font-size:14px}
+.back-link:hover{text-decoration:underline}
+.stat-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:20px}
+.stat-card{background:#fff;border-radius:6px;padding:20px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.stat-card .label{font-size:13px;color:#666;margin-bottom:8px}
+.stat-card .value{font-size:28px;font-weight:700}
+.stat-card.blue .value{color:#1890ff}
+.stat-card.green .value{color:#52c41a}
+.stat-card.orange .value{color:#fa8c16}
+.stat-card.purple .value{color:#722ed1}
+</style>
+</head>
+<body>
+<div class="container">
+<a href="/admin" class="back-link">← 返回后台管理</a>
+<div class="header">
+<h1>📊 系统监控</h1>
+<p>X1 检测系统运行状态监控</p>
+</div>
+
+<div class="stat-cards">
+<div class="stat-card blue"><div class="label">系统状态</div><div class="value" id="sys-status">运行中</div></div>
+<div class="stat-card green"><div class="label">导出记录</div><div class="value" id="sys-exports">-</div></div>
+<div class="stat-card orange"><div class="label">草稿记录</div><div class="value" id="sys-drafts">-</div></div>
+<div class="stat-card purple"><div class="label">用户数</div><div class="value" id="sys-users">-</div></div>
+</div>
+
+<div class="card">
+<h2>系统信息</h2>
+<div class="info-grid">
+<div class="info-item"><label>系统版本</label><value id="info-version">-</value></div>
+<div class="info-item"><label>服务端口</label><value id="info-port">-</value></div>
+<div class="info-item"><label>工作目录</label><value id="info-basedir">-</value></div>
+<div class="info-item"><label>模板目录</label><value id="info-template">-</value></div>
+<div class="info-item"><label>记录目录</label><value id="info-records">-</value></div>
+<div class="info-item"><label>报告目录</label><value id="info-reports">-</value></div>
+<div class="info-item"><label>日志目录</label><value id="info-logs">-</value></div>
+<div class="info-item"><label>缓存目录</label><value id="info-cache">-</value></div>
+</div>
+</div>
+
+<div class="card">
+<h2>运行时信息</h2>
+<div class="info-grid">
+<div class="info-item"><label>启动时间</label><value id="runtime-start">-</value></div>
+<div class="info-item"><label>运行时长</label><value id="runtime-uptime">-</value></div>
+<div class="info-item"><label>Python 版本</label><value id="runtime-python">-</value></div>
+<div class="info-item"><label>Flask 版本</label><value id="runtime-flask">-</value></div>
+</div>
+</div>
+</div>
+
+<script>
+async function loadMonitor(){
+  try{
+    const health = await fetch('/api/x/health').then(r => r.json());
+    const stats = await fetch('/admin/api/stats').then(r => r.json());
+    const users = await fetch('/admin/api/users').then(r => r.json());
+    
+    document.getElementById('sys-exports').textContent = stats.total_exports || 0;
+    document.getElementById('sys-drafts').textContent = stats.total_records || 0;
+    document.getElementById('sys-users').textContent = users.length || 0;
+    
+    document.getElementById('info-version').textContent = health.version || '-';
+    document.getElementById('info-port').textContent = health.port || '-';
+    document.getElementById('info-basedir').textContent = health.base_dir || '-';
+    document.getElementById('info-template').textContent = health.template_base || '-';
+    document.getElementById('info-records').textContent = health.records_dir || '-';
+    document.getElementById('info-reports').textContent = health.reports_dir || '-';
+    document.getElementById('info-logs').textContent = health.logs_dir || '-';
+    document.getElementById('info-cache').textContent = health.cache_dir || '-';
+    
+    document.getElementById('runtime-start').textContent = new Date().toLocaleString('zh-CN');
+    document.getElementById('runtime-uptime').textContent = '运行中';
+    document.getElementById('runtime-python').textContent = 'Python 3.9+';
+    document.getElementById('runtime-flask').textContent = 'Flask 2.x';
+  }catch(e){
+    console.error('加载监控数据失败:', e);
+  }
+}
+
+loadMonitor();
+setInterval(loadMonitor, 30000);
+</script>
+</body>
+</html>

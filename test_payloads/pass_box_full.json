@@ -1,0 +1,73 @@
+{
+  "project_name": "传递窗检测项目",
+  "client_name": "某制药有限公司",
+  "project_address": "上海市浦东新区张江高科技园区",
+  "detection_date": "2026-04-29",
+  "report_date": "2026-04-29",
+  "inspector": "张工",
+  "reviewer": "李工",
+  "approver": "王总",
+  "inspection_area": "A级洁净区与B级洁净区之间",
+  "project_overview": "本次检测针对某制药有限公司A级洁净区与B级洁净区之间的传递窗进行综合性能检测，确保其符合GMP要求。",
+  "weather_conditions": "晴，温度22℃，相对湿度55%",
+  "detection_basis": "GB 50591-2010《洁净室施工及验收规范》",
+  "detection_conclusion": "经检测，该传递窗各项指标均符合设计要求和相关标准规定，判定为合格。",
+  "domain": "pharma",
+  "rooms": [
+    {
+      "type_id": "pass_box",
+      "room_name": "传递窗-01",
+      "context": {
+        "device_name": "传递窗-01",
+        "device_model": "PB-1200",
+        "manufacturer": "某净化设备公司",
+        "installation_location": "A级洁净区与B级洁净区之间",
+        "product_inner_size": "1200mm×800mm×800mm",
+        "inner_length": "1200",
+        "inner_width": "800",
+        "inner_height": "800"
+      },
+      "params": [
+        {
+          "carrier": "static_pressure_difference",
+          "value": "15",
+          "unit": "Pa",
+          "standard": "≥10",
+          "conclusion": "合格"
+        },
+        {
+          "carrier": "airflow_direction",
+          "value": "从A级区向B级区",
+          "conclusion": "符合要求"
+        },
+        {
+          "carrier": "hepa_filter_leak_test",
+          "value": "未检出泄漏",
+          "conclusion": "合格"
+        },
+        {
+          "carrier": "illuminance",
+          "value": "350",
+          "unit": "lx",
+          "standard": "≥300",
+          "conclusion": "合格"
+        },
+        {
+          "carrier": "noise",
+          "value": "58",
+          "unit": "dB(A)",
+          "standard": "≤65",
+          "conclusion": "合格"
+        },
+        {
+          "carrier": "uv_lamp_intensity",
+          "value": "120",
+          "unit": "μW/cm²",
+          "standard": "≥90",
+          "conclusion": "合格"
+        }
+      ]
+    }
+  ],
+  "report_number": "PB-VERIFY-001"
+}

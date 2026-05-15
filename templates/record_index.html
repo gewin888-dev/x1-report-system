@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="现场记录">
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="apple-touch-icon" href="/static/icon-192.png">
+    <title>现场记录录入系统 {{ version }}</title>
+    <link rel="stylesheet" href="/static/record.css?v=4.10">
+</head>
+<body>
+    <div class="header">
+        <div class="header-main header-main-inline">
+            <div class="header-inline-toprow">
+                <h1>📋 现场记录录入 {{ version }}</h1>
+                <div class="header-actions header-actions-inline">
+                    <a href="/admin" class="admin-link" onclick="return handleAdminEntry(event)">⚙️后台</a>
+                    <a href="/logout" class="logout">退出</a>
+                </div>
+            </div>
+            <div class="user-info user-info-inline">检测员：<span id="currentUser"></span> <span id="syncBadge" style="display:none;background:#f44336;color:white;padding:2px 8px;border-radius:10px;font-size:11px;margin-left:6px;">离线</span> <span id="pendingCount" style="display:none;background:#ff9800;color:white;padding:2px 8px;border-radius:10px;font-size:11px;margin-left:4px;cursor:pointer;" onclick="syncPendingRecords()">0</span></div>
+        </div>
+    </div>
+    <div class="tab-bar">
+        <div class="tab-btn active" onclick="showTab('new')"><span class="tab-icon">📝</span><span class="tab-text">录入编辑</span></div>
+        <div class="tab-btn" onclick="showTab('draft')"><span class="tab-icon">💾</span><span class="tab-text">暂存记录</span></div>
+        <div class="tab-btn" onclick="showTab('history')"><span class="tab-icon">📋</span><span class="tab-text">报告记录</span></div>
+        <div class="tab-btn" onclick="showTab('mytasks')"><span class="tab-icon">📩</span><span class="tab-text">我的任务</span></div>
+    </div>
+    <div class="container">
+        <div id="tab-new">
+            <div class="card card-primary" id="projectInfoCard" style="cursor:pointer;" onclick="toggleCard('projectInfoCard','projectInfoBody','projectInfoArrow','projectInfoSummary')">
+                <h2 style="display:flex;align-items:center;justify-content:space-between;margin:0;">
+                    <span>📌 项目信息 <span id="projectInfoSummary" style="font-size:12px;color:#888;font-weight:normal;"></span></span>
+                    <span id="projectInfoArrow" style="font-size:14px;color:#999;transition:transform 0.2s;">▼</span>
+                </h2>
+                <div id="projectInfoBody" style="margin-top:10px;" onclick="event.stopPropagation();">
+                    <div class="project-info-grid compact-project-grid">
+                        <div class="form-group project-span-2"><label>项目名称 <span class="required">*</span></label><input type="text" id="projectName" placeholder="例：XX医院手术室洁净区检测" oninput="updateProjectInfoSummary()"></div>
+                        <div class="form-group project-span-2 report-number-row"><label>报告编号 <span class="required">*</span></label><div class="report-number-inline single-line-report-number no-wrap-row"><span class="report-prefix-inline">PDJC-BG<span id="reportYearDisplay"></span>-<span id="reportWeekDisplay"></span></span><input type="text" id="reportNumberSuffix" placeholder="自定义编号" style="flex:1;" oninput="updateReportNumber()"><input type="hidden" id="reportNumber"></div></div>
+                        <div class="form-group"><label>委托单位 <span class="required">*</span></label><input type="text" id="clientName" placeholder="例：XX医院" oninput="updateProjectInfoSummary()"></div>
+                        <div class="form-group"><label>联系方式 <span class="required">*</span></label><input type="text" id="contactInfo" placeholder="联系人及电话"></div>
+                        <div class="form-group"><label>项目地址 <span class="required">*</span></label><input type="text" id="projectAddress" placeholder="例：呼和浩特市XX路XX号"></div>
+                        <div class="form-group"><label>受检区域 <span class="required">*</span></label><input type="text" id="inspectionArea" placeholder="例：3楼手术室洁净区"></div>
+                        <div class="form-group project-date-compact"><label>检测日期 <span class="required">*</span></label><input type="date" id="detectionDate" onchange="updateProjectInfoSummary()"></div>
+                        <div class="card-subsection project-subsection state-subsection project-span-2">
+                            <div class="project-inline-row">
+                                <div class="card-subtitle inline-subtitle">检测状态</div>
+                                <div class="form-group state-group compact-inline-group">
+                                    <div class="radio-group compact-radio-group single-line-radio-group">
+                                        <label><input type="radio" name="detectionState" value="空态"> 空态</label>
+                                        <label><input type="radio" name="detectionState" value="静态" checked> 静态</label>
+                                        <label><input type="radio" name="detectionState" value="动态"> 动态</label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-subsection project-subsection weather-section project-span-2">
+                            <div class="project-inline-row">
+                                <div class="card-subtitle inline-subtitle">气象条件</div>
+                                <div class="form-group compact-inline-group"><div class="form-row compact-weather-row single-line-weather-row"><input type="text" id="weatherTemp" placeholder="温度℃"><input type="text" id="weatherHumidity" placeholder="湿度%"><input type="text" id="weatherPressure" placeholder="气压hPa"></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card card-domain"><h2>🏢 检测领域 <span class="required">*</span></h2><div class="card-hint">请先选择本次业务所属领域，再继续添加房间/设备。</div><div class="domain-grid" id="domainGrid"></div></div>
+            <div class="card hidden" id="detectionTypeCard"><h2>🔬 检测类型 <span class="required">*</span></h2><div class="level-grid" id="detectionTypeList"></div></div>
+            <div class="card hidden" id="basisCard" style="cursor:pointer;" onclick="toggleCard('basisCard','basisBody','basisArrow','basisSummary')">
+                <h2 style="display:flex;align-items:center;justify-content:space-between;margin:0;">
+                    <span>📖 检测依据 <span id="basisSummary" style="font-size:12px;color:#888;font-weight:normal;"></span></span>
+                    <span id="basisArrow" style="font-size:14px;color:#999;transition:transform 0.2s;">▼</span>
+                </h2>
+                <div id="basisBody" style="display:none;margin-top:10px;" onclick="event.stopPropagation();">
+                    <div class="checklist" id="basisList"></div>
+                </div>
+            </div>
+            <div class="card hidden" id="judgementCard" style="cursor:pointer;" onclick="toggleCard('judgementCard','judgementBody','judgementArrow','judgementSummary')">
+                <h2 style="display:flex;align-items:center;justify-content:space-between;margin:0;">
+                    <span>⚖️ 判定标准 <span id="judgementSummary" style="font-size:12px;color:#888;font-weight:normal;"></span></span>
+                    <span id="judgementArrow" style="font-size:14px;color:#999;transition:transform 0.2s;">▼</span>
+                </h2>
+                <div id="judgementBody" style="display:none;margin-top:10px;" onclick="event.stopPropagation();">
+                    <p style="font-size:12px;color:#888;margin-bottom:8px;">💡 带⭐的标准用于生成判定范围</p>
+                    <div class="checklist" id="judgementList"></div>
+                    <div id="activeJudgementInfo" style="margin-top:12px;padding:10px;background:#fff3e0;border-left:3px solid #ff9800;border-radius:4px;display:none;">
+                        <strong style="color:#e65100;">⭐ 当前判定依据：</strong>
+                        <span id="activeJudgementName" style="color:#333;"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="card hidden" id="roomsCard">
+                <h2 id="roomSectionTitle">🏠 房间/设备 检测数据录入</h2>
+                <p class="card-hint room-card-hint">💡 支持多数据点录入和自动计算</p>
+                <div id="roomsContainer"></div>
+                <button class="add-room-btn" onclick="addRoom()">+ 添加房间/设备</button>
+            </div>
+            <div class="action-panel">
+                <div class="action-panel-text">
+                    <div class="action-panel-title">完成录入后执行操作</div>
+                    <div class="action-panel-desc">暂存用于中途保存，导出用于正式生成记录与报告。</div>
+                </div>
+                <div class="btn-group action-btn-group action-btn-grid">
+                    <button class="btn btn-secondary-action" onclick="saveDraft()">💾 暂存记录</button>
+                    <button class="btn btn-primary-action" onclick="submitAndExport()">📄 生成记录并导出报告</button>
+                </div>
+            </div>
+        </div>
+        <div id="tab-draft" class="hidden">
+            <div class="card">
+                <h2>💾 暂存记录</h2>
+                <div class="history-search-bar">
+                    <input type="text" id="draftSearch" placeholder="搜索项目名称 / 委托单位 / 检测日期 / 检测员（支持模糊搜索）" oninput="renderDraftRecords()">
+                </div>
+                <ul class="records-list" id="draftRecordsList"><li style="text-align:center;color:#999;padding:30px;">加载中...</li></ul>
+            </div>
+        </div>
+        <div id="tab-history" class="hidden">
+            <div class="card">
+                <h2>📋 报告记录</h2>
+                <div class="history-search-bar">
+                    <input type="text" id="historySearch" placeholder="搜索项目名称 / 委托单位 / 报告编号 / 检测员（支持部分关键词）" oninput="renderHistoryRecords()">
+                </div>
+                <ul class="records-list" id="recordsList"><li style="text-align:center;color:#999;padding:30px;">加载中...</li></ul>
+            </div>
+        </div>
+        <div id="tab-mytasks" class="hidden">
+            <div class="card">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                    <h2 style="margin:0;">📩 我的任务</h2>
+                    <div style="display:flex;gap:8px;">
+                        <button class="btn btn-sm" onclick="loadMyTasks('active')" id="mytask-btn-active" style="font-weight:bold;">进行中</button>
+                        <button class="btn btn-sm" onclick="loadMyTasks('completed')" id="mytask-btn-completed">已完成</button>
+                        <button class="btn btn-sm" onclick="loadMyTasks('all')" id="mytask-btn-all">全部</button>
+                    </div>
+                </div>
+                <div id="mytasks-list" style="font-size:14px;"><div style="text-align:center;color:#999;padding:30px;">点击“我的任务”查看</div></div>
+            </div>
+        </div>
+    </div>
+    <div class="toast" id="toast"></div>
+    <script>
+    // 内联调试：拦截所有可能的页面离开
+    window.addEventListener('beforeunload',function(e){
+        document.title='UNLOAD!';
+    });
+    window.addEventListener('unload',function(e){
+        try{localStorage.setItem('_dbg_unload',Date.now());}catch(e){}
+    });
+    // 仅拦截需要特殊处理的外部链接，避免误伤站内跳转/下载/后台入口
+    document.addEventListener('click',function(e){
+        var t=e.target;
+        while(t&&t.tagName!=='A')t=t.parentElement;
+        if(t&&t.tagName==='A'){
+            var h=t.getAttribute('href')||'';
+            var target=t.getAttribute('target')||'';
+            if(!h || h==='/logout') return;
+            if(h.startsWith('http://') || h.startsWith('https://')){
+                e.preventDefault();
+                window.open(h,target||'_blank');
+            }
+        }
+    },true);
+    </script>
+    <script src="/static/standards_db.js?v=4.7"></script>
+    <script src="/static/x-model.js?v=1.0.1"></script>
+    <script src="/static/record.js?v=10.9.3"></script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+{
+  "domain": "biosafety",
+  "project_context": {
+    "project_name": "洁净工作台检测验证",
+    "client_name": "测试单位",
+    "project_address": "测试地址",
+    "contact_info": "测试联系人 13800000000",
+    "detection_date": "2026-04-29",
+    "report_number": "X1-BENCH-20260429-01"
+  },
+  "rooms": [
+    {
+      "room_id": "bench_001",
+      "room_name": "洁净工作台-1",
+      "type_id": "clean_bench",
+      "type_name": "洁净工作台",
+      "domain": "biosafety",
+      "bench_result_state": "合格",
+      "params": [
+        {
+          "carrier": "bench_model",
+          "value": "SW-CJ-1FD",
+          "result": ""
+        },
+        {
+          "carrier": "appearance",
+          "value": "",
+          "result": "符合要求"
+        },
+        {
+          "carrier": "air_velocity",
+          "value": "0.42",
+          "result": ""
+        },
+        {
+          "carrier": "hepa_leak",
+          "value": "",
+          "result": "未检出泄漏"
+        },
+        {
+          "carrier": "particle",
+          "value": "",
+          "result": "100级"
+        },
+        {
+          "carrier": "noise",
+          "value": "55",
+          "result": ""
+        },
+        {
+          "carrier": "illumination",
+          "value": "600",
+          "result": ""
+        },
+        {
+          "carrier": "vibration",
+          "value": "3",
+          "result": ""
+        }
+      ]
+    }
+  ]
+}

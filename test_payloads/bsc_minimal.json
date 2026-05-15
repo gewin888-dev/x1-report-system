@@ -1,0 +1,73 @@
+{
+  "domain": "biosafety",
+  "project_context": {
+    "project_name": "生物安全柜检测验证",
+    "client_name": "测试单位",
+    "project_address": "测试地址",
+    "contact_info": "测试联系人 13800000000",
+    "detection_date": "2026-04-29",
+    "report_number": "X1-BSC-20260429-01"
+  },
+  "rooms": [
+    {
+      "room_id": "bsc_001",
+      "room_name": "生物安全柜-1",
+      "type_id": "bsc",
+      "type_name": "生物安全柜",
+      "domain": "biosafety",
+      "bsc_result_state": "合格",
+      "params": [
+        {
+          "carrier": "bsc_model",
+          "value": "BSC-1100IIA2",
+          "result": ""
+        },
+        {
+          "carrier": "bsc_type",
+          "value": "II级A2型",
+          "result": ""
+        },
+        {
+          "carrier": "appearance",
+          "value": "",
+          "result": "符合要求"
+        },
+        {
+          "carrier": "downflow_velocity",
+          "value": "0.35",
+          "result": ""
+        },
+        {
+          "carrier": "inflow_velocity",
+          "value": "0.52",
+          "result": ""
+        },
+        {
+          "carrier": "hepa_leak",
+          "value": "",
+          "result": "未检出泄漏"
+        },
+        {
+          "carrier": "particle",
+          "value": "",
+          "result": "100级"
+        },
+        {
+          "carrier": "noise",
+          "value": "58",
+          "result": ""
+        },
+        {
+          "carrier": "illumination",
+          "value": "650",
+          "result": ""
+        },
+        {
+          "carrier": "vibration",
+          "value": "5",
+          "result": ""
+        }
+      ]
+    }
+  ]
+}

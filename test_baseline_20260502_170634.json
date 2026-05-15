@@ -1,0 +1,156 @@
+[
+  {
+    "type_id": "operating_room",
+    "status": "❌失败",
+    "error_type": "对象识别异常",
+    "details": {
+      "export_id": "X1EXPORT_20260502170548",
+      "template_ready": true,
+      "expected_type": "operating_room",
+      "actual_type": null
+    }
+  },
+  {
+    "type_id": "clean_function_room",
+    "status": "❌失败",
+    "error_type": "对象识别异常",
+    "details": {
+      "export_id": "X1EXPORT_20260502170552",
+      "template_ready": true,
+      "expected_type": "clean_function_room",
+      "actual_type": null
+    }
+  },
+  {
+    "type_id": "negative_pressure",
+    "status": "❌失败",
+    "error_type": "对象识别异常",
+    "details": {
+      "export_id": "X1EXPORT_20260502170555",
+      "template_ready": true,
+      "expected_type": "negative_pressure",
+      "actual_type": null
+    }
+  },
+  {
+    "type_id": "bsl",
+    "status": "❌失败",
+    "error_type": "对象识别异常",
+    "details": {
+      "export_id": "X1EXPORT_20260502170558",
+      "template_ready": true,
+      "expected_type": "bsl",
+      "actual_type": null
+    }
+  },
+  {
+    "type_id": "animal_room",
+    "status": "❌失败",
+    "error_type": "对象识别异常",
+    "details": {
+      "export_id": "X1EXPORT_20260502170602",
+      "template_ready": true,
+      "expected_type": "animal_room",
+      "actual_type": null
+    }
+  },
+  {
+    "type_id": "bsc",
+    "status": "❌失败",
+    "error_type": "对象识别异常",
+    "details": {
+      "export_id": "X1EXPORT_20260502170605",
+      "template_ready": true,
+      "expected_type": "bsc",
+      "actual_type": null
+    }
+  },
+  {
+    "type_id": "clean_bench",
+    "status": "❌失败",
+    "error_type": "对象识别异常",
+    "details": {
+      "export_id": "X1EXPORT_20260502170608",
+      "template_ready": true,
+      "expected_type": "clean_bench",
+      "actual_type": null
+    }
+  },
+  {
+    "type_id": "ivc",
+    "status": "❌失败",
+    "error_type": "对象识别异常",
+    "details": {
+      "export_id": "X1EXPORT_20260502170611",
+      "template_ready": true,
+      "expected_type": "ivc",
+      "actual_type": null
+    }
+  },
+  {
+    "type_id": "gmp_workshop",
+    "status": "❌失败",
+    "error_type": "对象识别异常",
+    "details": {
+      "export_id": "X1EXPORT_20260502170615",
+      "template_ready": true,
+      "expected_type": "gmp_workshop",
+      "actual_type": null
+    }
+  },
+  {
+    "type_id": "veterinary_gmp_workshop",
+    "status": "❌失败",
+    "error_type": "对象识别异常",
+    "details": {
+      "export_id": "X1EXPORT_20260502170618",
+      "template_ready": true,
+      "expected_type": "veterinary_gmp_workshop",
+      "actual_type": null
+    }
+  },
+  {
+    "type_id": "pass_box",
+    "status": "❌失败",
+    "error_type": "对象识别异常",
+    "details": {
+      "export_id": "X1EXPORT_20260502170621",
+      "template_ready": true,
+      "expected_type": "pass_box",
+      "actual_type": null
+    }
+  },
+  {
+    "type_id": "laminar_hood",
+    "status": "❌失败",
+    "error_type": "对象识别异常",
+    "details": {
+      "export_id": "X1EXPORT_20260502170624",
+      "template_ready": true,
+      "expected_type": "laminar_hood",
+      "actual_type": null
+    }
+  },
+  {
+    "type_id": "food_workshop",
+    "status": "❌失败",
+    "error_type": "对象识别异常",
+    "details": {
+      "export_id": "X1EXPORT_20260502170627",
+      "template_ready": true,
+      "expected_type": "food_workshop",
+      "actual_type": null
+    }
+  },
+  {
+    "type_id": "electronics_workshop",
+    "status": "❌失败",
+    "error_type": "对象识别异常",
+    "details": {
+      "export_id": "X1EXPORT_20260502170631",
+      "template_ready": true,
+      "expected_type": "electronics_workshop",
+      "actual_type": null
+    }
+  }
+]

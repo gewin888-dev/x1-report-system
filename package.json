@@ -1,0 +1,12 @@
+{
+  "name": "x1-offline-test",
+  "private": true,
+  "version": "1.0.0",
+  "description": "X1 offline browser test harness",
+  "scripts": {
+    "offline:test": "node test_offline_browser_flow.js"
+  },
+  "devDependencies": {
+    "playwright": "^1.59.1"
+  }
+}

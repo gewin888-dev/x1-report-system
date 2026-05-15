@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Databases (tracked via backup, not git)
+*.db
+*.db-journal
+*.db-wal
+
+# Runtime
+x1.pid
+logs/
+logs_x1/
+temp_x1/
+cache_x1/
+
+# Reports & records (data, not code)
+reports_x1/
+records_x1/
+uploads_x1/
+
+# Backups
+backups/
+.trash_db_cleanup_*/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Old backup dirs within project
+/Users/fuwuqi/backups_x1/
+
+# Node modules
+node_modules/
+
+# Trash
+trash/
+
+# Archive (old docs, keep separate)
+_archive/
+
+# Uploads directory
+uploads/

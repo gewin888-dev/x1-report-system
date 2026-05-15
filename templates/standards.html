@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>标准数据库管理 - X1 检测系统</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif;background:#f0f2f5;color:#333}
+.container{max-width:1400px;margin:0 auto;padding:20px}
+.header{background:#fff;padding:20px;border-radius:8px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.header h1{font-size:24px;margin-bottom:8px}
+.header p{color:#666;font-size:14px}
+.card{background:#fff;border-radius:8px;padding:20px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.card h2{font-size:18px;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #1890ff}
+.btn{display:inline-block;padding:6px 14px;background:#1890ff;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px;margin-right:8px}
+.btn:hover{background:#40a9ff}
+.btn-sm{padding:4px 10px;font-size:12px}
+.table{width:100%;border-collapse:collapse}
+.table th,.table td{padding:10px 12px;text-align:left;border-bottom:1px solid #f0f0f0;font-size:13px}
+.table th{background:#fafafa;font-weight:600;color:#666}
+.back-link{display:inline-block;margin-bottom:16px;color:#1890ff;text-decoration:none;font-size:14px}
+.back-link:hover{text-decoration:underline}
+.tag{display:inline-block;padding:2px 7px;border-radius:3px;font-size:12px;background:#f0f5ff;color:#1890ff;border:1px solid #adc6ff;margin:2px}
+.tag-domain{background:#fff7e6;color:#d48806;border-color:#ffd591}
+.modal-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:#fff;border-radius:8px;width:960px;max-width:95vw;max-height:88vh;overflow:hidden;display:flex;flex-direction:column}
+.modal-header{padding:16px 24px;border-bottom:1px solid #e8e8e8;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+.modal-header h3{font-size:17px}
+.modal-close{font-size:26px;cursor:pointer;color:#999;line-height:1}
+.modal-close:hover{color:#333}
+.modal-body{padding:20px 24px;overflow-y:auto;flex:1}
+.obj-tabs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:20px}
+.obj-tab{padding:6px 14px;border:1px solid #d9d9d9;border-radius:4px;cursor:pointer;font-size:13px;background:#fff}
+.obj-tab.active{background:#1890ff;color:#fff;border-color:#1890ff}
+.class-section{margin-bottom:16px;border:1px solid #e8e8e8;border-radius:6px;overflow:hidden}
+.class-title{padding:9px 16px;background:#f6f8ff;font-weight:600;font-size:14px;color:#1890ff;border-bottom:1px solid #e8e8e8}
+.param-table{width:100%;border-collapse:collapse}
+.param-table td{padding:7px 16px;border-bottom:1px solid #f5f5f5;font-size:13px;vertical-align:top}
+.param-table td:first-child{color:#555;width:180px;white-space:nowrap}
+.param-table td:last-child{color:#222}
+.param-table tr:last-child td{border-bottom:none}
+.sub-header td{background:#f0f5ff;font-weight:600;color:#1890ff;padding:6px 16px}
+.empty{text-align:center;padding:40px;color:#999;font-size:14px}
+.stat-row{display:flex;gap:16px;margin-bottom:20px}
+.stat-box{background:#f6f8ff;border-radius:6px;padding:14px 20px;flex:1;text-align:center}
+.stat-box .n{font-size:28px;font-weight:700;color:#1890ff}
+.stat-box .l{font-size:13px;color:#666;margin-top:4px}
+</style>
+</head>
+<body>
+<div class="container">
+<a href="/admin" class="back-link">← 返回后台管理</a>
+<div class="header">
+<h1>📖 标准数据库管理</h1>
+<p>X1 系统使用的检测标准判定范围数据（来源：standards_ranges.json）</p>
+</div>
+
+<div class="stat-row">
+<div class="stat-box"><div class="n" id="cnt-std">-</div><div class="l">标准总数</div></div>
+<div class="stat-box"><div class="n" id="cnt-obj">-</div><div class="l">覆盖对象数</div></div>
+</div>
+
+<div class="card">
+<h2>标准列表</h2>
+<table class="table">
+<thead>
+<tr><th style="width:160px">标准编号</th><th>适用领域</th><th style="width:130px">覆盖对象</th><th style="width:70px">操作</th></tr>
+</thead>
+<tbody id="tb-standards"></tbody>
+</table>
+</div>
+</div>
+
+<div class="modal-overlay" id="stdModal">
+<div class="modal">
+<div class="modal-header">
+<h3 id="modal-title">标准详情</h3>
+<span class="modal-close" onclick="closeModal()">×</span>
+</div>
+<div class="modal-body">
+<div class="obj-tabs" id="obj-tabs"></div>
+<div id="obj-content"></div>
+</div>
+</div>
+</div>
+
+<script>
+var OBJ_NAMES = {
+  operating_room:'手术室', eye_operating_room:'眼科手术室',
+  operating_room_trial:'手术室(试运行)', clean_function_room_trial:'洁净功能室(试运行)',
+  negative_pressure_trial:'负压病房(试运行)', clean_function_room:'洁净功能室',
+  bsl:'生物安全实验室', gmp_workshop:'GMP车间', veterinary_gmp_workshop:'兽药GMP车间',
+  laminar_hood:'层流罩', food_workshop:'食品车间', electronics_workshop:'电子车间',
+  negative_pressure:'负压病房', animal_room:'动物房', bsc:'生物安全柜',
+  clean_bench:'洁净工作台', ivc:'IVC笼具', pass_box:'传递窗', _universal:'通用'
+};
+
+var CLASS_NAMES = {
+  _default:'默认', '辅房':'辅房', '辅房等级':'辅房等级',
+  '屏障环境洁净辅房':'屏障环境洁净辅房', '普通环境':'普通环境',
+  '屏障环境':'屏障环境', '隔离环境':'隔离环境'
+};
+
+var PARAM_NAMES = {
+  wind_speed:'风速', wind_uniformity:'风速均匀度', avg_speed:'平均风速',
+  airflow_speed:'气流速度', downflow_speed:'下降气流速度', exhaust_speed:'排风速度',
+  cage_airspeed:'笼架风速', speed_uniformity:'风速均匀度',
+  pressure:'压差', temperature:'温度', temperature_aux:'温度', humidity:'相对湿度',
+  humidity_aux:'相对湿度', temp_diff:'温差', noise:'噪声',
+  illumination:'照度', illumination_min:'最低照度', illumination_main:'主要照度',
+  illumination_aux:'辅助照度', illumination_main_room:'主要房间照度',
+  illumination_aux_room:'辅助房间照度', illumination_general_processing:'一般加工区照度',
+  illumination_mixed_processing:'准清洁加工区照度', illumination_non_processing:'非加工区照度',
+  work_illumination:'工作面照度', animal_illumination:'动物照度', illumination_uniformity:'照度均匀度',
+  particle:'浮游粒子', particle_door:'门缝粒子', particle_negative:'浮游粒子(负压)',
+  bacteria:'细菌浓度', surface_bacteria:'表面细菌', settling:'沉降菌', floating:'浮游菌',
+  airchange:'换气次数', airchange_clean:'洁净区换气次数',
+  airchange_b12:'B1/B2型换气次数', airchange_b3:'B3型换气次数',
+  self_clean_time:'自净时间', virus_removal:'病毒去除率',
+  hepa_leak:'高效过滤器检漏', hepa_integrity:'高效过滤器完整性',
+  airtightness:'气密性', door_interlock:'门互锁', alarm_interlock:'报警联锁',
+  uv_intensity:'紫外线强度', appearance:'外观', function:'功能',
+  airflow_direction:'气流方向', airflow_pattern:'气流形态', airflow_state:'气流状态'
+};
+
+var PARAM_UNITS = {
+  wind_speed:'m/s', avg_speed:'m/s', airflow_speed:'m/s', downflow_speed:'m/s',
+  exhaust_speed:'m/s', cage_airspeed:'m/s',
+  pressure:'Pa', temperature:'℃', temperature_aux:'℃', temp_diff:'℃',
+  humidity:'%RH', humidity_aux:'%RH',
+  noise:'dB(A)',
+  illumination:'lx', illumination_min:'lx', illumination_main:'lx', illumination_aux:'lx',
+  illumination_main_room:'lx', illumination_aux_room:'lx', illumination_general_processing:'lx',
+  illumination_mixed_processing:'lx', illumination_non_processing:'lx',
+  work_illumination:'lx', animal_illumination:'lx',
+  bacteria:'CFU/m³', surface_bacteria:'CFU/碟', settling:'CFU/碟', floating:'CFU/m³',
+  airchange:'次/h', airchange_clean:'次/h', airchange_b12:'次/h', airchange_b3:'次/h',
+  self_clean_time:'min', uv_intensity:'μW/cm²'
+};
+
+var currentStdData = null;
+
+function isRangeObj(v){
+  return typeof v === 'object' && v !== null &&
+    (v.hasOwnProperty('range') || v.hasOwnProperty('range_op') || v.hasOwnProperty('range_surr'));
+}
+
+function formatRange(p, v){
+  if(typeof v !== 'object') return String(v);
+  var unit = PARAM_UNITS[p] ? ' ' + PARAM_UNITS[p] : '';
+  var isParticle = p.indexOf('particle') >= 0 || p.indexOf('Particle') >= 0;
+  if(v.hasOwnProperty('range')){
+    if(v.range === '' || v.range === '—' || v.range === null) return '—';
+    if(isParticle) return v.range;
+    return v.range + unit;
+  }
+  if(v.hasOwnProperty('range_op') || v.hasOwnProperty('range_surr')){
+    var parts = [];
+    if(v.range_op) parts.push('手术区: ' + v.range_op + (isParticle ? '' : unit));
+    if(v.range_surr) parts.push('周边区: ' + v.range_surr + (isParticle ? '' : unit));
+    return parts.join('　');
+  }
+  return JSON.stringify(v);
+}
+
+function renderParamTable(params){
+  var html = '<table class="param-table"><tbody>';
+  Object.keys(params).forEach(function(p){
+    var v = params[p];
+    var pName = PARAM_NAMES[p] || p;
+    if(typeof v === 'object' && v !== null && !isRangeObj(v)){
+      // 嵌套子分区（辅房子项、辅房等级子项）
+      html += '<tr class="sub-header"><td colspan="2">' + pName + '</td></tr>';
+      Object.keys(v).forEach(function(subP){
+        var subV = v[subP];
+        var subName = PARAM_NAMES[subP] || subP;
+        html += '<tr><td style="padding-left:32px">' + subName + '</td><td>' + formatRange(subP, subV) + '</td></tr>';
+      });
+    } else {
+      html += '<tr><td>' + pName + '</td><td>' + formatRange(p, v) + '</td></tr>';
+    }
+  });
+  html += '</tbody></table>';
+  return html;
+}
+
+function loadStandards(){
+  fetch('/admin/api/standards').then(function(r){return r.json()}).then(function(d){
+    var stds = d.standards || [];
+    document.getElementById('cnt-std').textContent = stds.length;
+    var objSet = {};
+    stds.forEach(function(s){s.objects.forEach(function(o){objSet[o]=1})});
+    document.getElementById('cnt-obj').textContent = Object.keys(objSet).length;
+
+    var html = '';
+    stds.forEach(function(s){
+      var domainTags = (s.domains||[]).map(function(d){
+        return '<span class="tag tag-domain">' + d + '</span>';
+      }).join('');
+      var objTags = s.objects.map(function(o){
+        return '<span class="tag">' + (OBJ_NAMES[o]||o) + '</span>';
+      }).join('');
+      html += '<tr>';
+      html += '<td><strong>' + s.code + '</strong></td>';
+      html += '<td>' + (domainTags||'<span style="color:#999">—</span>') + '</td>';
+      html += '<td>' + objTags + '</td>';
+      html += '<td><button class="btn btn-sm" onclick="viewStandard(\'' + encodeURIComponent(s.code) + '\',\'' + s.code.replace(/'/g,"\\'") + '\')">查看</button></td>';
+      html += '</tr>';
+    });
+    document.getElementById('tb-standards').innerHTML = html || '<tr><td colspan="4" class="empty">暂无数据</td></tr>';
+  });
+}
+
+function viewStandard(encodedCode, displayCode){
+  fetch('/admin/api/standards/' + encodedCode).then(function(r){return r.json()}).then(function(d){
+    if(d.error){alert('加载失败: ' + d.error); return;}
+    document.getElementById('modal-title').textContent = displayCode;
+    currentStdData = d.data;
+    var objs = Object.keys(d.data);
+    var tabHtml = objs.map(function(o, i){
+      return '<button class="obj-tab' + (i===0?' active':'') + '" onclick="showObj(\'' + o + '\',this)">' + (OBJ_NAMES[o]||o) + '</button>';
+    }).join('');
+    document.getElementById('obj-tabs').innerHTML = tabHtml;
+    if(objs.length > 0) showObjData(objs[0]);
+    document.getElementById('stdModal').classList.add('show');
+  });
+}
+
+function showObj(objKey, btn){
+  document.querySelectorAll('.obj-tab').forEach(function(b){b.classList.remove('active')});
+  if(btn) btn.classList.add('active');
+  showObjData(objKey);
+}
+
+function showObjData(objKey){
+  var data = currentStdData[objKey];
+  if(!data){document.getElementById('obj-content').innerHTML='<div class="empty">暂无数据</div>';return;}
+  var html = '';
+  Object.keys(data).forEach(function(cls){
+    var params = data[cls];
+    var clsName = CLASS_NAMES[cls] || cls;
+    html += '<div class="class-section">';
+    html += '<div class="class-title">' + clsName + '</div>';
+    html += renderParamTable(params);
+    html += '</div>';
+  });
+  document.getElementById('obj-content').innerHTML = html || '<div class="empty">暂无参数数据</div>';
+}
+
+function closeModal(){
+  document.getElementById('stdModal').classList.remove('show');
+  currentStdData = null;
+}
+
+loadStandards();
+</script>
+</body>
+</html>

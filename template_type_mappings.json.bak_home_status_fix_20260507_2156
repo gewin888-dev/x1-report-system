@@ -1,0 +1,143 @@
+{
+  "gmp_workshop": {
+    "allowed_template_keys": [
+      "pharma/gmp_workshop/grade/a",
+      "pharma/gmp_workshop/grade/b",
+      "pharma/gmp_workshop/grade/c",
+      "pharma/gmp_workshop/grade/d"
+    ],
+    "default_template_key": "pharma/gmp_workshop/grade/a",
+    "updated_at": "2026-05-07 16:00:30",
+    "updated_by": "admin"
+  },
+  "veterinary_gmp_workshop": {
+    "allowed_template_keys": [
+      "pharma/veterinary_gmp_workshop/grade/a",
+      "pharma/veterinary_gmp_workshop/grade/b",
+      "pharma/veterinary_gmp_workshop/grade/c",
+      "pharma/veterinary_gmp_workshop/grade/d"
+    ],
+    "default_template_key": "pharma/veterinary_gmp_workshop/grade/a",
+    "updated_at": "2026-05-07 16:04:30",
+    "updated_by": "admin"
+  },
+  "operating_room": {
+    "allowed_template_keys": [
+      "hospital/operating_room/main/level1",
+      "hospital/operating_room/1",
+      "hospital/operating_room/default",
+      "hospital/operating_room/default/f",
+      "hospital/operating_room/default/1",
+      "hospital/operating_room/default/2/3",
+      "hospital/operating_room/default/4",
+      "hospital/operating_room/default/y1",
+      "hospital/operating_room/default/y2/3",
+      "hospital/operating_room/default/y4",
+      "hospital/operating_room/default-2"
+    ],
+    "updated_at": "",
+    "updated_by": "admin",
+    "default_template_key": "hospital/operating_room/main/level1"
+  },
+  "laminar_hood": {
+    "allowed_template_keys": [
+      "pharma/laminar_hood/default",
+      "pharma/laminar_hood/default-2"
+    ],
+    "updated_at": "",
+    "updated_by": "admin",
+    "default_template_key": "pharma/laminar_hood/default"
+  },
+  "clean_function_room": {
+    "allowed_template_keys": [
+      "hospital/clean_function_room/icu",
+      "hospital/clean_function_room/cssd",
+      "hospital/clean_function_room/dialysis",
+      "hospital/clean_function_room/general"
+    ],
+    "default_template_key": "hospital/clean_function_room/general",
+    "updated_at": "2026-05-07 16:49:00",
+    "updated_by": "admin"
+  },
+  "pass_box": {
+    "allowed_template_keys": [
+      "pharma/pass_box/default"
+    ],
+    "updated_at": "2026-05-06 23:59:29",
+    "updated_by": "admin",
+    "default_template_key": "pharma/pass_box/default"
+  },
+  "animal_room": {
+    "allowed_template_keys": [
+      "biosafety/animal_room/normal",
+      "biosafety/animal_room/default",
+      "biosafety/animal_room/default/pz",
+      "biosafety/animal_room/default/pzf",
+      "biosafety/animal_room/default/gl"
+    ],
+    "updated_at": "2026-05-07 09:35:16",
+    "updated_by": "admin",
+    "default_template_key": "biosafety/animal_room/normal"
+  },
+  "ivc": {
+    "allowed_template_keys": [
+      "biosafety/ivc/default"
+    ],
+    "updated_at": "",
+    "updated_by": "admin"
+  },
+  "negative_pressure": {
+    "allowed_template_keys": [
+      "hospital/negative_pressure/default"
+    ],
+    "updated_at": "",
+    "updated_by": "admin"
+  },
+  "bsl": {
+    "allowed_template_keys": [
+      "biosafety/bsl/p2",
+      "biosafety/bsl/p3"
+    ],
+    "default_template_key": "biosafety/bsl/p2",
+    "updated_by": "admin",
+    "updated_at": "2026-05-07 15:57:00"
+  },
+  "bsc": {
+    "allowed_template_keys": [
+      "biosafety/bsc/default"
+    ],
+    "updated_at": "2026-05-07 17:11:51",
+    "updated_by": "admin",
+    "default_template_key": "biosafety/bsc/default"
+  },
+  "food_workshop": {
+    "allowed_template_keys": [
+      "food/food_workshop/grade/1",
+      "food/food_workshop/grade/2",
+      "food/food_workshop/grade/3",
+      "food/food_workshop/grade/4"
+    ],
+    "default_template_key": "food/food_workshop/grade/1",
+    "updated_at": "2026-05-07 16:11:00",
+    "updated_by": "admin"
+  },
+  "electronics_workshop": {
+    "allowed_template_keys": [
+      "electronics/electronics_workshop/iso/5",
+      "electronics/electronics_workshop/iso/6",
+      "electronics/electronics_workshop/iso/7",
+      "electronics/electronics_workshop/iso/8",
+      "electronics/electronics_workshop/iso/9"
+    ],
+    "default_template_key": "electronics/electronics_workshop/iso/5",
+    "updated_at": "2026-05-07 16:19:00",
+    "updated_by": "admin"
+  },
+  "clean_bench": {
+    "allowed_template_keys": [
+      "biosafety/clean_bench/default"
+    ],
+    "updated_at": "",
+    "updated_by": "admin"
+  }
+}

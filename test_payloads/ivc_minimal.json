@@ -1,0 +1,68 @@
+{
+  "domain": "biosafety",
+  "project_context": {
+    "project_name": "IVC笼具检测验证",
+    "client_name": "测试单位",
+    "project_address": "测试地址",
+    "contact_info": "测试联系人 13800000000",
+    "detection_date": "2026-04-29",
+    "report_number": "X1-IVC-20260429-01"
+  },
+  "rooms": [
+    {
+      "room_id": "ivc_001",
+      "room_name": "IVC笼具-1",
+      "type_id": "ivc",
+      "type_name": "IVC笼具",
+      "domain": "biosafety",
+      "ivc_result_state": "合格",
+      "params": [
+        {
+          "carrier": "ivc_model",
+          "value": "IVC-36",
+          "result": ""
+        },
+        {
+          "carrier": "cage_count",
+          "value": "36",
+          "result": ""
+        },
+        {
+          "carrier": "appearance",
+          "value": "",
+          "result": "符合要求"
+        },
+        {
+          "carrier": "air_velocity",
+          "value": "0.38",
+          "result": ""
+        },
+        {
+          "carrier": "hepa_leak",
+          "value": "",
+          "result": "未检出泄漏"
+        },
+        {
+          "carrier": "particle",
+          "value": "",
+          "result": "100级"
+        },
+        {
+          "carrier": "noise",
+          "value": "52",
+          "result": ""
+        },
+        {
+          "carrier": "illumination",
+          "value": "550",
+          "result": ""
+        },
+        {
+          "carrier": "ammonia",
+          "value": "8",
+          "result": ""
+        }
+      ]
+    }
+  ]
+}
