@@ -285,11 +285,7 @@ input[type="text"]:focus,input[type="password"]:focus,input[type="number"]:focus
       <select id="project-payment-status" onchange="loadProjects(1)"><option value="">全部收款情况</option></select>
       <input type="text" id="project-owner" placeholder="负责人" oninput="debounceProjectSearch()" style="width:140px">
     </div>
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin:2px 0 12px 0;padding:10px 12px;border:1px solid #e6f4ff;border-radius:10px;background:linear-gradient(180deg,#f8fcff 0%,#ffffff 100%);">
-      <div style="font-size:13px;color:#1d4ed8;font-weight:600;">项目进度看板</div>
-      <div style="font-size:12px;color:#64748b;">每行代表一个项目；总表只看推进状态，完整资料请进入项目信息卡。</div>
-    </div>
-    <div id="project-list"></div>
+        <div id="project-list"></div>
     <div id="project-pagination"></div>
   </div>
 </div>
