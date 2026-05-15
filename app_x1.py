@@ -695,6 +695,90 @@ def enforce_csrf_for_authenticated_writes():
     return None
 
 
+
+@app.route('/admin/api/registrations')
+@login_required
+@require_permission('admin.users.manage')
+def admin_api_registrations():
+    """获取客户注册申请列表"""
+    from database import get_db
+    status = request.args.get('status', 'pending')
+    with get_db() as conn:
+        _ensure_registration_table(conn)
+        if status == 'all':
+            rows = conn.execute('SELECT * FROM customer_registrations ORDER BY created_at DESC').fetchall()
+        else:
+            rows = conn.execute('SELECT * FROM customer_registrations WHERE status=? ORDER BY created_at DESC', [status]).fetchall()
+    result = []
+    for r in rows:
+        result.append({
+            'id': r['id'],
+            'username': r['username'],
+            'company': r['company'],
+            'contact_name': r['contact_name'],
+            'phone': r['phone'],
+            'address': r['address'] or '',
+            'status': r['status'],
+            'reviewed_by': r['reviewed_by'] or '',
+            'reviewed_at': r['reviewed_at'] or '',
+            'reject_reason': r['reject_reason'] or '',
+            'created_at': (r['created_at'] or '')[:19]
+        })
+    return jsonify(result)
+
+
+@app.route('/admin/api/registrations/<int:reg_id>/approve', methods=['POST'])
+@login_required
+@require_permission('admin.users.manage')
+def admin_api_approve_registration(reg_id):
+    """审核通过客户注册"""
+    from database import get_db
+    with get_db() as conn:
+        _ensure_registration_table(conn)
+        reg = conn.execute('SELECT * FROM customer_registrations WHERE id=?', [reg_id]).fetchone()
+        if not reg:
+            return jsonify({'success': False, 'message': '注册记录不存在'})
+        if reg['status'] != 'pending':
+            return jsonify({'success': False, 'message': '该申请已处理'})
+        
+        # 激活用户账号
+        conn.execute('UPDATE users SET is_active=1 WHERE user_id=?', [reg['username']])
+        # 更新注册记录
+        conn.execute(
+            """UPDATE customer_registrations SET status='approved', reviewed_by=?, reviewed_at=datetime('now','localtime') WHERE id=?""",
+            [current_user.id, reg_id]
+        )
+        conn.commit()
+    log_action(current_user.id, 'approve_registration', reg['username'], f"审核通过客户注册：{reg['company']} / {reg['contact_name']}")
+    return jsonify({'success': True, 'message': '已通过审核，客户可登录使用'})
+
+
+@app.route('/admin/api/registrations/<int:reg_id>/reject', methods=['POST'])
+@login_required
+@require_permission('admin.users.manage')
+def admin_api_reject_registration(reg_id):
+    """驳回客户注册"""
+    data = request.get_json(silent=True) or {}
+    reason = (data.get('reason') or '').strip() or '未通过审核'
+    from database import get_db
+    with get_db() as conn:
+        _ensure_registration_table(conn)
+        reg = conn.execute('SELECT * FROM customer_registrations WHERE id=?', [reg_id]).fetchone()
+        if not reg:
+            return jsonify({'success': False, 'message': '注册记录不存在'})
+        if reg['status'] != 'pending':
+            return jsonify({'success': False, 'message': '该申请已处理'})
+        
+        # 更新注册记录（不激活账号）
+        conn.execute(
+            """UPDATE customer_registrations SET status='rejected', reviewed_by=?, reviewed_at=datetime('now','localtime'), reject_reason=? WHERE id=?""",
+            [current_user.id, reason, reg_id]
+        )
+        conn.commit()
+    log_action(current_user.id, 'reject_registration', reg['username'], f"驳回客户注册：{reg['company']}，原因：{reason}")
+    return jsonify({'success': True, 'message': '已驳回'})
+
+
 @app.route('/static/manifest.json')
 def x_manifest():
     return jsonify({
@@ -791,6 +875,84 @@ def login_page():
         return redirect(url_for('login_page'))
     
     return render_template('login.html', version=APP_VERSION)
+
+
+@app.route('/register')
+def register_page():
+    """客户自助注册页面"""
+    return render_template('register.html', version=APP_VERSION)
+
+
+@app.route('/api/register', methods=['POST'])
+def api_register():
+    """客户自助注册 API：创建待审核客户账号"""
+    data = request.get_json(silent=True) or {}
+    company = (data.get('company') or '').strip()
+    contact_name = (data.get('contact_name') or '').strip()
+    phone = (data.get('phone') or '').strip()
+    username = (data.get('username') or '').strip()
+    password = (data.get('password') or '').strip()
+    address = (data.get('address') or '').strip()
+
+    # 校验
+    if not company or not contact_name or not phone or not username or not password:
+        return jsonify({'success': False, 'message': '请填写所有必填字段'})
+    if len(username) < 3 or len(username) > 20:
+        return jsonify({'success': False, 'message': '用户名需要3-20个字符'})
+    import re as _re
+    if not _re.match(r'^[a-zA-Z0-9_]+$', username):
+        return jsonify({'success': False, 'message': '用户名只能包含字母、数字、下划线'})
+    if len(password) < 6:
+        return jsonify({'success': False, 'message': '密码至少6位'})
+    if not _re.match(r'^1[3-9]\d{9}$', phone):
+        return jsonify({'success': False, 'message': '请输入正确的手机号'})
+
+    from database import get_db
+    from werkzeug.security import generate_password_hash
+    try:
+        with get_db() as conn:
+            # 检查用户名是否已存在
+            existing = conn.execute('SELECT user_id FROM users WHERE user_id = ?', [username]).fetchone()
+            if existing:
+                return jsonify({'success': False, 'message': '该用户名已被注册'})
+
+            # 创建账号：is_active=0（待审核）
+            conn.execute(
+                """INSERT INTO users (user_id, display_name, password_hash, role, department, is_active, client_name, created_at)
+                   VALUES (?, ?, ?, 'customer', ?, 0, ?, datetime('now', 'localtime'))""",
+                [username, contact_name, generate_password_hash(password, method='pbkdf2:sha256'), company, company]
+            )
+
+            # 记录注册附加信息到 customer_registrations 表
+            _ensure_registration_table(conn)
+            conn.execute(
+                """INSERT INTO customer_registrations (username, company, contact_name, phone, address, status, created_at)
+                   VALUES (?, ?, ?, ?, ?, 'pending', datetime('now', 'localtime'))""",
+                [username, company, contact_name, phone, address]
+            )
+            conn.commit()
+
+        log_action(username, 'customer_register', '', f'客户自助注册：{company} / {contact_name} / {phone}')
+        return jsonify({'success': True, 'message': '注册成功，等待审核'})
+    except Exception as e:
+        return jsonify({'success': False, 'message': f'注册失败：{str(e)}'})
+
+
+def _ensure_registration_table(conn):
+    """确保 customer_registrations 表存在"""
+    conn.execute("""CREATE TABLE IF NOT EXISTS customer_registrations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT NOT NULL,
+        company TEXT NOT NULL,
+        contact_name TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        address TEXT DEFAULT '',
+        status TEXT DEFAULT 'pending',
+        reviewed_by TEXT DEFAULT '',
+        reviewed_at TEXT DEFAULT '',
+        reject_reason TEXT DEFAULT '',
+        created_at TEXT NOT NULL
+    )""")
 
 
 @app.route('/logout')
