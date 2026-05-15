@@ -3187,7 +3187,7 @@ function viewTemplate(id, refreshOnly){
     var flowSummary = (meta.group && statsMap[meta.group]) ? statsMap[meta.group] : (statsMap.all || summarizeTemplateFlowRows(d.files||[], viewId, meta.group||''));
 
     var html='';
-    html+='<div id="template-detail-sticky-head" style="position:sticky;top:0;z-index:5;background:#fff;padding-bottom:12px;margin:-8px -8px 16px;border-bottom:1px solid #f0f0f0;padding-left:8px;padding-right:56px;padding-top:8px">';
+    html+='<div id="template-detail-sticky-head" style="position:sticky;top:-24px;z-index:5;background:#fff;padding-bottom:12px;margin:-24px -24px 16px;padding-left:24px;padding-right:56px;padding-top:24px;border-bottom:1px solid #f0f0f0">';
     html+='<div style="margin-bottom:16px">';
     html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">';
     html+='<div><h3 style="margin:0 0 8px">'+viewName+' 模板配置</h3>';
