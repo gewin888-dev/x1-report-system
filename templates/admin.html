@@ -1172,12 +1172,12 @@ function loadStats(){
     Object.keys(d.by_operator||{}).forEach(function(k){
       h += '<tr><td>'+k+'</td><td>'+d.by_operator[k]+'</td></tr>';
     });
-    document.getElementById('tb-operator').innerHTML = h || '<tr><td colspan="2" class="empty">暂无数据</td></tr>';
+    var elOp=document.getElementById('tb-operator'); if(elOp) elOp.innerHTML = h || '<tr><td colspan="2" class="empty">暂无数据</td></tr>';
     h = '';
     Object.keys(d.by_domain||{}).forEach(function(k){
       h += '<tr><td>'+(DOMAIN_MAP[k]||k)+'</td><td>'+d.by_domain[k]+'</td></tr>';
     });
-    document.getElementById('tb-domain').innerHTML = h || '<tr><td colspan="2" class="empty">暂无数据</td></tr>';
+    var elDm=document.getElementById('tb-domain'); if(elDm) elDm.innerHTML = h || '<tr><td colspan="2" class="empty">暂无数据</td></tr>';
     h = '';
     var months = Object.keys(d.by_month||{}).sort().reverse();
     months.forEach(function(m){
@@ -1185,7 +1185,7 @@ function loadStats(){
         h += '<tr><td>'+m+'</td><td>'+d.by_month[m]+'</td></tr>';
       }
     });
-    document.getElementById('tb-monthly').innerHTML = h || '<tr><td colspan="2" class="empty">暂无数据</td></tr>';
+    var elMo=document.getElementById('tb-monthly'); if(elMo) elMo.innerHTML = h || '<tr><td colspan="2" class="empty">暂无数据</td></tr>';
     if(window.__renderAdvancedStats){ window.__renderAdvancedStats(d); }
   });
 }
