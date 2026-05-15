@@ -1030,7 +1030,7 @@ function loadNotifications(){
     var html = '';
     items.forEach(function(n){
       var cls = n.is_read ? 'notif-item read' : 'notif-item unread';
-      var catIcon = {registration:'📋',urge:'⚡',feedback:'✍️',report:'📄',system:'🔔'}[n.category] || '🔔';
+      var catIcon = {registration:'📋',urge:'⚡',feedback:'✍️',report:'📄',system:'🔔',dispatch:'📨'}[n.category] || '🔔';
       html += '<div class="'+cls+'" onclick="clickNotif('+n.id+',\''+escapeHtml(n.link||'')+'\')"><div class="notif-dot"></div><div class="notif-body"><div class="notif-title">'+catIcon+' '+escapeHtml(n.title)+'</div>';
       if(n.content) html += '<div class="notif-content">'+escapeHtml(n.content)+'</div>';
       html += '<div class="notif-time">'+escapeHtml(n.created_at)+'</div></div></div>';

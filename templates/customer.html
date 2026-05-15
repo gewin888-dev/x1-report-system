@@ -1043,7 +1043,7 @@ function loadCustNotifications(){
     items.forEach(function(n){
       var bg = n.is_read ? '#fff' : '#eff6ff';
       var border = n.is_read ? '#f3f4f6' : '#bfdbfe';
-      var catIcon = {registration:'📋',urge:'⚡',feedback:'✍️',report:'📄',system:'🔔'}[n.category] || '🔔';
+      var catIcon = {registration:'📋',urge:'⚡',feedback:'✍️',report:'📄',system:'🔔',dispatch:'📨'}[n.category] || '🔔';
       html += '<div style="padding:12px 14px;border:1px solid '+border+';border-radius:10px;background:'+bg+';margin-bottom:8px;cursor:pointer;" onclick="custReadNotif('+n.id+')">';
       html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">';
       html += '<div style="font-size:14px;font-weight:600;color:#0f172a;">'+catIcon+' '+(n.title||'')+'</div>';

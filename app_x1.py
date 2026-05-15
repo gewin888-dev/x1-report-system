@@ -2229,6 +2229,23 @@ def create_project_task():
     # 自动流转：派单 → 已排期
     _auto_advance_project_stage(payload['project_id'], target_inspection='已排期')
 
+    # 通知被派单人员
+    if assigned_to:
+        try:
+            from notifications import create_notification
+            project_name = project_row['project_name'] or str(payload['project_id'])
+            type_label = _get_task_type_label(task_type)
+            create_notification(
+                title='新任务派单',
+                content=f'您被指派了「{project_name}」的{type_label}任务',
+                category='dispatch',
+                target_role=None,
+                target_user=assigned_to,
+                link='tasks'
+            )
+        except Exception:
+            pass
+
     conn = get_x1_data_conn()
     try:
         row = conn.execute("SELECT * FROM project_tasks WHERE id=?", (task_id,)).fetchone()
