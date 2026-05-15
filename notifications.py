@@ -39,6 +39,10 @@ def ensure_notifications_table():
 
 
 def create_notification(title, content='', category='system', target_role='', target_user='', link=''):
+    # 防御 None
+    target_role = target_role or ''
+    target_user = target_user or ''
+    link = link or ''
     """
     创建通知
     
