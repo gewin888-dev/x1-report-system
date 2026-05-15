@@ -269,9 +269,36 @@ def register_customer_routes(app):
         if not client_name:
             return jsonify({'success': True, 'items': []})
 
-        reports_dir = BASE_DIR / 'reports_x1'
         results = []
+        seen_projects = set()  # 用于去重
 
+        # 数据源1：已确认的项目（从 business_projects 表）
+        conn = _get_x1_data_conn()
+        try:
+            confirmed_rows = conn.execute(
+                "SELECT * FROM business_projects WHERE client_name=? AND report_status IN ('客户已确认','已发送客户') ORDER BY updated_at DESC",
+                (client_name,)
+            ).fetchall()
+            for row in confirmed_rows:
+                pname = row['project_name'] or ''
+                seen_projects.add(pname)
+                results.append({
+                    'export_id': '',
+                    'project_id': row['id'],
+                    'project_name': pname,
+                    'detection_object': row['detection_type'] or '',
+                    'detection_date': (row['updated_at'] or '')[:10],
+                    'report_number': row['project_no'] or '',
+                    'status': '客户已确认' if row['report_status'] == '客户已确认' else '已发送',
+                    'feishu_report_url': '',
+                    'feishu_export_url': '',
+                    'can_preview_pdf': True,
+                })
+        finally:
+            conn.close()
+
+        # 数据源2：导出记录（从 reports_x1/*.json）
+        reports_dir = BASE_DIR / 'reports_x1'
         if reports_dir.exists():
             for json_file in sorted(reports_dir.glob('*.json'), reverse=True):
                 try:
@@ -285,13 +312,18 @@ def register_customer_routes(app):
                     if file_client_name != client_name:
                         continue
 
+                    pname = project.get('project_name', '')
+                    if pname in seen_projects:
+                        continue  # 已经从确认项目源取到，跳过重复
+                    seen_projects.add(pname)
+
                     feishu = data.get('feishu', {})
                     feishu_report = feishu.get('report', {})
                     feishu_export = feishu.get('export', {})
 
                     results.append({
                         'export_id': data.get('export_id', ''),
-                        'project_name': project.get('project_name', ''),
+                        'project_name': pname,
                         'detection_object': project.get('inspection_area', ''),
                         'detection_date': project.get('detection_date', ''),
                         'report_number': project.get('report_number', ''),
@@ -320,10 +352,30 @@ def register_customer_routes(app):
                 (client_name,)
             ).fetchall()
 
+            # 查询催单冷却状态（4小时内是否催过）
+            cooldown_time = (datetime.now() - timedelta(hours=4)).strftime('%Y-%m-%d %H:%M:%S')
+            urge_logs = conn.execute(
+                "SELECT project_id, urge_type FROM project_urge_logs WHERE client_name=? AND created_at > ?",
+                (client_name, cooldown_time)
+            ).fetchall()
+            # 构建 {project_id: set(urge_types)} 映射
+            urge_cooling = {}
+            for log in urge_logs:
+                pid = log['project_id']
+                if pid not in urge_cooling:
+                    urge_cooling[pid] = set()
+                urge_cooling[pid].add(log['urge_type'])
+
             projects = []
             for row in rows:
+                pid = row['id']
+                cooling = urge_cooling.get(pid, set())
+                rs = (row['report_status'] or '').strip()
+                # 已确认的项目不在进行中列表显示（转历史记录）
+                if rs in ('客户已确认', '已发送客户'):
+                    continue
                 projects.append({
-                    'id': row['id'],
+                    'id': pid,
                     'project_no': row['project_no'] or '',
                     'project_name': row['project_name'] or '',
                     'client_name': row['client_name'] or '',
@@ -335,10 +387,12 @@ def register_customer_routes(app):
                     'project_desc': row['project_desc'] or '',
                     'business_stage': row['business_stage'] or '',
                     'inspection_stage': row['inspection_stage'] or '',
-                    'report_status': row['report_status'] or '',
+                    'report_status': rs,
                     'invoice_status': row['invoice_status'] or '',
                     'payment_status': row['payment_status'] or '',
                     'has_urge': row['has_urge'] if 'has_urge' in row.keys() else '',
+                    'urge_cooling_report': 'report' in cooling,
+                    'urge_cooling_invoice': 'invoice' in cooling,
                     'created_at': row['created_at'] or '',
                     'updated_at': row['updated_at'] or '',
                 })
@@ -425,8 +479,8 @@ def register_customer_routes(app):
             if not project or project['client_name'] != client_name:
                 return jsonify({'success': False, 'message': '项目不存在或无权操作'}), 404
 
-            # 冷却期检查：24小时内同一项目同一类型不能重复催单
-            cooldown_time = (datetime.now() - timedelta(hours=24)).strftime('%Y-%m-%d %H:%M:%S')
+            # 冷却期检查：4小时内同一项目同一类型不能重复催单
+            cooldown_time = (datetime.now() - timedelta(hours=4)).strftime('%Y-%m-%d %H:%M:%S')
             recent = conn.execute(
                 "SELECT id FROM project_urge_logs WHERE project_id = ? AND urge_type = ? AND created_at > ?",
                 (project_id, urge_type, cooldown_time)
@@ -435,7 +489,7 @@ def register_customer_routes(app):
             if recent:
                 return jsonify({
                     'success': False,
-                    'message': '您已在24小时内催过单，请耐心等待处理。'
+                    'message': '正在处理您的请求，请4小时后再试。'
                 }), 429
 
             # 写入催单记录

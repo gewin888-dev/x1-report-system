@@ -203,10 +203,15 @@
       empty.style.display = 'none';
       tbody.innerHTML = list.map(function (r) {
         var status = r.status || '已完成';
-        var statusCls = (status === '已完成' || status === '成功') ? 'background:#f6ffed;color:#52c41a;' : 'background:#e6f7ff;color:#1677ff;';
-        var previewBtn = r.feishu_url
-          ? '<a href="' + escapeHtml(r.feishu_url) + '" target="_blank" class="btn btn-primary btn-sm" style="font-size:12px;padding:3px 10px;">预览</a>'
-          : '';
+        var statusCls = (status === '客户已确认') ? 'background:#f6ffed;color:#389e0d;'
+          : (status === '已出具' || status === '已完成' || status === '成功' || status === '已发送') ? 'background:#f6ffed;color:#52c41a;'
+          : 'background:#e6f7ff;color:#1677ff;';
+        var previewBtn = '';
+        if (r.can_preview_pdf && r.project_id) {
+          previewBtn = '<button class="btn btn-preview btn-sm" style="font-size:12px;padding:3px 10px;" onclick="previewReport(' + r.project_id + ')">🔍 查看报告</button>';
+        } else if (r.feishu_url) {
+          previewBtn = '<a href="' + escapeHtml(r.feishu_url) + '" target="_blank" class="btn btn-primary btn-sm" style="font-size:12px;padding:3px 10px;">预览</a>';
+        }
         var downloadBtn = r.feishu_export_url
           ? '<a href="' + escapeHtml(r.feishu_export_url) + '" target="_blank" class="btn btn-default btn-sm" style="font-size:12px;padding:3px 10px;">下载</a>'
           : '';
@@ -240,28 +245,41 @@
         var statusColor = p.status === '已完成' ? 'background:#f6ffed;color:#52c41a;'
           : p.status === '进行中' ? 'background:#e6f7ff;color:#1677ff;'
           : 'background:#fff7e6;color:#fa8c16;';
-        var hasUrge = p.has_urge || '';
-        var urgedReport = hasUrge.indexOf('report') !== -1;
-        var urgedInvoice = hasUrge.indexOf('invoice') !== -1;
-        var urgeBtns = '<button class="btn btn-primary btn-sm" style="font-size:12px;padding:4px 12px;" onclick="urgeProject(\'' + escapeHtml(String(p.id)) + '\',\'report\')">'
-          + '📄 催报告</button>'
-          + (urgedReport ? '<span style="font-size:11px;color:#1677ff;margin-left:2px;">已催</span>' : '')
-          + ' <button class="btn btn-warn btn-sm" style="font-size:12px;padding:4px 12px;" onclick="urgeProject(\'' + escapeHtml(String(p.id)) + '\',\'invoice\')">'
-          + '🧾 催发票</button>'
-          + (urgedInvoice ? '<span style="font-size:11px;color:#ff7a00;margin-left:2px;">已催</span>' : '');
+        // === 催单按钮（冷却期内灰色） ===
+        var coolingReport = p.urge_cooling_report;
+        var coolingInvoice = p.urge_cooling_invoice;
+        var urgeBtns = '';
+        if (coolingReport) {
+          urgeBtns += '<button class="btn btn-sm btn-disabled" disabled>📄 催报告（处理中）</button>';
+        } else {
+          urgeBtns += '<button class="btn btn-primary btn-sm" onclick="urgeProject(' + p.id + ',\'report\')">📄 催报告</button>';
+        }
+        if (coolingInvoice) {
+          urgeBtns += '<button class="btn btn-sm btn-disabled" disabled>🧾 催发票（处理中）</button>';
+        } else {
+          urgeBtns += ' <button class="btn btn-warn btn-sm" onclick="urgeProject(' + p.id + ',\'invoice\')">🧾 催发票</button>';
+        }
 
-        // 报告反馈/确认按钮：仅在报告已出具/待客户确认 时显示
+        // === 报告操作按钮（状态驱动高亮/灰色） ===
         var rptStatus = (p.report_status || '').trim();
-        var canFeedback = (rptStatus === '已出具' || rptStatus === '待客户确认');
-        var isConfirmed = (rptStatus === '客户已确认' || rptStatus === '已发送客户');
+        var canPreview = (rptStatus === '已出具' || rptStatus === '待客户确认');
+        var canFeedback = canPreview;
+        var canConfirm = canPreview;
         var reportBtns = '';
+        if (canPreview) {
+          reportBtns += '<button class="btn btn-preview" onclick="previewReport(' + p.id + ')">🔍 预览报告</button>';
+        } else {
+          reportBtns += '<button class="btn btn-sm btn-disabled" disabled>🔍 预览报告</button>';
+        }
         if (canFeedback) {
-          reportBtns = '<button class="btn btn-preview" onclick="previewReport(' + p.id + ')">🔍 预览报告</button>'
-            + '<button class="btn btn-feedback" onclick="openReportFeedback(' + p.id + ')">✍️ 报告反馈</button>'
-            + '<button class="btn btn-confirm" onclick="openConfirmReport(' + p.id + ')">✅ 确认报告</button>';
-        } else if (isConfirmed) {
-          reportBtns = '<button class="btn btn-preview" onclick="previewReport(' + p.id + ')">🔍 查看报告</button>'
-            + '<span class="btn btn-confirmed">✅ 已确认</span>';
+          reportBtns += '<button class="btn btn-feedback" onclick="openReportFeedback(' + p.id + ')">✍️ 报告反馈</button>';
+        } else {
+          reportBtns += '<button class="btn btn-sm btn-disabled" disabled>✍️ 报告反馈</button>';
+        }
+        if (canConfirm) {
+          reportBtns += '<button class="btn btn-confirm" onclick="openConfirmReport(' + p.id + ')">✅ 确认报告</button>';
+        } else {
+          reportBtns += '<button class="btn btn-sm btn-disabled" disabled>✅ 确认报告</button>';
         }
 
         return '<div class="project-card">'
@@ -318,10 +336,17 @@
   window.urgeProject = function (projectId, type) {
     api('POST', '/customer/api/projects/' + projectId + '/urge', { type: type })
       .then(function (d) {
-        alert(d.message || '催单已提交');
+        showToast(d.message || '催单已提交', 'success');
         loadProjects();
       })
-      .catch(function () { showToast('催单失败，请重试', 'error'); });
+      .catch(function (e) {
+        if (e && e.message && e.message.indexOf('4小时') !== -1) {
+          showToast('正在处理您的请求，请4小时后再试', 'info');
+        } else {
+          showToast('催单失败，请重试', 'error');
+        }
+        loadProjects(); // 刷新按钮状态
+      });
   };
 
   /* ========== 报告反馈 & 确认 ========== */
