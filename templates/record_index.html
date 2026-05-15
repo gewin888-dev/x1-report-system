@@ -9,18 +9,18 @@
     <link rel="manifest" href="/static/manifest.json">
     <link rel="apple-touch-icon" href="/static/icon-192.png">
     <title>现场记录录入系统 {{ version }}</title>
-    <link rel="stylesheet" href="/static/record.css?v=4.10">
+    <link rel="stylesheet" href="/static/record.css?v=4.11">
 </head>
 <body>
     <div class="header">
         <div class="header-main header-main-inline">
             <div class="header-inline-toprow" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:nowrap;">
-                <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
-                    <img src="/static/logo.png" alt="普迪检测" style="height:36px;width:auto;">
-                    <span style="font-size:16px;font-weight:700;color:#fff;white-space:nowrap;">普迪检测</span>
+                <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+                    <img src="/static/logo.png" alt="普迪检测" style="height:46px;width:auto;background:rgba(255,255,255,.92);border-radius:6px;padding:3px;">
+                    <span style="font-size:18px;font-weight:700;color:#fff;white-space:nowrap;">普迪检测 <span style="font-size:13px;font-weight:500;opacity:.8;">X4.7</span></span>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;font-size:11px;color:#ccc;white-space:nowrap;">
-                    <span>检测员：<span id="currentUser"></span> {{ version }}</span><span id="syncBadge" style="display:none;background:#f44336;color:white;padding:1px 6px;border-radius:8px;font-size:10px;">离线</span><span id="pendingCount" style="display:none;background:#ff9800;color:white;padding:1px 6px;border-radius:8px;font-size:10px;cursor:pointer;" onclick="syncPendingRecords()">0</span>
+                    <span>检测员：<span id="currentUser"></span></span><span id="syncBadge" style="display:none;background:#f44336;color:white;padding:1px 6px;border-radius:8px;font-size:10px;">离线</span><span id="pendingCount" style="display:none;background:#ff9800;color:white;padding:1px 6px;border-radius:8px;font-size:10px;cursor:pointer;" onclick="syncPendingRecords()">0</span>
                     <a href="/admin" class="admin-link" onclick="return handleAdminEntry(event)" style="font-size:12px;">⚙️后台</a>
                     <a href="/logout" class="logout" style="font-size:12px;">退出</a>
                 </div>

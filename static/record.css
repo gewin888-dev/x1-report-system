@@ -26,14 +26,14 @@ input[type="number"] {
     appearance: textfield;
 }
 .header { 
-    background: linear-gradient(135deg, #5f76ea 0%, #6a63d7 52%, #7b4fb2 100%); 
+    background: linear-gradient(135deg, #1677ff 0%, #4096ff 100%); 
     color: white; 
-    padding: 16px 18px 14px; 
+    padding: 20px 18px 18px; 
     position: sticky; 
     top: 0; 
     z-index: 100; 
     overflow: hidden; 
-    box-shadow: 0 10px 24px rgba(68, 85, 153, 0.18);
+    box-shadow: 0 10px 24px rgba(22, 119, 255, 0.2);
 }
 .header-main {
     max-width: 928px;
