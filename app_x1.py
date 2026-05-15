@@ -1842,7 +1842,7 @@ def admin_api_business_projects_summary():
         total_projects = conn.execute("SELECT COUNT(*) AS c FROM business_projects").fetchone()['c']
         inspecting_projects = conn.execute("SELECT COUNT(*) AS c FROM business_projects WHERE inspection_stage='检测中'").fetchone()['c']
         pending_reports = conn.execute("SELECT COUNT(*) AS c FROM business_projects WHERE report_status IN ('编制中','审核中','待修改','待出具')").fetchone()['c']
-        pending_invoices = conn.execute("SELECT COUNT(*) AS c FROM business_projects WHERE invoice_status IN ('未开票','待开票','部分开票')").fetchone()['c']
+        pending_invoices = conn.execute("SELECT COUNT(*) AS c FROM business_projects WHERE invoice_status IN ('未开票','部分开票')").fetchone()['c']
         pending_payments = conn.execute("SELECT COUNT(*) AS c FROM business_projects WHERE payment_status IN ('未回款','部分回款','逾期未回款')").fetchone()['c']
         contract_total_amount = conn.execute("SELECT COALESCE(SUM(contract_amount),0) AS s FROM business_projects").fetchone()['s']
         paid_total_amount = conn.execute("SELECT COALESCE(SUM(paid_amount),0) AS s FROM business_projects").fetchone()['s']
