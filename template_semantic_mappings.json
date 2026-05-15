@@ -276,110 +276,110 @@
   },
   "biosafety.animal_room.normal": {
     "allowed_template_keys": [
-      "biosafety/animal_room/normal",
+      "biosafety/animal_room/default",
       "biosafety/animal_room/default"
     ],
-    "default_template_key": "biosafety/animal_room/normal",
+    "default_template_key": "biosafety/animal_room/default",
     "updated_by": "admin",
     "updated_at": "2026-05-07 15:03:49",
     "semantic_key": "biosafety.animal_room.normal"
   },
   "biosafety.animal_room.barrier_main": {
     "allowed_template_keys": [
-      "biosafety/animal_room/barrier-main",
+      "biosafety/animal_room/default/pz",
       "biosafety/animal_room/default/pz"
     ],
-    "default_template_key": "biosafety/animal_room/barrier-main",
+    "default_template_key": "biosafety/animal_room/default/pz",
     "updated_by": "admin",
     "updated_at": "2026-05-07 15:03:57",
     "semantic_key": "biosafety.animal_room.barrier_main"
   },
   "biosafety.animal_room.isolation": {
     "allowed_template_keys": [
-      "biosafety/animal_room/isolation",
+      "biosafety/animal_room/default/gl",
       "biosafety/animal_room/default/gl"
     ],
-    "default_template_key": "biosafety/animal_room/isolation",
+    "default_template_key": "biosafety/animal_room/default/gl",
     "updated_by": "admin",
     "updated_at": "2026-05-07 15:04:04",
     "semantic_key": "biosafety.animal_room.isolation"
   },
   "biosafety.animal_room.barrier_aux.clean_storage": {
     "allowed_template_keys": [
-      "biosafety/animal_room/barrier-aux/洁物储存室",
+      "biosafety/animal_room/default/pzf",
       "biosafety/animal_room/default/pzf"
     ],
-    "default_template_key": "biosafety/animal_room/barrier-aux/洁物储存室",
+    "default_template_key": "biosafety/animal_room/default/pzf",
     "updated_by": "admin",
     "updated_at": "2026-05-07 15:04:12",
     "semantic_key": "biosafety.animal_room.barrier_aux.clean_storage"
   },
   "biosafety.animal_room.barrier_aux.after_sterilization": {
     "allowed_template_keys": [
-      "biosafety/animal_room/barrier-aux/灭菌后室区",
+      "biosafety/animal_room/default/pzf",
       "biosafety/animal_room/default/pzf"
     ],
-    "default_template_key": "biosafety/animal_room/barrier-aux/灭菌后室区",
+    "default_template_key": "biosafety/animal_room/default/pzf",
     "updated_by": "admin",
     "updated_at": "2026-05-07 15:04:18",
     "semantic_key": "biosafety.animal_room.barrier_aux.after_sterilization"
   },
   "biosafety.animal_room.barrier_aux.clean_corridor": {
     "allowed_template_keys": [
-      "biosafety/animal_room/barrier-aux/洁净走廊",
+      "biosafety/animal_room/default/pzf",
       "biosafety/animal_room/default/pzf"
     ],
-    "default_template_key": "biosafety/animal_room/barrier-aux/洁净走廊",
+    "default_template_key": "biosafety/animal_room/default/pzf",
     "updated_by": "admin",
     "updated_at": "2026-05-07 15:04:26",
     "semantic_key": "biosafety.animal_room.barrier_aux.clean_corridor"
   },
   "biosafety.animal_room.barrier_aux.dirty_corridor": {
     "allowed_template_keys": [
-      "biosafety/animal_room/barrier-aux/污物走廊",
+      "biosafety/animal_room/default/pzf",
       "biosafety/animal_room/default/pzf"
     ],
-    "default_template_key": "biosafety/animal_room/barrier-aux/污物走廊",
+    "default_template_key": "biosafety/animal_room/default/pzf",
     "updated_by": "admin",
     "updated_at": "2026-05-07 15:04:34",
     "semantic_key": "biosafety.animal_room.barrier_aux.dirty_corridor"
   },
   "biosafety.animal_room.barrier_aux.buffer": {
     "allowed_template_keys": [
-      "biosafety/animal_room/barrier-aux/缓冲间",
+      "biosafety/animal_room/default/pzf",
       "biosafety/animal_room/default/pzf"
     ],
-    "default_template_key": "biosafety/animal_room/barrier-aux/缓冲间",
+    "default_template_key": "biosafety/animal_room/default/pzf",
     "updated_by": "admin",
     "updated_at": "2026-05-07 15:04:40",
     "semantic_key": "biosafety.animal_room.barrier_aux.buffer"
   },
   "biosafety.animal_room.barrier_aux.change_room_2": {
     "allowed_template_keys": [
-      "biosafety/animal_room/barrier-aux/二更",
+      "biosafety/animal_room/default/pzf",
       "biosafety/animal_room/default/pzf"
     ],
-    "default_template_key": "biosafety/animal_room/barrier-aux/二更",
+    "default_template_key": "biosafety/animal_room/default/pzf",
     "updated_by": "admin",
     "updated_at": "2026-05-07 15:04:49",
     "semantic_key": "biosafety.animal_room.barrier_aux.change_room_2"
   },
   "biosafety.animal_room.barrier_aux.cleaning_disinfection": {
     "allowed_template_keys": [
-      "biosafety/animal_room/barrier-aux/清洗消毒室",
+      "biosafety/animal_room/default/pzf",
       "biosafety/animal_room/default/pzf"
     ],
-    "default_template_key": "biosafety/animal_room/barrier-aux/清洗消毒室",
+    "default_template_key": "biosafety/animal_room/default/pzf",
     "updated_by": "admin",
     "updated_at": "2026-05-07 15:04:56",
     "semantic_key": "biosafety.animal_room.barrier_aux.cleaning_disinfection"
   },
   "biosafety.animal_room.barrier_aux.change_room_1": {
     "allowed_template_keys": [
-      "biosafety/animal_room/barrier-aux/一更",
+      "biosafety/animal_room/default/pzf",
       "biosafety/animal_room/default/pzf"
     ],
-    "default_template_key": "biosafety/animal_room/barrier-aux/一更",
+    "default_template_key": "biosafety/animal_room/default/pzf",
     "updated_by": "admin",
     "updated_at": "2026-05-07 15:05:13",
     "semantic_key": "biosafety.animal_room.barrier_aux.change_room_1"
