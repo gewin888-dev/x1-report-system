@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 50" width="200" height="50">
+  <!-- 盾牌/检测标志 -->
+  <g transform="translate(5,3)">
+    <!-- 盾牌外框 -->
+    <path d="M22 2 L42 8 L42 24 C42 34 32 42 22 44 C12 42 2 34 2 24 L2 8 Z" 
+          fill="#1677ff" stroke="none"/>
+    <!-- 对勾 -->
+    <path d="M14 22 L20 28 L32 16" 
+          stroke="#fff" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- 分子/检测点缀 -->
+    <circle cx="36" cy="6" r="2.5" fill="#40a9ff"/>
+    <circle cx="40" cy="12" r="1.5" fill="#69c0ff"/>
+  </g>
+  <!-- 公司名称 -->
+  <text x="54" y="22" font-family="-apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif" 
+        font-size="11" font-weight="600" fill="#001529" letter-spacing="0.5">
+    内蒙古普迪检测技术服务有限公司
+  </text>
+  <!-- 英文副标题 -->
+  <text x="54" y="38" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif" 
+        font-size="8" fill="#8c8c8c" letter-spacing="0.8">
+    INNER MONGOLIA PUDI TESTING SERVICES CO., LTD.
+  </text>
+</svg>
