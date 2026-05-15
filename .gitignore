@@ -51,3 +51,26 @@ _archive/
 
 # Uploads directory
 uploads/
+
+# Backup files
+*.bak
+*.bak_*
+*.before_*
+
+# Temp probe scripts
+tmp_*.js
+tmp_*.py
+
+# Old logs in root
+x1.log
+
+# Old user files in root (data is in data/)
+users.json
+
+# SHM/WAL files
+*.db-shm
+*.db-wal
+
+# Package lock (if not using npm build)
+package-lock.json
+EXTRA2
