@@ -2652,6 +2652,9 @@ function filterTemplates(){
     status+='<span class="tag" style="background:#fafafa;color:#595959;border:1px solid #d9d9d9">场景 '+(effective.total||0)+'</span>';
     if((effective.risk||0)>0) status+='<span class="tag" style="background:#fff1f0;color:#cf1322;border:1px solid #ffa39e">异常 '+(effective.risk||0)+'</span>';
     if((effective.missing_count||0)>0) status+='<span class="tag" style="background:#fff7e6;color:#d46b08;border:1px solid #ffd591">缺失 '+(effective.missing_count||0)+'</span>';
+    if(effective.default_warning==='missing') status+='<span class="tag" style="background:#fff1f0;color:#cf1322;border:1px solid #ffa39e">默认模板缺失</span>';
+    if(effective.default_warning==='disabled') status+='<span class="tag" style="background:#fff7e6;color:#d46b08;border:1px solid #ffd591">默认模板已停用</span>';
+    if(effective.default_warning==='unset') status+='<span class="tag" style="background:#fafafa;color:#8c8c8c;border:1px solid #d9d9d9">未设置默认</span>';
     status+='</div>';
     var domainTag='<span class="tag" style="background:#f0f5ff;color:#1890ff;border-color:#adc6ff">'+(DOMAIN_NAMES[effective.domain]||effective.domain||'未分类')+'</span>';
     var viewBtn='<button class="btn btn-sm" style="min-width:108px;background:#e6f4ff;border-color:#91caff;color:#0958d9" onclick="viewTemplate('+String.fromCharCode(39)+effective.id+String.fromCharCode(39)+')">📂 查看详情</button>';

@@ -83,7 +83,6 @@
   },
   "animal_room": {
     "allowed_template_keys": [
-      "biosafety/animal_room/normal",
       "biosafety/animal_room/default",
       "biosafety/animal_room/default/pz",
       "biosafety/animal_room/default/pzf",
@@ -91,7 +90,7 @@
     ],
     "updated_at": "2026-05-07 09:35:16",
     "updated_by": "admin",
-    "default_template_key": "biosafety/animal_room/normal"
+    "default_template_key": "biosafety/animal_room/default"
   },
   "ivc": {
     "allowed_template_keys": [
