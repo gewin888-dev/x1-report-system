@@ -14,6 +14,11 @@ _feishu_folder_cache = {}
 _MONTH_RE = re.compile(r'^\d{4}-\d{2}$')
 _YEAR_RE = re.compile(r'^\d{4}$')
 
+# Token 缓存
+_token_cache = {'token': None, 'expires_at': 0}
+# 目录解析缓存 {key: (folder_token, expire_time)}
+_folder_resolve_cache = {}
+
 
 def get_feishu_config():
     """读取飞书配置"""
@@ -28,7 +33,11 @@ def get_feishu_config():
 
 
 def get_feishu_token():
-    """获取飞书 tenant_access_token"""
+    """获取飞书 tenant_access_token（带缓存，有效期内不重复请求）"""
+    global _token_cache
+    now = time.time()
+    if _token_cache['token'] and now < _token_cache['expires_at']:
+        return _token_cache['token']
     config = get_feishu_config()
     if not config:
         return None
@@ -40,7 +49,11 @@ def get_feishu_token():
         )
         data = resp.json()
         if data.get('code') == 0:
-            return data.get('tenant_access_token')
+            token = data.get('tenant_access_token')
+            expire = data.get('expire', 7200)
+            # 提前 5 分钟过期，避免边缘情况
+            _token_cache = {'token': token, 'expires_at': now + expire - 300}
+            return token
     except Exception:
         pass
     return None
@@ -189,14 +202,18 @@ def get_feishu_yearly_folder(prefix, year=None, token=None, parent_token=None, p
 
 
 def resolve_feishu_upload_folder(prefix, year=None, now=None):
-    """解析飞书上传目标目录。
-
-    - direct: 配置 token 已是直接落点目录（如某个月目录、已有文件目录），直接使用
-    - month-root: 配置 token 是月份父目录，自动按当前月份找/建 YYYY-MM 子目录
-    - year-root: 配置 token 是年份父目录，继续按年份找/建 YYYY 子目录
-    """
+    """解析飞书上传目标目录（带 10 分钟缓存）。"""
     if now is None:
         now = datetime.now()
+    if year is None:
+        year = now.year
+    cache_key = f"{prefix}_{year}_{now.month}"
+    cached = _folder_resolve_cache.get(cache_key)
+    if cached:
+        folder_token, expire_time = cached
+        if time.time() < expire_time:
+            return folder_token
+
     config = get_feishu_config()
     if not config:
         return None
@@ -210,10 +227,15 @@ def resolve_feishu_upload_folder(prefix, year=None, now=None):
     entries = _list_feishu_folder_entries(parent_token, token=token)
     mode = _infer_folder_mode(entries)
     if mode == 'direct':
-        return parent_token
-    if mode == 'month-root':
-        return get_feishu_monthly_folder(prefix, year=now.year, month=now.month, token=token, parent_token=parent_token, parent_entries=entries)
-    return get_feishu_yearly_folder(prefix, year, token=token, parent_token=parent_token, parent_entries=entries)
+        result = parent_token
+    elif mode == 'month-root':
+        result = get_feishu_monthly_folder(prefix, year=now.year, month=now.month, token=token, parent_token=parent_token, parent_entries=entries)
+    else:
+        result = get_feishu_yearly_folder(prefix, year, token=token, parent_token=parent_token, parent_entries=entries)
+
+    if result:
+        _folder_resolve_cache[cache_key] = (result, time.time() + 600)  # 缓存 10 分钟
+    return result
 
 
 def get_feishu_folder_meta(prefix, year=None, now=None):

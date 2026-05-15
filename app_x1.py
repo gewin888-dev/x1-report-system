@@ -6123,72 +6123,81 @@ def api_x_submit_export():
             }
         }), 200
 
-    # 上传到飞书
-    feishu_report = {}
-    feishu_export = {}
-    feishu_enabled = _setting_enabled('feishu.enabled', True)
-    detection_date = export_payload.get('project', {}).get('detection_date', '')
-    year = int(detection_date[:4]) if detection_date and len(detection_date) >= 4 else datetime.now().year
-    
-    # 上传检测报告（优先 filled，降级 bound）
-    report_file = filled_docx_target if filled_docx_path else bound_docx_target
-    if feishu_enabled and report_file.exists():
-        reports_folder = resolve_feishu_upload_folder('reports', year)
-        if reports_folder:
-            feishu_report = upload_file_to_feishu(str(report_file), reports_folder)
-            if feishu_report.get('success'):
-                print(f"✅ 检测报告已上传飞书: {feishu_report.get('feishu_url', '')}")
-    
-    # 上传原始记录
-    if feishu_enabled and xlsx_target.exists():
-        exports_folder = resolve_feishu_upload_folder('exports', year)
-        if exports_folder:
-            feishu_export = upload_file_to_feishu(str(xlsx_target), exports_folder)
-            if feishu_export.get('success'):
-                print(f"✅ 原始记录已上传飞书: {feishu_export.get('feishu_url', '')}")
-    
-    # 正式目录双落地：原始记录 / 检测报告（按业务命名）
-    project_info = export_payload.get('project', {}) or {}
-    client_name = _safe_filename_part(project_info.get('client_name', ''), '未知委托单位')
-    project_name = _safe_filename_part(project_info.get('project_name', ''), '未命名项目')
-    report_number = _safe_filename_part(project_info.get('report_number', ''), export_id)
+    # 飞书上传 + PDF 转换 + 正式目录落地：异步执行，不阻塞导出主流程
+    import threading
 
-    formal_export_name = f"原始记录_{client_name}_{project_name}.xlsx"
-    report_source = Path(filled_docx_path) if filled_docx_path else (bound_docx_target if bound_docx_target.exists() else docx_target)
-    formal_report_name = f"{report_number}_{client_name}{report_source.suffix or '.docx'}"
+    def _async_post_export():
+        """后台线程：飞书上传 + PDF 转换 + 正式目录落地"""
+        try:
+            feishu_report = {}
+            feishu_export = {}
+            feishu_enabled = _setting_enabled('feishu.enabled', True)
+            detection_date = export_payload.get('project', {}).get('detection_date', '')
+            year = int(detection_date[:4]) if detection_date and len(detection_date) >= 4 else datetime.now().year
 
-    formal_export = _copy_to_formal_dir(xlsx_target, FORMAL_RECORDS_BASE, year, formal_export_name)
-    formal_report = _copy_to_formal_dir(report_source, FORMAL_REPORTS_BASE, year, formal_report_name)
+            report_file = filled_docx_target if filled_docx_path else bound_docx_target
+            if feishu_enabled and report_file.exists():
+                reports_folder = resolve_feishu_upload_folder('reports', year)
+                if reports_folder:
+                    feishu_report = upload_file_to_feishu(str(report_file), reports_folder)
+                    if feishu_report.get('success'):
+                        print(f"✅ 检测报告已上传飞书: {feishu_report.get('feishu_url', '')}")
 
-    # 保存飞书结果到 JSON（无论成功失败都落账，便于后续重试与一致性核查）
-    final_payload['feishu'] = {
-        'report': feishu_report or {'success': False, 'error': '未执行或未获得上传结果'},
-        'export': feishu_export or {'success': False, 'error': '未执行或未获得上传结果'}
-    }
-    final_payload['formal_local'] = {
-        'report': formal_report,
-        'export': formal_export
-    }
+            if feishu_enabled and xlsx_target.exists():
+                exports_folder = resolve_feishu_upload_folder('exports', year)
+                if exports_folder:
+                    feishu_export = upload_file_to_feishu(str(xlsx_target), exports_folder)
+                    if feishu_export.get('success'):
+                        print(f"✅ 原始记录已上传飞书: {feishu_export.get('feishu_url', '')}")
 
-    # 自动转换 PDF 预览版（后台异步，不阻塞导出主流程）
-    pdf_preview_path = ''
-    try:
-        from pdf_converter import convert_docx_to_pdf
-        pdf_dir = BASE_DIR / 'preview_pdf'
-        pdf_dir.mkdir(exist_ok=True)
-        docx_for_pdf = Path(filled_docx_path) if filled_docx_path else (bound_docx_target if bound_docx_target.exists() else None)
-        if docx_for_pdf and docx_for_pdf.exists():
-            pdf_out = pdf_dir / f"{export_id}.pdf"
-            pdf_preview_path = convert_docx_to_pdf(str(docx_for_pdf), str(pdf_out))
-    except Exception as e:
-        print(f"[submit_export] PDF 转换跳过: {e}")
-    final_payload['pdf_preview'] = pdf_preview_path
+            # 正式目录双落地
+            project_info = export_payload.get('project', {}) or {}
+            cn = _safe_filename_part(project_info.get('client_name', ''), '未知委托单位')
+            pn = _safe_filename_part(project_info.get('project_name', ''), '未命名项目')
+            rn = _safe_filename_part(project_info.get('report_number', ''), export_id)
+            formal_export_name = f"原始记录_{cn}_{pn}.xlsx"
+            report_source = Path(filled_docx_path) if filled_docx_path else (bound_docx_target if bound_docx_target.exists() else docx_target)
+            formal_report_name = f"{rn}_{cn}{report_source.suffix or '.docx'}"
+            formal_export = _copy_to_formal_dir(xlsx_target, FORMAL_RECORDS_BASE, year, formal_export_name)
+            formal_report = _copy_to_formal_dir(report_source, FORMAL_REPORTS_BASE, year, formal_report_name)
 
+            # PDF 转换
+            pdf_preview_path = ''
+            try:
+                from pdf_converter import convert_docx_to_pdf
+                pdf_dir = BASE_DIR / 'preview_pdf'
+                pdf_dir.mkdir(exist_ok=True)
+                docx_for_pdf = Path(filled_docx_path) if filled_docx_path else (bound_docx_target if bound_docx_target.exists() else None)
+                if docx_for_pdf and docx_for_pdf.exists():
+                    pdf_out = pdf_dir / f"{export_id}.pdf"
+                    pdf_preview_path = convert_docx_to_pdf(str(docx_for_pdf), str(pdf_out))
+            except Exception as e:
+                print(f"[async_post_export] PDF 转换跳过: {e}")
+
+            # 回写完整结果到 JSON
+            final_payload['feishu'] = {
+                'report': feishu_report or {'success': False, 'error': '未执行或未获得上传结果'},
+                'export': feishu_export or {'success': False, 'error': '未执行或未获得上传结果'}
+            }
+            final_payload['formal_local'] = {'report': formal_report, 'export': formal_export}
+            final_payload['pdf_preview'] = pdf_preview_path
+            with open(json_target, 'w', encoding='utf-8') as f:
+                json.dump(final_payload, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"[async_post_export] 后台任务异常: {e}")
+
+    # 启动后台线程
+    threading.Thread(target=_async_post_export, daemon=True).start()
+
+    # 主流程立即返回（不等飞书/PDF）
+    final_payload['feishu'] = {'report': {'success': False, 'error': '异步上传中'}, 'export': {'success': False, 'error': '异步上传中'}}
+    final_payload['formal_local'] = {'report': '', 'export': ''}
+    final_payload['pdf_preview'] = ''
     with open(json_target, 'w', encoding='utf-8') as f:
         json.dump(final_payload, f, ensure_ascii=False, indent=2)
     draft_deleted = _delete_draft_file_if_exists(source_draft_id)
 
-    # 自动同步项目信息到后台项目管理（路线3：混合模式）
+    # 自动同步项目信息到后台项目管理
     _auto_sync_project_and_task(export_payload, export_id)
 
     # 自动流转：导出报告成功 → 检测完成 + 已出具
