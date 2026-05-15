@@ -975,6 +975,7 @@ function initCustomerPortalPanel(){
       if(!sel||!d.success)return;
       d.items.forEach(function(c){
         var o=document.createElement('option'); o.value=c.user_id;
+        o.setAttribute('data-client',c.client_name);
         o.textContent=c.display_name+' ('+c.client_name+')'; sel.appendChild(o);
       });
     }).catch(function(){});
@@ -987,8 +988,10 @@ function loadCustomerPreview(){
   var sel=document.getElementById('customer-preview-account');
   var frame=document.getElementById('customer-preview-frame');
   if(!frame)return;
-  // iframe 直接加载 /customer，利用当前的 admin 登录态
-  frame.src='/customer?_t='+Date.now();
+  var selectedOpt=sel.options[sel.selectedIndex];
+  var clientName=selectedOpt?selectedOpt.getAttribute('data-client'):''
+  if(!clientName){showToast('请先选择客户','error');return;}
+  frame.src='/customer?as_client='+encodeURIComponent(clientName)+'&_t='+Date.now();
 }
 
 function showToast(message,type){

@@ -27,8 +27,10 @@ def customer_required(f):
 
 def _get_client_name():
     """获取当前客户绑定的委托单位名"""
+    # admin 预览模式：通过 ?as_client=xxx 模拟指定客户
     if current_user.role == 'admin':
-        return ''  # admin 预览模式，无绑定
+        as_client = request.args.get('as_client', '').strip()
+        return as_client  # 空串表示未指定
     from database import get_db
     with get_db() as conn:
         row = conn.execute(
@@ -603,7 +605,7 @@ def register_customer_routes(app):
     @customer_required
     def customer_get_report_feedback(project_id):
         """获取某项目的报告反馈历史"""
-        client_name = current_user.client_name or ''
+        client_name = _get_client_name()
         conn = _get_x1_data_conn()
         try:
             # 校验项目归属
@@ -632,7 +634,7 @@ def register_customer_routes(app):
     @customer_required
     def customer_submit_report_feedback(project_id):
         """客户提交报告修正意见，状态回退到“待修改”"""
-        client_name = current_user.client_name or ''
+        client_name = _get_client_name()
         data = request.get_json(silent=True) or {}
         content = (data.get('content') or '').strip()
         if not content:
@@ -674,7 +676,7 @@ def register_customer_routes(app):
     @customer_required
     def customer_confirm_report(project_id):
         """客户确认报告无误，同意出具正式报告"""
-        client_name = current_user.client_name or ''
+        client_name = _get_client_name()
         data = request.get_json(silent=True) or {}
         remark = (data.get('remark') or '').strip()
         conn = _get_x1_data_conn()
@@ -721,7 +723,7 @@ def register_customer_routes(app):
     def customer_preview_pdf(project_id):
         """客户预览报告PDF——仅在报告已出具后可用"""
         from flask import send_file as _send_file
-        client_name = current_user.client_name or ''
+        client_name = _get_client_name()
         conn = _get_x1_data_conn()
         try:
             project = conn.execute(

@@ -72,7 +72,14 @@
 
   /* ========== API 通用 ========== */
 
+  // 透传 as_client 参数（admin 预览模式）
+  var _asClient = (new URLSearchParams(window.location.search)).get('as_client') || '';
+
   function api(method, url, body) {
+    if (_asClient) {
+      var sep = url.indexOf('?') === -1 ? '?' : '&';
+      url += sep + 'as_client=' + encodeURIComponent(_asClient);
+    }
     var opts = { method: method, headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin' };
     if (body) opts.body = JSON.stringify(body);
     return fetch(url, opts).then(function (r) {
@@ -355,11 +362,12 @@
   var _currentReportProjectId = null;
 
   window.previewReport = function (projectId) {
+    var qs = _asClient ? '?as_client=' + encodeURIComponent(_asClient) : '';
     // 先用 HEAD 请求检查 PDF 是否存在
-    fetch('/customer/api/projects/' + projectId + '/preview_pdf', { method: 'HEAD', credentials: 'same-origin' })
+    fetch('/customer/api/projects/' + projectId + '/preview_pdf' + qs, { method: 'HEAD', credentials: 'same-origin' })
       .then(function (r) {
         if (r.ok) {
-          window.open('/customer/api/projects/' + projectId + '/preview_pdf', '_blank');
+          window.open('/customer/api/projects/' + projectId + '/preview_pdf' + qs, '_blank');
         } else {
           showToast('报告正在生成中，请稍后再试', 'info');
         }
