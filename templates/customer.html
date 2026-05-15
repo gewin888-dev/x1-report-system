@@ -90,42 +90,37 @@
         /* ===== Tabs ===== */
         .tab-nav {
             display: flex;
-            gap: 0;
-            border-bottom: 2px solid #e8e8e8;
+            gap: 6px;
             margin-bottom: 24px;
+            padding: 4px;
+            background: #f5f5f5;
+            border-radius: 10px;
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
         }
         .tab-btn {
             background: none;
             border: none;
-            padding: 12px 22px;
-            font-size: 15px;
+            padding: 10px 20px;
+            font-size: 14px;
             font-weight: 500;
             color: #666;
             white-space: nowrap;
-            position: relative;
-            transition: color .2s;
-        }
-        .tab-btn::after {
-            content: '';
-            position: absolute;
-            bottom: -2px;
-            left: 0;
-            right: 0;
-            height: 2px;
-            background: transparent;
-            transition: background .2s;
+            border-radius: 8px;
+            transition: all .2s ease;
+            cursor: pointer;
+            flex: 1;
+            text-align: center;
         }
         .tab-btn:hover {
             color: #1677ff;
+            background: rgba(22,119,255,.06);
         }
         .tab-btn.active {
-            color: #1677ff;
-            font-weight: 600;
-        }
-        .tab-btn.active::after {
+            color: #fff;
             background: #1677ff;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(22,119,255,.25);
         }
 
         /* ===== Tab Panels ===== */
@@ -636,8 +631,9 @@
                 margin-bottom: 16px;
             }
             .tab-btn {
-                padding: 10px 14px;
-                font-size: 14px;
+                padding: 8px 12px;
+                font-size: 13px;
+                flex: 1;
             }
             .profile-grid {
                 grid-template-columns: 1fr;
