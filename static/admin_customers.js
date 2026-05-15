@@ -39,7 +39,7 @@ function loadCustomerList() {
 
 /* ========== 3. 汇总卡片 ========== */
 function renderCustomerSummary(s) {
-  var ids = { 'cs-total': s.total, 'cs-with-projects': s.with_projects, 'cs-pending-urge': s.pending_urge, 'cs-pending-feedback': s.pending_feedback, 'cs-receivable': s.receivable_clients };
+  var ids = { 'cs-total': s.total, 'cs-with-projects': s.with_projects, 'cs-pending-feedback': s.pending_feedback, 'cs-receivable': s.receivable_clients };
   for (var k in ids) {
     var el = document.getElementById(k);
     if (el) el.textContent = ids[k] || 0;
@@ -76,9 +76,7 @@ function renderCustomerList(items) {
 
     // 状态指示
     var badges = '';
-    if ((c.urge_count || 0) > 0) {
-      badges += '<span style="display:inline-flex;align-items:center;gap:2px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:999px;padding:2px 8px;font-size:11px;line-height:18px;font-weight:600;">⚡' + c.urge_count + '</span>';
-    }
+
     if ((c.feedback_count || 0) > 0) {
       badges += '<span style="display:inline-flex;align-items:center;gap:2px;background:#fffbeb;color:#d97706;border:1px solid #fde68a;border-radius:999px;padding:2px 8px;font-size:11px;line-height:18px;font-weight:600;">💬' + c.feedback_count + '</span>';
     }

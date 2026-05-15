@@ -801,7 +801,7 @@ input[type="text"]:focus,input[type="password"]:focus,input[type="number"]:focus
     <div class="page-hero" style="margin-bottom:12px;">
       <div>
         <div class="page-title">🏢 客户管理</div>
-        <div class="page-subtitle">统一查看、管理和维护客户信息，自动关联项目、报告、催单和反馈记录</div>
+        <div class="page-subtitle">统一查看、管理和维护客户信息，自动关联项目、报告和反馈记录</div>
       </div>
       <div class="page-tools">
         <input id="customer-search" type="text" placeholder="搜索客户名称/联系人/电话..." oninput="filterCustomerList()"
@@ -809,10 +809,9 @@ input[type="text"]:focus,input[type="password"]:focus,input[type="number"]:focus
         <button class="btn btn-primary" onclick="openCustomerCreateModal()">➕ 新增客户</button>
       </div>
     </div>
-    <div class="stat-cards" style="grid-template-columns:repeat(5,minmax(0,1fr));margin-bottom:0">
+    <div class="stat-cards" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:0">
       <div class="stat-card blue"><div class="label">客户总数</div><div class="value" id="cs-total">-</div></div>
       <div class="stat-card green"><div class="label">有项目客户</div><div class="value" id="cs-with-projects">-</div></div>
-      <div class="stat-card orange"><div class="label">未处理催单</div><div class="value" id="cs-pending-urge">-</div></div>
       <div class="stat-card purple"><div class="label">未处理反馈</div><div class="value" id="cs-pending-feedback">-</div></div>
       <div class="stat-card red"><div class="label">待收款客户</div><div class="value" id="cs-receivable">-</div></div>
     </div>
@@ -4262,7 +4261,7 @@ ensureCurrentUserProfile().then(function(){
 <script src="/static/admin_stats.js?v=20260509c"></script>
 
 <script src="/static/admin_projects.js?v=20260516v4"></script>
-<script src="/static/admin_customers.js?v=20260516v3"></script>
+<script src="/static/admin_customers.js?v=20260516v4"></script>
 </body>
 </html>
 
