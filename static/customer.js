@@ -297,6 +297,9 @@
           + '<div class="project-meta">'
           + '<span>客户：' + escapeHtml(p.client_name || '') + '</span>'
           + '<span>检测类型：' + escapeHtml(p.detection_type || '') + '</span>'
+          + (p.expected_detection_date ? '<span>检测日期：' + escapeHtml(p.expected_detection_date) + '</span>' : '')
+          + (p.project_address ? '<span>项目地址：' + escapeHtml(p.project_address) + '</span>' : '')
+          + (p.contact_name ? '<span>联系人：' + escapeHtml(p.contact_name) + (p.contact_phone ? ' ' + escapeHtml(p.contact_phone) : '') + '</span>' : '')
           + '<span>下单日期：' + escapeHtml((p.created_at || '').slice(0, 10)) + '</span>'
           + '</div>'
           + renderProgressBar(p)
