@@ -7727,3 +7727,64 @@ function prefillFromTask(taskId){
       alert(err.message || '获取项目信息失败');
     });
 }
+
+/* ====== 我的任务 — 角标 + 提示音 ====== */
+(function(){
+  var _lastTaskCount = -1; // -1 表示首次加载不响
+
+  function playTaskSound(){
+    try {
+      var ctx = new (window.AudioContext || window.webkitAudioContext)();
+      // 三音提示（do-mi-sol 上行）
+      [523, 659, 784].forEach(function(freq, i){
+        var osc = ctx.createOscillator();
+        var gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.13, ctx.currentTime + i * 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.25);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + i * 0.12);
+        osc.stop(ctx.currentTime + i * 0.12 + 0.25);
+      });
+    } catch(e){}
+  }
+
+  function pollTaskCount(){
+    fetch('/api/my_tasks/pending_count')
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        var badge = document.getElementById('mytask-badge');
+        if(!badge) return;
+        var count = d.count || 0;
+        if(count > 0){
+          badge.textContent = count;
+          badge.style.display = '';
+          // 有新任务时响
+          if(_lastTaskCount >= 0 && count > _lastTaskCount) playTaskSound();
+        } else {
+          badge.style.display = 'none';
+        }
+        _lastTaskCount = count;
+      })
+      .catch(function(){});
+  }
+
+  // 页面加载后立即查一次，然后每 60 秒轮询
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', function(){ pollTaskCount(); setInterval(pollTaskCount, 60000); });
+  } else {
+    pollTaskCount();
+    setInterval(pollTaskCount, 60000);
+  }
+
+  // 切到任务 tab 时刷新
+  var _origShowTab = window.showTab;
+  if(_origShowTab){
+    window.showTab = function(tab){
+      _origShowTab(tab);
+      if(tab === 'mytasks') pollTaskCount();
+    };
+  }
+})();

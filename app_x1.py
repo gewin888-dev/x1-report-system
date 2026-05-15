@@ -2469,6 +2469,23 @@ def api_my_tasks():
     return jsonify({'success': True, 'items': items})
 
 
+@app.route('/api/my_tasks/pending_count')
+@login_required
+def api_my_tasks_pending_count():
+    """返回当前用户待处理任务数（assigned + accepted + in_progress）"""
+    user_id = current_user.id
+    conn = get_x1_data_conn()
+    try:
+        row = conn.execute(
+            "SELECT COUNT(*) as cnt FROM project_tasks "
+            "WHERE assigned_to=? AND task_status IN ('assigned','accepted','in_progress')",
+            (user_id,)
+        ).fetchone()
+    finally:
+        conn.close()
+    return jsonify({'success': True, 'count': row['cnt'] if row else 0})
+
+
 @app.route('/api/project_tasks/<int:task_id>/accept', methods=['POST'])
 @login_required
 @require_permission('tasks.execute')
