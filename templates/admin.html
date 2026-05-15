@@ -804,51 +804,33 @@ input[type="text"]:focus,input[type="password"]:focus,input[type="number"]:focus
 </div>
 
 <div class="panel" id="panel-customers">
-<div style="margin-bottom:20px;">
-  <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:18px;">
-    <div>
-      <div style="font-size:22px;font-weight:800;color:#0f172a;margin-bottom:4px;">🏢 客户管理</div>
-      <div style="font-size:13px;color:#64748b;">统一查看、管理和维护客户信息，自动关联项目、报告、催单和反馈记录</div>
-    </div>
-    <div style="display:flex;gap:8px;align-items:center;">
-      <div style="position:relative;">
-        <input id="customer-search" type="text" placeholder="🔍 搜索客户名称/联系人/电话..." oninput="filterCustomerList()"
-          style="padding:8px 14px;border:1px solid #e2e8f0;border-radius:10px;font-size:13px;width:260px;background:#f8fafc;transition:all .15s;"
-          onfocus="this.style.borderColor='#3b82f6';this.style.background='#fff'" onblur="this.style.borderColor='#e2e8f0';this.style.background='#f8fafc'">
+  <div class="card summary-panel" style="margin-bottom:16px;">
+    <div class="page-hero" style="margin-bottom:12px;">
+      <div>
+        <div class="page-title">🏢 客户管理</div>
+        <div class="page-subtitle">统一查看、管理和维护客户信息，自动关联项目、报告、催单和反馈记录</div>
       </div>
-      <button onclick="openCustomerCreateModal()" style="padding:8px 18px;background:linear-gradient(135deg,#2563eb,#3b82f6);color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;box-shadow:0 2px 8px rgba(37,99,235,0.25);transition:transform .1s;" onmousedown="this.style.transform='scale(0.97)'" onmouseup="this.style.transform='scale(1)'">➕ 新增客户</button>
+      <div class="page-tools">
+        <input id="customer-search" type="text" placeholder="搜索客户名称/联系人/电话..." oninput="filterCustomerList()"
+          style="padding:6px 12px;border:1px solid #d9d9d9;border-radius:6px;font-size:13px;width:220px;">
+        <button class="btn btn-primary" onclick="openCustomerCreateModal()">➕ 新增客户</button>
+      </div>
+    </div>
+    <div class="stat-cards" style="grid-template-columns:repeat(5,minmax(0,1fr));margin-bottom:0">
+      <div class="stat-card blue"><div class="label">客户总数</div><div class="value" id="cs-total">-</div></div>
+      <div class="stat-card green"><div class="label">有项目客户</div><div class="value" id="cs-with-projects">-</div></div>
+      <div class="stat-card orange"><div class="label">未处理催单</div><div class="value" id="cs-pending-urge">-</div></div>
+      <div class="stat-card purple"><div class="label">未处理反馈</div><div class="value" id="cs-pending-feedback">-</div></div>
+      <div class="stat-card red"><div class="label">待收款客户</div><div class="value" id="cs-receivable">-</div></div>
     </div>
   </div>
-  <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;">
-    <div style="background:#fff;border-radius:12px;padding:16px 20px;border:1px solid #e2e8f0;border-left:4px solid #3b82f6;">
-      <div style="font-size:12px;color:#64748b;margin-bottom:4px;">客户总数</div>
-      <div style="font-size:24px;font-weight:800;color:#0f172a;" id="cs-total">-</div>
-    </div>
-    <div style="background:#fff;border-radius:12px;padding:16px 20px;border:1px solid #e2e8f0;border-left:4px solid #16a34a;">
-      <div style="font-size:12px;color:#64748b;margin-bottom:4px;">有项目客户</div>
-      <div style="font-size:24px;font-weight:800;color:#16a34a;" id="cs-with-projects">-</div>
-    </div>
-    <div style="background:#fff;border-radius:12px;padding:16px 20px;border:1px solid #e2e8f0;border-left:4px solid #d97706;">
-      <div style="font-size:12px;color:#64748b;margin-bottom:4px;">未处理催单</div>
-      <div style="font-size:24px;font-weight:800;color:#d97706;" id="cs-pending-urge">-</div>
-    </div>
-    <div style="background:#fff;border-radius:12px;padding:16px 20px;border:1px solid #e2e8f0;border-left:4px solid #7c3aed;">
-      <div style="font-size:12px;color:#64748b;margin-bottom:4px;">未处理反馈</div>
-      <div style="font-size:24px;font-weight:800;color:#7c3aed;" id="cs-pending-feedback">-</div>
-    </div>
-    <div style="background:#fff;border-radius:12px;padding:16px 20px;border:1px solid #e2e8f0;border-left:4px solid #dc2626;">
-      <div style="font-size:12px;color:#64748b;margin-bottom:4px;">待收款客户</div>
-      <div style="font-size:24px;font-weight:800;color:#dc2626;" id="cs-receivable">-</div>
-    </div>
+  <div id="customer-list-view" style="position:relative;">
+    <div id="customer-list-container"></div>
   </div>
-</div>
-<div id="customer-list-view" style="position:relative;">
-  <div id="customer-list-container"></div>
-</div>
-<div id="customer-detail-view" style="display:none;">
-  <div style="margin-bottom:16px;"><button onclick="backToCustomerList()" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;font-size:13px;color:#334155;cursor:pointer;transition:all .15s;font-weight:500;" onmouseenter="this.style.background='#eff6ff';this.style.borderColor='#bfdbfe'" onmouseleave="this.style.background='#f8fafc';this.style.borderColor='#e2e8f0'">← 返回客户列表</button></div>
-  <div id="customer-detail-content"></div>
-</div>
+  <div id="customer-detail-view" style="display:none;">
+    <div style="margin-bottom:12px;"><button onclick="backToCustomerList()" class="btn" style="font-size:13px;">← 返回客户列表</button></div>
+    <div id="customer-detail-content"></div>
+  </div>
 </div>
 <div class="panel" id="panel-customer-portal">
 <div class="card" style="padding:0;overflow:hidden;height:calc(100vh - 48px);">
