@@ -652,3 +652,79 @@ def register_customer_routes(app):
             return jsonify({'success': True, 'message': '报告已确认，将安排打印出具正式报告'})
         finally:
             conn.close()
+
+    # ============================================================
+    # 报告 PDF 预览
+    # ============================================================
+
+    @app.route('/customer/api/projects/<int:project_id>/preview_pdf', methods=['GET'])
+    @customer_required
+    def customer_preview_pdf(project_id):
+        """客户预览报告PDF——仅在报告已出具后可用"""
+        from flask import send_file as _send_file
+        client_name = current_user.client_name or ''
+        conn = _get_x1_data_conn()
+        try:
+            project = conn.execute(
+                "SELECT * FROM business_projects WHERE id=? AND client_name=?",
+                (project_id, client_name)
+            ).fetchone()
+            if not project:
+                return jsonify({'success': False, 'error': '项目不存在'}), 404
+
+            rs = (project['report_status'] or '').strip()
+            allowed = ('已出具', '待客户确认', '客户已确认', '已发送客户')
+            if rs not in allowed:
+                return jsonify({'success': False, 'error': '报告尚未出具，无法预览'}), 400
+        finally:
+            conn.close()
+
+        # 查找对应的 PDF 文件
+        project_name = (project['project_name'] or '').strip()
+        reports_dir = BASE_DIR / 'reports_x1'
+        preview_dir = BASE_DIR / 'preview_pdf'
+
+        # 策略1：从 preview_pdf 目录找匹配的 PDF
+        # 策略2：遍历 reports_x1/*.json 找到匹配项目的导出记录
+        pdf_path = None
+        if reports_dir.exists():
+            for json_file in sorted(reports_dir.glob('X1EXPORT_*.json'), reverse=True):
+                try:
+                    data = json.loads(json_file.read_text(encoding='utf-8'))
+                    ep = data.get('export_payload', {})
+                    proj = ep.get('project', {})
+                    if proj.get('project_name') == project_name and proj.get('client_name') == client_name:
+                        # 找到匹配的导出记录
+                        export_id = data.get('export_id', '')
+                        # 检查 PDF 是否已生成
+                        candidate = preview_dir / f"{export_id}.pdf"
+                        if candidate.exists() and candidate.stat().st_size > 0:
+                            pdf_path = candidate
+                            break
+                        # PDF 未生成，尝试实时转换
+                        pdf_preview = data.get('pdf_preview', '')
+                        if not pdf_preview:
+                            docx_src = data.get('filled_docx_path') or data.get('bound_docx_path', '')
+                            if docx_src and Path(docx_src).exists():
+                                try:
+                                    from pdf_converter import convert_docx_to_pdf
+                                    preview_dir.mkdir(exist_ok=True)
+                                    pdf_out = str(preview_dir / f"{export_id}.pdf")
+                                    result = convert_docx_to_pdf(docx_src, pdf_out)
+                                    if result:
+                                        pdf_path = Path(result)
+                                        break
+                                except Exception:
+                                    pass
+                except Exception:
+                    continue
+
+        if not pdf_path or not pdf_path.exists():
+            return jsonify({'success': False, 'error': 'PDF 预览文件尚未生成，请稍后重试或联系检测中心'}), 404
+
+        return _send_file(
+            str(pdf_path),
+            mimetype='application/pdf',
+            as_attachment=False,
+            download_name=f"检测报告_{project_name}.pdf"
+        )

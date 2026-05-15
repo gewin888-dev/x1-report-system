@@ -6069,6 +6069,21 @@ def api_x_submit_export():
         'report': formal_report,
         'export': formal_export
     }
+
+    # 自动转换 PDF 预览版（后台异步，不阻塞导出主流程）
+    pdf_preview_path = ''
+    try:
+        from pdf_converter import convert_docx_to_pdf
+        pdf_dir = BASE_DIR / 'preview_pdf'
+        pdf_dir.mkdir(exist_ok=True)
+        docx_for_pdf = Path(filled_docx_path) if filled_docx_path else (bound_docx_target if bound_docx_target.exists() else None)
+        if docx_for_pdf and docx_for_pdf.exists():
+            pdf_out = pdf_dir / f"{export_id}.pdf"
+            pdf_preview_path = convert_docx_to_pdf(str(docx_for_pdf), str(pdf_out))
+    except Exception as e:
+        print(f"[submit_export] PDF 转换跳过: {e}")
+    final_payload['pdf_preview'] = pdf_preview_path
+
     with open(json_target, 'w', encoding='utf-8') as f:
         json.dump(final_payload, f, ensure_ascii=False, indent=2)
     draft_deleted = _delete_draft_file_if_exists(source_draft_id)

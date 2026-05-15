@@ -256,10 +256,12 @@
         var isConfirmed = (rptStatus === '客户已确认' || rptStatus === '已发送客户');
         var reportBtns = '';
         if (canFeedback) {
-          reportBtns = ' <button class="btn btn-sm" style="font-size:12px;padding:4px 12px;background:#fff7e6;color:#d46b08;border:1px solid #ffd591;" onclick="openReportFeedback(' + p.id + ')">✍️ 报告反馈</button>'
-            + ' <button class="btn btn-sm" style="font-size:12px;padding:4px 12px;background:#f6ffed;color:#389e0d;border:1px solid #b7eb8f;" onclick="confirmReport(' + p.id + ')">\u2705 确认报告</button>';
+          reportBtns = ' <a href="/customer/api/projects/' + p.id + '/preview_pdf" target="_blank" class="btn btn-sm" style="font-size:12px;padding:4px 12px;background:#e6f4ff;color:#0958d9;border:1px solid #91caff;text-decoration:none;">🔍 预览报告</a>'
+            + ' <button class="btn btn-sm" style="font-size:12px;padding:4px 12px;background:#fff7e6;color:#d46b08;border:1px solid #ffd591;" onclick="openReportFeedback(' + p.id + ')">✍️ 报告反馈</button>'
+            + ' <button class="btn btn-sm" style="font-size:12px;padding:4px 12px;background:#f6ffed;color:#389e0d;border:1px solid #b7eb8f;" onclick="confirmReport(' + p.id + ')">✅ 确认报告</button>';
         } else if (isConfirmed) {
-          reportBtns = ' <span style="font-size:12px;color:#389e0d;font-weight:600;">✅ 已确认</span>';
+          reportBtns = ' <a href="/customer/api/projects/' + p.id + '/preview_pdf" target="_blank" class="btn btn-sm" style="font-size:12px;padding:4px 12px;background:#e6f4ff;color:#0958d9;border:1px solid #91caff;text-decoration:none;">🔍 查看报告</a>'
+            + ' <span style="font-size:12px;color:#389e0d;font-weight:600;">✅ 已确认</span>';
         }
 
         return '<div class="project-card">'

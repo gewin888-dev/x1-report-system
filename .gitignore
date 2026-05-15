@@ -75,3 +75,4 @@ users.json
 package-lock.json
 EXTRA2
 data/flask_secret_key.txt
+preview_pdf/
