@@ -151,7 +151,7 @@ function showCustomerDetail(clientName) {
     })
     .catch(function(err) {
       console.error(err);
-      box.innerHTML = '<div style="text-align:center;padding:60px;color:#dc2626;">加载失败: ' + _safeHtml(err.message) + '</td></tr>';
+      box.innerHTML = '<div style="text-align:center;padding:60px;color:#dc2626;">加载失败: ' + _safeHtml(err.message) + '</div>';
     });
 }
 
@@ -267,14 +267,14 @@ function renderCustomerDetail(data) {
         + '<span style="font-size:11px;color:' + statusColor + ';font-weight:600;">' + _safeHtml(fb.status || '') + '</span>'
         + '</div>'
         + '<div style="font-size:13px;color:#334155;margin-bottom:4px;">' + _safeHtml(fb.content || '') + '</div>'
-        + '<div style="font-size:11px;color:#94a3b8;">' + _safeHtml(fb.created_at || '') + '</td></tr>';
+        + '<div style="font-size:11px;color:#94a3b8;">' + _safeHtml(fb.created_at || '') + '</div>';
       if (fb.reply) {
-        h += '<div style="margin-top:8px;padding:8px 12px;background:#f0fdf4;border-radius:6px;font-size:12px;color:#16a34a;">↩️ ' + _safeHtml(fb.reply) + '</td></tr>';
+        h += '<div style="margin-top:8px;padding:8px 12px;background:#f0fdf4;border-radius:6px;font-size:12px;color:#16a34a;">↩️ ' + _safeHtml(fb.reply) + '</div>';
       } else if (fb.status === '待处理') {
         h += '<div style="margin-top:8px;">'
           + '<input type="text" id="fb-reply-' + fb.id + '" placeholder="输入回复..." style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;width:70%;margin-right:6px;">'
           + '<button class="btn btn-sm" onclick="replyFeedback(' + fb.id + ',\'' + _safeHtml(p.client_name||'').replace(/'/g,"\\'") + '\')" style="background:#1677ff;color:#fff;font-size:12px;">回复</button>'
-          + '</td></tr>';
+          + '</div>';
       }
       h += '</div>';
     });
@@ -290,7 +290,7 @@ function renderCustomerDetail(data) {
         + '<span style="color:#94a3b8;font-size:12px;white-space:nowrap;">' + _safeHtml((u.created_at||'').slice(0,16)) + '</span>'
         + '<span style="color:#334155;">' + _safeHtml(u.project_name || '-') + '</span>'
         + (u.remark ? '<span style="color:#64748b;font-size:12px;">— ' + _safeHtml(u.remark) + '</span>' : '')
-        + '</td></tr>';
+        + '</div>';
     });
     h += '</div>';
   }
@@ -305,7 +305,7 @@ function renderCustomerDetail(data) {
         + '<span style="color:#334155;">' + _safeHtml(r.project_name || '') + '</span>'
         + '<span style="color:#94a3b8;font-size:12px;margin-left:auto;">' + _safeHtml((r.export_time||'').slice(0,16)) + '</span>'
         + (r.feishu_url ? '<a href="' + _safeHtml(r.feishu_url) + '" target="_blank" style="color:#3b82f6;font-size:12px;text-decoration:none;">查看</a>' : '')
-        + '</td></tr>';
+        + '</div>';
     });
     h += '</div>';
   }
@@ -319,7 +319,7 @@ function _pField(name, label, value) {
     + '<label style="display:block;font-size:11px;color:#94a3b8;margin-bottom:2px;">' + label + '</label>'
     + '<input type="text" data-profile-field="' + name + '" value="' + _safeHtml(value || '') + '" disabled '
     + 'style="width:100%;padding:7px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;color:#334155;background:#f8fafc;box-sizing:border-box;transition:all .15s;">'
-    + '</td></tr>';
+    + '</div>';
 }
 
 /* --- 状态徽章 --- */
@@ -452,7 +452,7 @@ function _createField(id, label, placeholder, required) {
   return '<div style="margin-bottom:14px;">'
     + '<label style="display:block;font-size:12px;color:#64748b;margin-bottom:4px;font-weight:500;">' + label + (required ? ' <span style="color:#dc2626;">*</span>' : '') + '</label>'
     + '<input id="' + id + '" type="text" placeholder="' + placeholder + '" style="width:100%;padding:9px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box;transition:border-color .15s;" onfocus="this.style.borderColor=\'#3b82f6\'" onblur="this.style.borderColor=\'#e2e8f0\'">'
-    + '</td></tr>';
+    + '</div>';
 }
 
 function closeCustomerCreateModal() {
