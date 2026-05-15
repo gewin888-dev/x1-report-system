@@ -5504,21 +5504,22 @@ def _delete_draft_file_if_exists(draft_id: str) -> bool:
 @app.route('/api/x/inspectors')
 @login_required
 def api_x_inspectors():
-    """返回可转让的检测员列表（不含当前用户）"""
+    """返回可转让的内部人员列表（不含当前用户、不含客户）"""
     from database import get_db
     result = []
     with get_db() as conn:
         columns = {row['name'] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
         has_is_active = 'is_active' in columns
-        if has_is_active:
-            rows = conn.execute('SELECT user_id, display_name, is_active FROM users ORDER BY user_id').fetchall()
-        else:
-            rows = conn.execute('SELECT user_id, display_name FROM users ORDER BY user_id').fetchall()
+        has_role = 'role' in columns
+        sql = 'SELECT user_id, display_name, role' + (', is_active' if has_is_active else '') + ' FROM users ORDER BY user_id'
+        rows = conn.execute(sql).fetchall()
         for row in rows:
             uid = row['user_id']
             if uid == current_user.id:
                 continue
             if has_is_active and not row['is_active']:
+                continue
+            if has_role and row['role'] == 'customer':
                 continue
             result.append({'username': uid, 'display_name': row['display_name'] or uid})
     return jsonify({'success': True, 'inspectors': result})
