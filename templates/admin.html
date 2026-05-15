@@ -350,49 +350,28 @@ input[type="text"]:focus,input[type="password"]:focus,input[type="number"]:focus
       </div>
     </div>
 
-    <div class="card" style="margin-bottom:14px;padding:16px;border:1px dashed #d9d9d9;box-shadow:none;background:#fafafa;">
-      <div style="font-size:15px;font-weight:700;margin-bottom:12px;color:#1f2937;">后续扩展（预留）</div>
-      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;">
-        <div id="project-task-card" style="padding:12px 14px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;">
-            <div style="font-size:14px;font-weight:600;color:#111827;">检测员派单</div>
-            <button class="btn btn-sm" id="project-dispatch-btn" onclick="showDispatchDialog()" title="为当前项目创建检测任务并指派检测员">发起派单</button>
-          </div>
-          <div id="project-task-list" style="font-size:12px;color:#374151;line-height:1.8;">
-            <div style="color:#999;padding:8px 0;">加载中...</div>
-          </div>
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-bottom:14px;">
+      <div class="card" style="padding:14px 16px;border:1px solid #e5e7eb;box-shadow:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;">
+          <div style="font-size:15px;font-weight:700;color:#1f2937;">📋 任务派单</div>
+          <button class="btn btn-sm btn-primary" id="project-dispatch-btn" onclick="showDispatchDialog()">+ 发起派单</button>
         </div>
-        <div style="padding:12px 14px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;">
-            <div style="font-size:14px;font-weight:600;color:#111827;">报告关联</div>
-            <span id="project-report-count" style="font-size:12px;color:#8c8c8c;"></span>
-          </div>
-          <div id="project-report-list" style="font-size:12px;color:#374151;max-height:240px;overflow-y:auto;">
-            <div style="color:#999;">加载中…</div>
-          </div>
+        <div id="project-task-list" style="font-size:12px;color:#374151;line-height:1.8;">
+          <div style="color:#999;padding:8px 0;">加载中...</div>
         </div>
-        <div style="padding:12px 14px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;">
-            <div style="font-size:14px;font-weight:600;color:#111827;">客户入口</div>
-            <button class="btn btn-sm" disabled title="后续将从这里进入客户视角或客户入口配置">客户视角（预留）</button>
-          </div>
-          <div style="display:grid;grid-template-columns:96px 1fr;gap:8px 10px;font-size:12px;color:#374151;line-height:1.8;">
-            <div style="color:#6b7280;">客户账号</div><div>—</div>
-            <div style="color:#6b7280;">可见状态</div><div><span style="display:inline-flex;align-items:center;padding:2px 8px;border-radius:999px;background:#fafafa;color:#666;border:1px solid #d9d9d9;">未启用</span></div>
-            <div style="color:#6b7280;">进度入口</div><div>未启用</div>
-            <div style="color:#6b7280;">下载入口</div><div>未启用</div>
-          </div>
+      </div>
+      <div class="card" style="padding:14px 16px;border:1px solid #e5e7eb;box-shadow:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px;">
+          <div style="font-size:15px;font-weight:700;color:#1f2937;">📄 关联报告</div>
+          <span id="project-report-count" style="font-size:12px;color:#8c8c8c;"></span>
         </div>
-        <div style="padding:12px 14px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;">
-          <div style="font-size:14px;font-weight:600;color:#111827;margin-bottom:8px;">项目主档案延伸</div>
-          <div style="font-size:12px;color:#6b7280;line-height:1.8;">项目编号：后续可扩展</div>
-          <div style="font-size:12px;color:#6b7280;line-height:1.8;">关联记录：后续可扩展</div>
-          <div style="font-size:12px;color:#6b7280;line-height:1.8;">流转历史：后续可扩展</div>
+        <div id="project-report-list" style="font-size:12px;color:#374151;max-height:240px;overflow-y:auto;">
+          <div style="color:#999;">加载中…</div>
         </div>
       </div>
     </div>
 
-    <div class="modal-footer"><button class="btn" id="project-close-btn" onclick="closeProjectModal()">关闭信息卡</button><button class="btn" id="project-cancel-btn" style="display:none" onclick="closeProjectModal()">取消编辑</button><button class="btn" id="project-assign-btn" style="display:none" onclick="showDispatchDialog()">指派任务</button><button class="btn" id="project-report-btn" style="display:none">查看报告（预留）</button><button class="btn btn-primary" id="project-save-btn" onclick="saveProject()">保存项目</button></div>
+    <div class="modal-footer"><button class="btn" id="project-close-btn" onclick="closeProjectModal()">关闭</button><button class="btn" id="project-cancel-btn" style="display:none" onclick="closeProjectModal()">取消</button><button class="btn btn-primary" id="project-save-btn" onclick="saveProject()">保存项目</button></div>
   </div>
 </div>
 

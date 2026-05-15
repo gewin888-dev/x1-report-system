@@ -73,16 +73,14 @@ function setProjectFormMode(mode){
   const topEditBtn=document.getElementById('project-top-edit-btn');
   const topCloseBtn=document.getElementById('project-top-close-btn');
   const cancelBtn=document.getElementById('project-cancel-btn');
-  const assignBtn=document.getElementById('project-assign-btn');
-  const reportBtn=document.getElementById('project-report-btn');
+
   const subtitle=document.getElementById('project-modal-subtitle');
   if(saveBtn){ saveBtn.style.display = readonly ? 'none' : ''; saveBtn.textContent = '保存项目'; }
   if(cancelBtn){ cancelBtn.style.display = readonly ? 'none' : ''; }
   if(closeBtn){ closeBtn.style.display = readonly ? '' : 'none'; closeBtn.textContent = '关闭信息卡'; }
   if(topEditBtn){ topEditBtn.style.display = readonly ? '' : 'none'; topEditBtn.onclick = switchProjectModalToEdit; }
   if(topCloseBtn){ topCloseBtn.style.display = readonly ? '' : 'none'; }
-  if(assignBtn){ assignBtn.style.display = readonly ? '' : 'none'; assignBtn.title = '预留：后续用于将当前项目派给检测员'; assignBtn.disabled = true; assignBtn.style.opacity = readonly ? '0.7' : '0'; }
-  if(reportBtn){ reportBtn.style.display = readonly ? '' : 'none'; reportBtn.title = '预留：后续用于查看当前项目的关联报告'; reportBtn.disabled = true; reportBtn.style.opacity = readonly ? '0.7' : '0'; }
+
   if(subtitle) subtitle.textContent = readonly ? '查看项目完整档案；后续检测员派单、客户进度查询与历史报告关联均以此为基础。' : '维护项目基础信息与推进状态，后续检测员派单、客户进度查询与历史报告关联均以此为基础。';
 }
 
@@ -178,8 +176,10 @@ function showDispatchDialog(){
     fetch('/admin/api/inspectors').then(r=>r.json()).then(d=>{
       if(d.success && d.items){
         d.items.forEach(u=>{
-          const roleLabel = u.role==='inspector' ? '检测员' : '主管';
-          sel.innerHTML += `<option value="${u.user_id}">${u.display_name}（${roleLabel}）</option>`;
+          const roleMap = {admin:'管理员',supervisor:'主管',inspector:'检测员',viewer:'访客'};
+          const roleLabel = roleMap[u.role] || u.role;
+          const dept = u.department ? ' · ' + u.department : '';
+          sel.innerHTML += `<option value="${u.user_id}">${u.display_name}（${roleLabel}${dept}）</option>`;
         });
       }
     }).catch(()=>{});

@@ -2131,15 +2131,15 @@ def admin_api_download_report(project_id):
 @login_required
 @require_permission('admin.projects.view')
 def admin_api_inspectors():
-    """返回可派单人员列表（inspector + supervisor）"""
+    """返回可派单人员列表（所有内部活跃用户）"""
     try:
         with get_db() as conn:
             rows = conn.execute(
-                "SELECT user_id, display_name, role FROM users "
-                "WHERE role IN ('inspector','supervisor') AND is_active=1 "
-                "ORDER BY role, user_id"
+                "SELECT user_id, display_name, role, department FROM users "
+                "WHERE role != 'customer' AND is_active=1 "
+                "ORDER BY CASE role WHEN 'inspector' THEN 1 WHEN 'supervisor' THEN 2 WHEN 'admin' THEN 3 ELSE 4 END, user_id"
             ).fetchall()
-        items = [{'user_id': r['user_id'], 'display_name': r['display_name'], 'role': r['role']} for r in rows]
+        items = [{'user_id': r['user_id'], 'display_name': r['display_name'], 'role': r['role'], 'department': r['department'] or ''} for r in rows]
         return jsonify({'success': True, 'items': items})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
