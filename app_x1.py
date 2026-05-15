@@ -515,6 +515,82 @@ def refresh_project_task_summary(project_id):
         conn.close()
 
 
+# ============================================================
+# 项目状态自动流转
+# ============================================================
+
+# 状态流转优先级（数值越大 = 越靠后）
+_INSPECTION_STAGE_ORDER = {
+    '未安排': 0, '': 0,
+    '已排期': 1, '待进场': 2,
+    '检测中': 3, '补测中': 3,
+    '检测完成': 4, '已结束': 5,
+    '检测异常': -1,  # 异常不自动流转
+}
+_REPORT_STATUS_ORDER = {
+    '未开始': 0, '': 0,
+    '编制中': 1, '审核中': 2, '待修改': 2, '待出具': 3,
+    '已出具': 4, '已发送客户': 5,
+}
+
+
+def _auto_advance_project_stage(project_id, target_inspection=None, target_report=None):
+    """自动推进项目状态，只前进不后退。
+    
+    规则：
+    - 只在目标状态比当前状态“更靠后”时才更新
+    - 异常状态不会被自动覆盖
+    - 写操作日志
+    """
+    if not project_id:
+        return
+    conn = get_x1_data_conn()
+    try:
+        row = conn.execute("SELECT * FROM business_projects WHERE id=?", (project_id,)).fetchone()
+        if not row:
+            return
+        
+        updates = []
+        params = []
+        current_ins = (row['inspection_stage'] or '').strip()
+        current_rpt = (row['report_status'] or '').strip()
+        
+        if target_inspection:
+            cur_order = _INSPECTION_STAGE_ORDER.get(current_ins, -99)
+            tgt_order = _INSPECTION_STAGE_ORDER.get(target_inspection, -99)
+            # 只前进，且不覆盖异常状态
+            if cur_order >= 0 and tgt_order > cur_order:
+                updates.append('inspection_stage=?')
+                params.append(target_inspection)
+        
+        if target_report:
+            cur_order = _REPORT_STATUS_ORDER.get(current_rpt, -99)
+            tgt_order = _REPORT_STATUS_ORDER.get(target_report, -99)
+            if cur_order >= 0 and tgt_order > cur_order:
+                updates.append('report_status=?')
+                params.append(target_report)
+        
+        if updates:
+            updates.append('updated_at=?')
+            params.append(datetime.now().isoformat(timespec='seconds'))
+            params.append(project_id)
+            conn.execute(
+                f"UPDATE business_projects SET {', '.join(updates)} WHERE id=?",
+                params
+            )
+            conn.commit()
+            log_action(
+                getattr(current_user, 'id', 'system') if hasattr(current_user, 'id') else 'system',
+                '项目状态自动流转',
+                f'project_id={project_id}',
+                f'inspection_stage: {current_ins}→{target_inspection or "-"}, report_status: {current_rpt}→{target_report or "-"}'
+            )
+    except Exception:
+        pass
+    finally:
+        conn.close()
+
+
 def _clean_project_payload(data):
     def s(key):
         return str(data.get(key, '') or '').strip()
@@ -1845,6 +1921,8 @@ def create_project_task():
         conn.close()
 
     refresh_project_task_summary(payload['project_id'])
+    # 自动流转：派单 → 已排期
+    _auto_advance_project_stage(payload['project_id'], target_inspection='已排期')
 
     conn = get_x1_data_conn()
     try:
@@ -2100,6 +2178,8 @@ def api_task_accept(task_id):
         conn.close()
 
     refresh_project_task_summary(row['project_id'])
+    # 自动流转：接单 → 待进场
+    _auto_advance_project_stage(row['project_id'], target_inspection='待进场')
     conn = get_x1_data_conn()
     try:
         updated = conn.execute("SELECT * FROM project_tasks WHERE id=?", (task_id,)).fetchone()
@@ -2140,6 +2220,8 @@ def api_task_start(task_id):
         conn.close()
 
     refresh_project_task_summary(row['project_id'])
+    # 自动流转：开始执行 → 检测中
+    _auto_advance_project_stage(row['project_id'], target_inspection='检测中')
     conn = get_x1_data_conn()
     try:
         updated = conn.execute("SELECT * FROM project_tasks WHERE id=?", (task_id,)).fetchone()
@@ -2181,6 +2263,8 @@ def api_task_complete(task_id):
         conn.close()
 
     refresh_project_task_summary(row['project_id'])
+    # 自动流转：完成任务 → 检测完成 + 报告编制中
+    _auto_advance_project_stage(row['project_id'], target_inspection='检测完成', target_report='编制中')
     conn = get_x1_data_conn()
     try:
         updated = conn.execute("SELECT * FROM project_tasks WHERE id=?", (task_id,)).fetchone()
@@ -5743,6 +5827,32 @@ def api_list_compat():
 
 
 
+def _try_advance_on_export(export_payload):
+    """导出报告成功后，尝试推进已存在项目的状态到 检测完成 + 已出具。"""
+    try:
+        project_info = export_payload.get('project', {}) or {}
+        project_name = (project_info.get('project_name') or '').strip()
+        client_name = (project_info.get('client_name') or '').strip()
+        if not project_name:
+            return
+        conn = get_x1_data_conn()
+        try:
+            row = conn.execute(
+                "SELECT id FROM business_projects WHERE project_name=? AND client_name=?",
+                (project_name, client_name)
+            ).fetchone()
+        finally:
+            conn.close()
+        if row:
+            _auto_advance_project_stage(
+                row['id'],
+                target_inspection='检测完成',
+                target_report='已出具'
+            )
+    except Exception:
+        pass
+
+
 def _auto_sync_project_and_task(export_payload, export_id):
     """导出报告时自动同步项目信息到后台项目管理。
     规则：按项目名 + 客户名查重，不存在则自动创建，已存在则跳过。
@@ -5965,6 +6075,9 @@ def api_x_submit_export():
 
     # 自动同步项目信息到后台项目管理（路线3：混合模式）
     _auto_sync_project_and_task(export_payload, export_id)
+
+    # 自动流转：导出报告成功 → 检测完成 + 已出具
+    _try_advance_on_export(export_payload)
 
     return jsonify({
         'success': True,
