@@ -1362,20 +1362,26 @@ function getRolePermissionMeta(){
 }
 
 function getRolePermissionGroups(){
+  // 按后台导航栏功能分组，对应侧边栏四大区域 + 特殊角色补充
   return [
-    {title:'后台访问', keys:['admin.access']},
-    {title:'记录管理', keys:['admin.records.view','admin.records.open_local','admin.records.open_feishu','admin.records.delete','admin.feishu.retry','admin.trash.cleanup','record.export','record.export.void']},
-    {title:'记录范围', keys:['record.scope.self','record.scope.department','record.scope.company']},
-    {title:'用户管理', keys:['admin.users.view','admin.users.manage']},
-    {title:'模板管理', keys:['admin.templates.view','admin.templates.preview','admin.templates.variables']},
-    {title:'模板治理', keys:['admin.templates.registry.manage','admin.templates.toggle','admin.templates.delete','admin.templates.verify','admin.templates.smoke_export','admin.templates.mapping.type_manage','admin.templates.mapping.semantic_manage','admin.templates.default.set']},
-    {title:'标准 / 日志 / 文档 / 统计', keys:['admin.standards.view','admin.logs.view','admin.logs.delete','admin.docs.view','admin.stats.view']},
-    {title:'文件与草稿', keys:['files.preview','files.preview.own','files.download.own','draft.read','draft.write','admin.files.download']},
-    {title:'项目管理', keys:['admin.projects.view','admin.projects.manage']},
-    {title:'任务派单', keys:['admin.tasks.view','admin.tasks.manage','tasks.execute']},
-    {title:'客户管理', keys:['admin.customers.view','admin.customers.manage']},
-    {title:'客户界面', keys:['customer.access','customer.profile','customer.history','customer.projects','customer.feedback']},
-    {title:'系统维护', keys:['admin.settings.edit','admin.maintenance.run','admin.migration.check']}
+    // ═══ 经营概览 ═══
+    {title:'📊 数据统计', keys:['admin.stats.view']},
+    {title:'📁 项目管理', keys:['admin.projects.view','admin.projects.manage','admin.tasks.view','admin.tasks.manage']},
+    {title:'🏢 客户管理', keys:['admin.customers.view','admin.customers.manage']},
+    // ═══ 检测业务 ═══
+    {title:'📋 报告管理', keys:['admin.records.view','admin.records.delete','admin.records.open_local','admin.records.open_feishu','admin.feishu.retry','admin.trash.cleanup','record.export','record.export.void','admin.files.download']},
+    {title:'📄 模板管理', keys:['admin.templates.view','admin.templates.preview','admin.templates.variables','admin.templates.upload','admin.templates.registry.manage','admin.templates.toggle','admin.templates.delete','admin.templates.verify','admin.templates.smoke_export','admin.templates.mapping.type_manage','admin.templates.mapping.semantic_manage','admin.templates.default.set']},
+    {title:'📖 标准数据库', keys:['admin.standards.view']},
+    // ═══ 系统管理 ═══
+    {title:'👤 用户管理', keys:['admin.users.view','admin.users.manage','admin.permissions.view','admin.permissions.manage']},
+    {title:'📝 操作日志', keys:['admin.logs.view','admin.logs.delete']},
+    {title:'⚙️ 系统设置', keys:['admin.settings.view','admin.settings.edit','admin.maintenance.run','admin.migration.check']},
+    {title:'📚 系统文档', keys:['admin.docs.view']},
+    // ═══ 特殊角色 ═══
+    {title:'🔧 检测员操作', keys:['tasks.execute','draft.read','draft.write','files.preview','files.preview.own','files.download.own','record.scope.self','record.scope.department','record.scope.company']},
+    {title:'🔍 客户界面', keys:['customer.access','customer.profile','customer.history','customer.projects','customer.feedback']},
+    // ═══ 通用 ═══
+    {title:'🔑 后台访问', keys:['admin.access']}
   ];
 }
 
