@@ -77,13 +77,13 @@ function renderCustomerList(items) {
     // 状态指示
     var badges = '';
     if ((c.urge_count || 0) > 0) {
-      badges += '<span style="display:inline-flex;align-items:center;gap:2px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:600;">⚡' + c.urge_count + '</span>';
+      badges += '<span style="display:inline-flex;align-items:center;gap:2px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:999px;padding:2px 8px;font-size:11px;line-height:18px;font-weight:600;">⚡' + c.urge_count + '</span>';
     }
     if ((c.feedback_count || 0) > 0) {
-      badges += '<span style="display:inline-flex;align-items:center;gap:2px;background:#fffbeb;color:#d97706;border:1px solid #fde68a;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:600;">💬' + c.feedback_count + '</span>';
+      badges += '<span style="display:inline-flex;align-items:center;gap:2px;background:#fffbeb;color:#d97706;border:1px solid #fde68a;border-radius:999px;padding:2px 8px;font-size:11px;line-height:18px;font-weight:600;">💬' + c.feedback_count + '</span>';
     }
     if (c.has_account) {
-      badges += '<span style="display:inline-flex;align-items:center;gap:2px;background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;border-radius:999px;padding:2px 8px;font-size:11px;">✅ 已开通</span>';
+      badges += '<span style="display:inline-flex;align-items:center;gap:2px;background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;border-radius:999px;padding:2px 8px;font-size:11px;line-height:18px;font-weight:600;">✅ 已开通</span>';
     }
 
     html += '<tr onclick="showCustomerDetail(\'' + _safeHtml(c.client_name).replace(/'/g, "\\'") + '\')"'
@@ -112,7 +112,7 @@ function renderCustomerList(items) {
       // 应收款
       + '<td style="text-align:right;font-size:13px;font-weight:' + recvWeight + ';color:' + recvColor + ';padding-right:12px;vertical-align:middle;">' + _money(c.receivable) + '</td>'
       // 状态
-      + '<td style="text-align:center;vertical-align:middle;"><div style="display:flex;align-items:center;justify-content:center;gap:4px;flex-wrap:wrap;">' + (badges || '<span style="color:#cbd5e1;font-size:12px;">—</span>') + '</div></td>'
+      + '<td style="text-align:center;vertical-align:middle;padding:14px 4px;"><div style="display:inline-flex;align-items:center;justify-content:center;gap:4px;flex-wrap:nowrap;">' + (badges || '<span style="color:#cbd5e1;font-size:12px;">—</span>') + '</div></td>'
       + '<td style="text-align:center;vertical-align:middle;"><button onclick="event.stopPropagation()" ;deleteCustomer(\x27' + _safeHtml(c.client_name).replace(/'/g, "\\'") + '\x27)" style="padding:3px 8px;font-size:11px;color:#94a3b8;border:1px solid #e2e8f0;border-radius:6px;background:#fff;cursor:pointer;transition:all .15s;" onmouseenter="this.style.color=\x27#dc2626\x27;this.style.borderColor=\x27#fca5a5\x27" onmouseleave="this.style.color=\x27#94a3b8\x27;this.style.borderColor=\x27#e2e8f0\x27">删除</button></div>'
 
       + '</td></tr>';
