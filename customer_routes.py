@@ -292,6 +292,7 @@ def register_customer_routes(app):
                     'detection_type': row['detection_type'] or '',
                     'detection_date': row['expected_detection_date'] or (row['updated_at'] or '')[:10],
                     'report_number': row['project_no'] or '',
+                    'report_no': row['project_no'] or '',
                     'project_address': row['project_address'] or '',
                     'contact_name': row['contact_name'] or '',
                     'contact_phone': row['contact_phone'] or '',
@@ -747,12 +748,37 @@ def register_customer_routes(app):
 
         # 查找对应的 PDF 文件
         project_name = (project['project_name'] or '').strip()
+        report_file_path = (project['report_file_path'] if 'report_file_path' in project.keys() else '') or ''
         reports_dir = BASE_DIR / 'reports_x1'
         preview_dir = BASE_DIR / 'preview_pdf'
 
-        # 策略1：从 preview_pdf 目录找匹配的 PDF
-        # 策略2：遍历 reports_x1/*.json 找到匹配项目的导出记录
         pdf_path = None
+
+        # 策略0：手动上传的报告文件
+        if report_file_path and Path(report_file_path).exists():
+            rfp = Path(report_file_path)
+            if rfp.suffix.lower() == '.pdf':
+                pdf_path = rfp
+            else:
+                # docx → 在 preview_pdf 中找已生成的 PDF
+                for candidate in sorted(preview_dir.glob(f'uploaded_{project_id}_*.pdf'), reverse=True) if preview_dir.exists() else []:
+                    if candidate.stat().st_size > 0:
+                        pdf_path = candidate
+                        break
+                # 没找到则实时转换
+                if not pdf_path:
+                    try:
+                        from pdf_converter import convert_docx_to_pdf
+                        preview_dir.mkdir(exist_ok=True)
+                        ts = rfp.stem.split('_')[-1] if '_' in rfp.stem else 'conv'
+                        pdf_out = str(preview_dir / f"uploaded_{project_id}_{ts}.pdf")
+                        result = convert_docx_to_pdf(str(rfp), pdf_out)
+                        if result:
+                            pdf_path = Path(result)
+                    except Exception:
+                        pass
+
+        # 策略1：从 reports_x1/*.json 找到匹配项目的导出记录
         if reports_dir.exists():
             for json_file in sorted(reports_dir.glob('X1EXPORT_*.json'), reverse=True):
                 try:
@@ -794,3 +820,54 @@ def register_customer_routes(app):
             as_attachment=False,
             download_name=f"检测报告_{project_name}.pdf"
         )
+
+    @app.route('/customer/api/projects/<int:project_id>/download_report', methods=['GET'])
+    @customer_required
+    def customer_download_report(project_id):
+        """客户下载报告文件（DOCX/PDF原件）"""
+        from flask import send_file as _send_file
+        client_name = _get_client_name()
+        conn = _get_x1_data_conn()
+        try:
+            project = conn.execute(
+                "SELECT * FROM business_projects WHERE id=? AND client_name=?",
+                (project_id, client_name)
+            ).fetchone()
+            if not project:
+                return jsonify({'success': False, 'error': '项目不存在'}), 404
+
+            rs = (project['report_status'] or '').strip()
+            allowed = ('已出具', '待客户确认', '客户已确认', '已发送客户')
+            if rs not in allowed:
+                return jsonify({'success': False, 'error': '报告尚未出具，无法下载'}), 400
+        finally:
+            conn.close()
+
+        project_name = (project['project_name'] or '').strip()
+        report_file_path = (project['report_file_path'] if 'report_file_path' in project.keys() else '') or ''
+
+        # 优先返回手动上传的报告文件
+        if report_file_path and Path(report_file_path).exists():
+            rfp = Path(report_file_path)
+            mime = 'application/pdf' if rfp.suffix.lower() == '.pdf' else 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            return _send_file(str(rfp), mimetype=mime, as_attachment=True,
+                              download_name=f"检测报告_{project_name}{rfp.suffix}")
+
+        # 其次从 reports_x1 找导出的 docx
+        reports_dir = BASE_DIR / 'reports_x1'
+        if reports_dir.exists():
+            for json_file in sorted(reports_dir.glob('X1EXPORT_*.json'), reverse=True):
+                try:
+                    data = json.loads(json_file.read_text(encoding='utf-8'))
+                    ep = data.get('export_payload', {})
+                    proj = ep.get('project', {})
+                    if proj.get('project_name') == project_name and proj.get('client_name') == client_name:
+                        docx_path = data.get('filled_docx_path') or data.get('bound_docx_path', '')
+                        if docx_path and Path(docx_path).exists():
+                            return _send_file(docx_path, as_attachment=True,
+                                              download_name=f"检测报告_{project_name}.docx")
+                        break
+                except Exception:
+                    continue
+
+        return jsonify({'success': False, 'error': '报告文件不存在，请联系检测中心'}), 404

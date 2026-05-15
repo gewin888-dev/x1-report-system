@@ -219,14 +219,17 @@
         } else if (r.feishu_url) {
           previewBtn = '<a href="' + escapeHtml(r.feishu_url) + '" target="_blank" class="btn btn-primary btn-sm" style="font-size:12px;padding:3px 10px;">预览</a>';
         }
-        var downloadBtn = r.feishu_export_url
-          ? '<a href="' + escapeHtml(r.feishu_export_url) + '" target="_blank" class="btn btn-default btn-sm" style="font-size:12px;padding:3px 10px;">下载</a>'
-          : '';
+        var downloadBtn = '';
+        if (r.feishu_export_url) {
+          downloadBtn = '<a href="' + escapeHtml(r.feishu_export_url) + '" target="_blank" class="btn btn-default btn-sm" style="font-size:12px;padding:3px 10px;">下载</a>';
+        } else if (r.project_id) {
+          downloadBtn = '<button class="btn btn-default btn-sm" style="font-size:12px;padding:3px 10px;" onclick="downloadReport(' + r.project_id + ')">⬇️ 下载</button>';
+        }
         return '<tr>'
           + '<td>' + escapeHtml(r.project_name) + '</td>'
-          + '<td>' + escapeHtml(r.detection_type || '') + '</td>'
+          + '<td>' + escapeHtml(r.detection_type || r.detection_object || '') + '</td>'
           + '<td>' + escapeHtml(r.detection_date || r.export_time || '') + '</td>'
-          + '<td>' + escapeHtml(r.report_no || '') + '</td>'
+          + '<td>' + escapeHtml(r.report_no || r.report_number || '') + '</td>'
           + '<td><span style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:12px;font-weight:500;' + statusCls + '">' + escapeHtml(status) + '</span></td>'
           + '<td style="white-space:nowrap;">' + previewBtn + ' ' + downloadBtn + '</td>'
           + '</tr>';
@@ -275,6 +278,7 @@
         var reportBtns = '';
         if (canPreview) {
           reportBtns += '<button class="btn btn-preview" onclick="previewReport(' + p.id + ')">🔍 预览报告</button>';
+          reportBtns += '<button class="btn btn-sm" onclick="downloadReport(' + p.id + ')" style="background:#f0f5ff;color:#1677ff;border:1px solid #91caff;">⬇️ 下载</button>';
         } else {
           reportBtns += '<button class="btn btn-sm btn-disabled" disabled>🔍 预览报告</button>';
         }
@@ -363,6 +367,11 @@
 
   /* --- 预览报告 --- */
   var _currentReportProjectId = null;
+
+  window.downloadReport = function (projectId) {
+    var qs = _asClient ? '?as_client=' + encodeURIComponent(_asClient) : '';
+    window.open('/customer/api/projects/' + projectId + '/download_report' + qs, '_blank');
+  };
 
   window.previewReport = function (projectId) {
     var qs = _asClient ? '?as_client=' + encodeURIComponent(_asClient) : '';

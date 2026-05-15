@@ -261,6 +261,11 @@ def init_business_projects_table():
             conn.execute("ALTER TABLE business_projects ADD COLUMN paid_amount REAL DEFAULT 0")
         except sqlite3.OperationalError:
             pass
+        # 增量迁移：报告文件路径（补录场景）
+        try:
+            conn.execute("ALTER TABLE business_projects ADD COLUMN report_file_path TEXT DEFAULT ''")
+        except sqlite3.OperationalError:
+            pass
         conn.commit()
     finally:
         conn.close()
@@ -322,6 +327,7 @@ def serialize_business_project(row):
         'updated_at': row['updated_at'] or '',
         'source': row['source'] if 'source' in row.keys() else '',
         'has_urge': row['has_urge'] if 'has_urge' in row.keys() else '',
+        'report_file_path': row['report_file_path'] if 'report_file_path' in row.keys() else '',
     }
 
 
@@ -1814,6 +1820,100 @@ def admin_api_business_project_delete(project_id):
         conn.execute('DELETE FROM business_projects WHERE id=?', [project_id])
         conn.commit()
         return jsonify({'success': True})
+    finally:
+        conn.close()
+
+
+@app.route('/admin/api/business_projects/<int:project_id>/upload_report', methods=['POST'])
+@login_required
+@require_permission('admin.projects.manage')
+def admin_api_upload_report(project_id):
+    """上传报告文件（补录场景），支持 .docx / .pdf"""
+    conn = get_x1_data_conn()
+    try:
+        project = conn.execute('SELECT * FROM business_projects WHERE id=?', [project_id]).fetchone()
+        if not project:
+            return jsonify({'success': False, 'error': '项目不存在'}), 404
+
+        f = request.files.get('report_file')
+        if not f or not f.filename:
+            return jsonify({'success': False, 'error': '请选择报告文件'}), 400
+
+        ext = Path(f.filename).suffix.lower()
+        if ext not in ('.docx', '.pdf', '.doc'):
+            return jsonify({'success': False, 'error': '仅支持 .docx / .pdf / .doc 格式'}), 400
+
+        upload_dir = BASE_DIR / 'uploaded_reports'
+        upload_dir.mkdir(exist_ok=True)
+
+        # 文件名：项目ID_时间戳.ext
+        ts = datetime.now().strftime('%Y%m%d%H%M%S')
+        safe_name = f"project_{project_id}_{ts}{ext}"
+        save_path = upload_dir / safe_name
+        f.save(str(save_path))
+
+        # 如果上传的是 docx，同时生成 PDF 预览
+        pdf_path = ''
+        if ext == '.docx':
+            try:
+                from pdf_converter import convert_docx_to_pdf
+                preview_dir = BASE_DIR / 'preview_pdf'
+                preview_dir.mkdir(exist_ok=True)
+                pdf_out = str(preview_dir / f"uploaded_{project_id}_{ts}.pdf")
+                result = convert_docx_to_pdf(str(save_path), pdf_out)
+                if result:
+                    pdf_path = result
+            except Exception:
+                pass  # PDF 生成失败不影响主流程
+        elif ext == '.pdf':
+            # PDF 直接复制到预览目录
+            preview_dir = BASE_DIR / 'preview_pdf'
+            preview_dir.mkdir(exist_ok=True)
+            pdf_dest = preview_dir / f"uploaded_{project_id}_{ts}.pdf"
+            import shutil
+            shutil.copy2(str(save_path), str(pdf_dest))
+            pdf_path = str(pdf_dest)
+
+        # 更新项目记录
+        now = datetime.now().isoformat(timespec='seconds')
+        updates = {'report_file_path': str(save_path), 'updated_at': now}
+        # 如果 report_status 还是初始状态，自动推进到“已出具”
+        current_rs = (project['report_status'] or '').strip()
+        if current_rs in ('', '未开始', '编制中', '审核中', '待出具'):
+            updates['report_status'] = '已出具'
+            updates['inspection_stage'] = '检测完成'
+
+        set_clause = ', '.join(f"{k}=?" for k in updates.keys())
+        conn.execute(f'UPDATE business_projects SET {set_clause} WHERE id=?',
+                     list(updates.values()) + [project_id])
+        conn.commit()
+
+        return jsonify({
+            'success': True,
+            'file_path': str(save_path),
+            'pdf_path': pdf_path,
+            'message': '报告上传成功' + ('，PDF 预览已生成' if pdf_path else '')
+        })
+    finally:
+        conn.close()
+
+
+@app.route('/admin/api/business_projects/<int:project_id>/download_report', methods=['GET'])
+@login_required
+@require_permission('admin.projects.view')
+def admin_api_download_report(project_id):
+    """下载项目报告文件（DOCX/PDF）"""
+    conn = get_x1_data_conn()
+    try:
+        project = conn.execute('SELECT * FROM business_projects WHERE id=?', [project_id]).fetchone()
+        if not project:
+            return jsonify({'success': False, 'error': '项目不存在'}), 404
+        rfp = (project['report_file_path'] if 'report_file_path' in project.keys() else '') or ''
+        if not rfp or not Path(rfp).exists():
+            return jsonify({'success': False, 'error': '报告文件不存在'}), 404
+        pname = project['project_name'] or '检测报告'
+        ext = Path(rfp).suffix
+        return send_file(rfp, as_attachment=True, download_name=f"{pname}{ext}")
     finally:
         conn.close()
 

@@ -45,7 +45,7 @@ function renderProjectTable(data){ const items=data.items||[]; const box=documen
 function toggleProjectGroup(gid,headerEl){ const rows=document.querySelectorAll('tr.'+gid); if(!rows.length) return; const show=rows[0].style.display==='none'; rows.forEach(r=>r.style.display=show?'':'none'); const arrow=headerEl.querySelector('.proj-group-arrow'); if(arrow) arrow.textContent=show?'▼':'▶'; }
 function renderProjectPagination(total,page,pageSize){ const box=document.getElementById('project-pagination'); if(!box) return; const totalPages=Math.max(1,Math.ceil(total/pageSize)); box.innerHTML=`<div class="pagination"><span class="page-info">共 ${total} 条 / 第 ${page} / ${totalPages} 页</span><button ${page<=1?'disabled':''} onclick="loadProjects(${page-1})">上一页</button><button ${page>=totalPages?'disabled':''} onclick="loadProjects(${page+1})">下一页</button></div>`; }
 function resetProjectForm(){ ['project-id','project-name','project-client-name','project-address','project-contact-name','project-contact-phone','project-detection-domain','project-detection-type','project-expected-date','project-desc','project-contract-status-form','project-contract-amount','project-paid-amount','project-inspection-stage-form','project-report-status-form','project-invoice-status-form','project-payment-status-form','project-owner-form','project-remarks'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; }); }
-function fillProjectForm(x){ document.getElementById('project-id').value=x.id||''; document.getElementById('project-name').value=x.project_name||''; document.getElementById('project-client-name').value=x.client_name||''; document.getElementById('project-address').value=x.project_address||''; document.getElementById('project-contact-name').value=x.contact_name||''; document.getElementById('project-contact-phone').value=x.contact_phone||''; document.getElementById('project-detection-domain').value=x.detection_domain||''; document.getElementById('project-detection-type').value=x.detection_type||''; document.getElementById('project-expected-date').value=x.expected_detection_date||''; document.getElementById('project-desc').value=x.project_desc||''; document.getElementById('project-contract-status-form').value=x.contract_status||''; document.getElementById('project-contract-amount').value=x.contract_amount||''; var paidEl=document.getElementById('project-paid-amount'); if(paidEl) paidEl.value=x.paid_amount||''; document.getElementById('project-inspection-stage-form').value=x.inspection_stage||''; document.getElementById('project-report-status-form').value=x.report_status||''; document.getElementById('project-invoice-status-form').value=x.invoice_status||''; document.getElementById('project-payment-status-form').value=x.payment_status||''; document.getElementById('project-owner-form').value=x.owner||''; document.getElementById('project-remarks').value=x.remarks||''; }
+function fillProjectForm(x){ document.getElementById('project-id').value=x.id||''; document.getElementById('project-name').value=x.project_name||''; document.getElementById('project-client-name').value=x.client_name||''; document.getElementById('project-address').value=x.project_address||''; document.getElementById('project-contact-name').value=x.contact_name||''; document.getElementById('project-contact-phone').value=x.contact_phone||''; document.getElementById('project-detection-domain').value=x.detection_domain||''; document.getElementById('project-detection-type').value=x.detection_type||''; document.getElementById('project-expected-date').value=x.expected_detection_date||''; document.getElementById('project-desc').value=x.project_desc||''; document.getElementById('project-contract-status-form').value=x.contract_status||''; document.getElementById('project-contract-amount').value=x.contract_amount||''; var paidEl=document.getElementById('project-paid-amount'); if(paidEl) paidEl.value=x.paid_amount||''; document.getElementById('project-inspection-stage-form').value=x.inspection_stage||''; document.getElementById('project-report-status-form').value=x.report_status||''; document.getElementById('project-invoice-status-form').value=x.invoice_status||''; document.getElementById('project-payment-status-form').value=x.payment_status||''; document.getElementById('project-owner-form').value=x.owner||''; document.getElementById('project-remarks').value=x.remarks||''; var rfs=document.getElementById('report-file-status'); if(rfs){ if(x.report_file_path){ rfs.style.display=''; rfs.style.color='#389e0d'; rfs.innerHTML='\u2705 \u5df2\u4e0a\u4f20\u62a5\u544a <a href="/admin/api/business_projects/'+x.id+'/download_report" target="_blank" style="color:#1677ff;font-size:12px;">\u4e0b\u8f7d</a>'; } else { rfs.style.display='none'; rfs.textContent=''; } } }
 function setProjectFieldReadonlyStyle(id, readonly){
   const el = document.getElementById(id);
   if(!el) return;
@@ -284,4 +284,31 @@ function loadProjectReports(projectId){
       }).join('');
     })
     .catch(function(err){ console.error(err); box.innerHTML='<div style="color:#f5222d;">加载失败</div>'; });
+}
+
+// ========== 报告上传 ==========
+function uploadReport() {
+  var projectId = document.getElementById('project-id').value;
+  if (!projectId) { alert('请先保存项目后再上传报告'); return; }
+  var fileInput = document.getElementById('report-file-input');
+  if (!fileInput || !fileInput.files.length) { alert('请选择报告文件'); return; }
+  var formData = new FormData();
+  formData.append('report_file', fileInput.files[0]);
+  var statusEl = document.getElementById('report-file-status');
+  if (statusEl) { statusEl.style.display = ''; statusEl.textContent = '上传中...'; statusEl.style.color = '#1677ff'; }
+  fetch('/admin/api/business_projects/' + projectId + '/upload_report', {
+    method: 'POST', body: formData, credentials: 'same-origin'
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.success) {
+      if (statusEl) { statusEl.textContent = '✅ ' + d.message; statusEl.style.color = '#389e0d'; }
+      fileInput.value = '';
+      // 刷新项目数据
+      showProjectModal(parseInt(projectId), 'edit');
+      loadProjects();
+    } else {
+      if (statusEl) { statusEl.textContent = '❌ ' + (d.error || '上传失败'); statusEl.style.color = '#cf1322'; }
+    }
+  }).catch(function() {
+    if (statusEl) { statusEl.textContent = '❌ 网络错误'; statusEl.style.color = '#cf1322'; }
+  });
 }
