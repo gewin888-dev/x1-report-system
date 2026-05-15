@@ -1061,6 +1061,27 @@ function markAllNotifRead(){
   });
 }
 
+var _lastNotifCount = 0;
+
+function playNotifSound(){
+  try {
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    // 双音提示（叮咚）
+    [880, 1175].forEach(function(freq, i){
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.15, ctx.currentTime + i * 0.12);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.12 + 0.3);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + i * 0.12);
+      osc.stop(ctx.currentTime + i * 0.12 + 0.3);
+    });
+  } catch(e){}
+}
+
 function pollNotifCount(){
   fetch('/api/notifications/unread_count').then(function(r){return r.json()}).then(function(d){
     var badge = document.getElementById('notif-badge');
@@ -1069,9 +1090,12 @@ function pollNotifCount(){
     if(count > 0){
       badge.textContent = count > 99 ? '99+' : count;
       badge.style.display = '';
+      // 新通知到达时播放提示音
+      if(count > _lastNotifCount && _lastNotifCount >= 0) playNotifSound();
     } else {
       badge.style.display = 'none';
     }
+    _lastNotifCount = count;
   }).catch(function(){});
 }
 

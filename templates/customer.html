@@ -1064,6 +1064,26 @@ function custMarkAllRead(){
   api('/api/notifications/read_all', 'POST').then(function(){ pollCustNotifCount(); loadCustNotifications(); });
 }
 
+var _lastCustNotifCount = 0;
+
+function playCustNotifSound(){
+  try {
+    var ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [660, 880].forEach(function(freq, i){
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.12, ctx.currentTime + i * 0.15);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.15 + 0.25);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + i * 0.15);
+      osc.stop(ctx.currentTime + i * 0.15 + 0.25);
+    });
+  } catch(e){}
+}
+
 function pollCustNotifCount(){
   api('/api/notifications/unread_count').then(function(d){
     var badge = document.getElementById('cust-notif-badge');
@@ -1072,9 +1092,11 @@ function pollCustNotifCount(){
     if(count > 0){
       badge.textContent = count;
       badge.style.display = '';
+      if(count > _lastCustNotifCount && _lastCustNotifCount >= 0) playCustNotifSound();
     } else {
       badge.style.display = 'none';
     }
+    _lastCustNotifCount = count;
   }).catch(function(){});
 }
 
