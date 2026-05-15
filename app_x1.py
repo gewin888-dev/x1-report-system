@@ -532,9 +532,9 @@ def refresh_project_task_summary(project_id):
 # 状态流转优先级（数值越大 = 越靠后）
 _INSPECTION_STAGE_ORDER = {
     '未安排': 0, '': 0,
-    '已排期': 1, '待进场': 2,
-    '检测中': 3, '补测中': 3,
-    '检测完成': 4, '已结束': 5,
+    '已排期': 1,
+    '检测中': 2,
+    '检测完成': 3,
     '检测异常': -1,  # 异常不自动流转
 }
 _REPORT_STATUS_ORDER = {
@@ -2538,8 +2538,8 @@ def api_task_accept(task_id):
         conn.close()
 
     refresh_project_task_summary(row['project_id'])
-    # 自动流转：接单 → 待进场
-    _auto_advance_project_stage(row['project_id'], target_inspection='待进场')
+    # 自动流转：接单 → 已排期
+    _auto_advance_project_stage(row['project_id'], target_inspection='已排期')
     conn = get_x1_data_conn()
     try:
         updated = conn.execute("SELECT * FROM project_tasks WHERE id=?", (task_id,)).fetchone()
