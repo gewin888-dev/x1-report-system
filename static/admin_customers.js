@@ -56,7 +56,7 @@ function renderCustomerList(items) {
   }
 
   // 表头
-  var html = '<div style="display:grid;grid-template-columns:2fr 80px 100px 100px 100px 120px;gap:0;padding:0 20px;margin-bottom:4px;font-size:12px;color:#94a3b8;font-weight:500;">'
+  var html = '<div style="display:grid;grid-template-columns:2fr 70px 95px 95px 95px 110px 50px;gap:0;padding:0 20px;margin-bottom:4px;font-size:12px;color:#94a3b8;font-weight:500;">'
     + '<div>客户</div><div style="text-align:center;">项目数</div><div style="text-align:right;">合同总额</div><div style="text-align:right;">已收款</div><div style="text-align:right;">应收款</div><div style="text-align:center;">状态</div></div>';
 
   items.forEach(function(c) {
@@ -87,7 +87,7 @@ function renderCustomerList(items) {
     }
 
     html += '<div onclick="showCustomerDetail(\'' + _safeHtml(c.client_name).replace(/'/g, "\\'") + '\')"'
-      + ' style="display:grid;grid-template-columns:2fr 80px 100px 100px 100px 120px;gap:0;align-items:center;'
+      + ' style="display:grid;grid-template-columns:2fr 70px 95px 95px 95px 110px 50px;gap:0;align-items:center;'
       + 'background:#fff;border-radius:10px;padding:14px 20px;margin-bottom:6px;cursor:pointer;'
       + 'border:1px solid #f1f5f9;transition:all .15s;box-shadow:0 1px 2px rgba(0,0,0,0.03);"'
       + ' onmouseenter="this.style.borderColor=\'#bfdbfe\';this.style.boxShadow=\'0 2px 8px rgba(59,130,246,0.08)\'"'
@@ -114,6 +114,7 @@ function renderCustomerList(items) {
       + '<div style="text-align:right;font-size:13px;font-weight:' + recvWeight + ';color:' + recvColor + ';">' + _money(c.receivable) + '</div>'
       // 状态
       + '<div style="display:flex;align-items:center;justify-content:center;gap:4px;flex-wrap:wrap;">' + (badges || '<span style="color:#cbd5e1;font-size:12px;">—</span>') + '</div>'
+      + '<div style="text-align:center;"><button onclick="event.stopPropagation();deleteCustomer(\x27' + _safeHtml(c.client_name).replace(/'/g, "\\'") + '\x27)" style="padding:3px 8px;font-size:11px;color:#94a3b8;border:1px solid #e2e8f0;border-radius:6px;background:#fff;cursor:pointer;transition:all .15s;" onmouseenter="this.style.color=\x27#dc2626\x27;this.style.borderColor=\x27#fca5a5\x27" onmouseleave="this.style.color=\x27#94a3b8\x27;this.style.borderColor=\x27#e2e8f0\x27">删除</button></div>'
 
       + '</div>';
   });
@@ -480,5 +481,28 @@ function submitCustomerCreate() {
     })
     .catch(function(err) {
       if (typeof showToast === 'function') showToast(err.message || '创建失败', 'error');
+    });
+}
+
+/* ========== 12. 删除客户 ========== */
+function deleteCustomer(clientName) {
+  if (!confirm('确认删除客户「' + clientName + '」？\n\n⚠️ 有关联项目的客户不允许删除。')) return;
+  fetch('/admin/api/customer_management/delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ client_name: clientName })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.success) throw new Error(d.error || '删除失败');
+      if (typeof showToast === 'function') showToast('客户已删除', 'success');
+      // 如在详情页则回到列表
+      var detailView = document.getElementById('customer-detail-view');
+      if (detailView && detailView.style.display !== 'none') backToCustomerList();
+      else loadCustomerList();
+    })
+    .catch(function(err) {
+      if (typeof showToast === 'function') showToast(err.message || '删除失败', 'error');
+      else alert(err.message || '删除失败');
     });
 }
