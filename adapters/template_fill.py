@@ -4918,18 +4918,32 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
         if type_id == 'operating_room':
             # 单房间 operating_room 在公共信息表后、仪器表前常残留一组空标题块（检 测 报 告 / 报告编号：），
             # mixed report 复用完整文档时会把这组空块带入第一房间页前。这里在单房间输出阶段直接清理。
-            _or_gap_pat = re.compile(
-                r'(<w:p[^>]*>.*?<w:t[^>]*>检\s*测\s*报\s*告</w:t>.*?</w:p>\s*'
-                r'<w:p[^>]*>.*?报告编号：.*?</w:p>\s*'
-                r'<w:tbl.*?委托单位.*?检测结论.*?</w:tbl>\s*'
-                r'<w:p[^>]*>.*?编制人：.*?</w:p>\s*'
-                r'(?:<w:p[\s\S]*?</w:p>\s*){0,3})'
-                r'(<w:p[^>]*>.*?<w:t[^>]*>检\s*测\s*报\s*告</w:t>.*?</w:p>\s*'
-                r'<w:p[^>]*>.*?报告编号：.*?</w:p>\s*'
-                r'<w:tbl.*?序号.*?检测项目.*?检测仪器.*?</w:tbl>)',
-                re.S
-            )
-            document_xml = _or_gap_pat.sub(r'\2', document_xml, count=1)
+            # 性能优化：原正则在大文档上有灾难性回溯（14秒），改用字符串定位
+            # 目标：删除"检测报告标题+报告编号+信息表+编制人"重复块
+            _gap_start = -1
+            _gap_end = -1
+            # 找第一个"检 测 报 告"标题（在仪器表之前）
+            _first_title = document_xml.find('检 测 报 告')
+            if _first_title < 0:
+                _first_title = document_xml.find('检测报告')
+            if _first_title > 0:
+                # 找这个标题所在段落的开始
+                _p_start = document_xml.rfind('<w:p', 0, _first_title)
+                if _p_start > 0:
+                    # 找"序号"和"检测项目"（仪器表的标志）
+                    _instr_tbl = document_xml.find('序号', _first_title)
+                    if _instr_tbl > 0 and '检测项目' in document_xml[_instr_tbl:_instr_tbl+500]:
+                        # 找仪器表前的"检 测 报 告"标题段落开始
+                        _second_title = document_xml.rfind('<w:p', _first_title + 10, _instr_tbl)
+                        # 检查这个位置附近是否有"检测报告"文本
+                        _check_area = document_xml[max(0, _second_title):_instr_tbl]
+                        if '报告编号' in _check_area:
+                            # 删除从第一个标题段落开始到第二个标题段落开始之间的内容
+                            # 但要保留第二个标题（仪器表前的那个）
+                            _gap_start = _p_start
+                            _gap_end = _second_title
+            if _gap_start > 0 and _gap_end > _gap_start and (_gap_end - _gap_start) < 200000:
+                document_xml = document_xml[:_gap_start] + document_xml[_gap_end:]
         with ZipFile(output, 'w', ZIP_DEFLATED) as dst:
             for name in members:
                 # 跳过目录项，避免重写 zip 时生成损坏条目
