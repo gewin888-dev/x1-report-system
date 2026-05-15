@@ -1,20 +1,26 @@
 /* ============================================================
- * admin_customers.js — 客户管理面板
+ * admin_customers.js — 客户管理面板（美化版 v2）
  * ============================================================ */
 
 var customerPanelInited = false;
 var customerListData = [];
 var customerSearchTimer = null;
 
-/* ---------- 1. 初始化 ---------- */
+/* ========== 工具函数 ========== */
+function _money(v) {
+  var n = parseFloat(v) || 0;
+  if (!n) return '-';
+  return '¥' + n.toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+}
+function _safeHtml(s) { return typeof escapeHtml === 'function' ? escapeHtml(s) : String(s || ''); }
+
+/* ========== 1. 初始化 ========== */
 function initCustomersPanel() {
-  if (!customerPanelInited) {
-    customerPanelInited = true;
-  }
+  if (!customerPanelInited) customerPanelInited = true;
   loadCustomerList();
 }
 
-/* ---------- 2. 加载客户列表 ---------- */
+/* ========== 2. 加载列表 ========== */
 function loadCustomerList() {
   fetch('/admin/api/customer_management/list')
     .then(function(r) { return r.json(); })
@@ -27,109 +33,114 @@ function loadCustomerList() {
     .catch(function(err) {
       console.error(err);
       var box = document.getElementById('customer-list-container');
-      if (box) box.innerHTML = '<div class="empty">加载客户列表失败</div>';
+      if (box) box.innerHTML = '<div style="padding:60px;text-align:center;color:#94a3b8;font-size:14px;">加载客户列表失败</div>';
     });
 }
 
-/* ---------- 3. 汇总卡片 ---------- */
-function renderCustomerSummary(summary) {
-  var el;
-  el = document.getElementById('cs-total');
-  if (el) el.textContent = summary.total || 0;
-  el = document.getElementById('cs-with-projects');
-  if (el) el.textContent = summary.with_projects || 0;
-  el = document.getElementById('cs-pending-urge');
-  if (el) el.textContent = summary.pending_urge || 0;
-  el = document.getElementById('cs-pending-feedback');
-  if (el) el.textContent = summary.pending_feedback || 0;
-  el = document.getElementById('cs-receivable');
-  if (el) el.textContent = summary.receivable_clients || 0;
+/* ========== 3. 汇总卡片 ========== */
+function renderCustomerSummary(s) {
+  var ids = { 'cs-total': s.total, 'cs-with-projects': s.with_projects, 'cs-pending-urge': s.pending_urge, 'cs-pending-feedback': s.pending_feedback, 'cs-receivable': s.receivable_clients };
+  for (var k in ids) {
+    var el = document.getElementById(k);
+    if (el) el.textContent = ids[k] || 0;
+  }
 }
 
-/* ---------- 4. 渲染客户列表 ---------- */
+/* ========== 4. 渲染客户列表 ========== */
 function renderCustomerList(items) {
-  var container = document.getElementById('customer-list-container');
-  if (!container) return;
+  var box = document.getElementById('customer-list-container');
+  if (!box) return;
   if (!items || !items.length) {
-    container.innerHTML = '<div class="empty" style="padding:40px;text-align:center;color:#999;">暂无客户数据</div>';
+    box.innerHTML = '<div style="padding:60px;text-align:center;color:#94a3b8;font-size:14px;">暂无客户数据</div>';
     return;
   }
-  var html = '';
-  items.forEach(function(item) {
-    var receivableStyle = (parseFloat(item.receivable) || 0) > 0 ? 'color:#cf1322;font-weight:600;' : 'color:#389e0d;';
-    var urgeBadge = (item.urge_count || 0) > 0
-      ? '<span style="background:#fff1f0;color:#cf1322;border:1px solid #ffa39e;border-radius:999px;padding:1px 7px;font-size:11px;margin-left:4px;">🔔' + item.urge_count + '</span>'
-      : '';
-    var feedbackBadge = (item.feedback_count || 0) > 0
-      ? '<span style="background:#fff7e6;color:#d46b08;border:1px solid #ffd591;border-radius:999px;padding:1px 7px;font-size:11px;margin-left:4px;">💬' + item.feedback_count + '</span>'
-      : '';
-    var accountTag = item.has_account
-      ? '<span style="background:#f6ffed;color:#389e0d;border:1px solid #b7eb8f;border-radius:999px;padding:1px 7px;font-size:11px;">✅ 已开通</span>'
-      : '<span style="background:#fafafa;color:#999;border:1px solid #d9d9d9;border-radius:999px;padding:1px 7px;font-size:11px;">未开通</span>';
-    var domains = '';
-    if (item.domains) {
-      var darr = typeof item.domains === 'string' ? item.domains.split(',').filter(function(s){return s.trim();}) : item.domains;
-      domains = darr.map(function(d) {
-        return '<span style="background:#e6f4ff;color:#0958d9;border-radius:4px;padding:1px 6px;font-size:11px;margin-right:4px;">' + escapeHtml(d.trim()) + '</span>';
-      }).join('');
-    }
-    var money = function(v) { var n = parseFloat(v) || 0; return n ? '¥' + n.toLocaleString('zh-CN', {minimumFractionDigits: 0, maximumFractionDigits: 2}) : '-'; };
 
-    html += '<div class="customer-card" onclick="showCustomerDetail(\'' + escapeHtml(item.client_name).replace(/'/g, "\\'") + '\')" style="'
-      + 'background:#fff;border-radius:10px;padding:14px 20px;margin-bottom:8px;cursor:pointer;'
-      + 'border:1px solid #f0f0f0;transition:background 0.15s;"'
-      + ' onmouseenter="this.style.background=\'#f0f7ff\'" onmouseleave="this.style.background=\'#fff\'">'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;">'
-      + '<div style="display:flex;align-items:center;gap:12px;flex:1;min-width:0;">'
-      + '<span style="font-size:15px;font-weight:600;">🏢 ' + escapeHtml(item.client_name) + '</span>'
-      + '<span style="color:#666;font-size:13px;">' + escapeHtml(item.contact_name || '-') + '</span>'
-      + '<span style="color:#888;font-size:12px;font-family:monospace;">' + escapeHtml(item.contact_phone || '') + '</span>'
+  // 表头
+  var html = '<div style="display:grid;grid-template-columns:2fr 80px 100px 100px 100px 120px;gap:0;padding:0 20px;margin-bottom:4px;font-size:12px;color:#94a3b8;font-weight:500;">'
+    + '<div>客户</div><div style="text-align:center;">项目数</div><div style="text-align:right;">合同总额</div><div style="text-align:right;">已收款</div><div style="text-align:right;">应收款</div><div style="text-align:center;">状态</div></div>';
+
+  items.forEach(function(c) {
+    var receivable = parseFloat(c.receivable) || 0;
+    var recvColor = receivable > 0 ? '#dc2626' : '#16a34a';
+    var recvWeight = receivable > 0 ? '700' : '400';
+
+    // 标签
+    var tags = '';
+    if (c.domains) {
+      var darr = typeof c.domains === 'string' ? c.domains.split(',').filter(function(s){return s.trim();}) : c.domains;
+      darr.slice(0, 3).forEach(function(d) {
+        tags += '<span style="display:inline-block;background:#eff6ff;color:#3b82f6;border-radius:4px;padding:1px 6px;font-size:11px;margin-right:3px;line-height:18px;">' + _safeHtml(d.trim()) + '</span>';
+      });
+      if (darr.length > 3) tags += '<span style="color:#94a3b8;font-size:11px;">+' + (darr.length - 3) + '</span>';
+    }
+
+    // 状态指示
+    var badges = '';
+    if ((c.urge_count || 0) > 0) {
+      badges += '<span style="display:inline-flex;align-items:center;gap:2px;background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:600;">⚡' + c.urge_count + '</span>';
+    }
+    if ((c.feedback_count || 0) > 0) {
+      badges += '<span style="display:inline-flex;align-items:center;gap:2px;background:#fffbeb;color:#d97706;border:1px solid #fde68a;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:600;">💬' + c.feedback_count + '</span>';
+    }
+    if (c.has_account) {
+      badges += '<span style="display:inline-flex;align-items:center;gap:2px;background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;border-radius:999px;padding:2px 8px;font-size:11px;">✅ 已开通</span>';
+    }
+
+    html += '<div onclick="showCustomerDetail(\'' + _safeHtml(c.client_name).replace(/'/g, "\\'") + '\')"'
+      + ' style="display:grid;grid-template-columns:2fr 80px 100px 100px 100px 120px;gap:0;align-items:center;'
+      + 'background:#fff;border-radius:10px;padding:14px 20px;margin-bottom:6px;cursor:pointer;'
+      + 'border:1px solid #f1f5f9;transition:all .15s;box-shadow:0 1px 2px rgba(0,0,0,0.03);"'
+      + ' onmouseenter="this.style.borderColor=\'#bfdbfe\';this.style.boxShadow=\'0 2px 8px rgba(59,130,246,0.08)\'"'
+      + ' onmouseleave="this.style.borderColor=\'#f1f5f9\';this.style.boxShadow=\'0 1px 2px rgba(0,0,0,0.03)\'">'
+
+      // 客户信息列
+      + '<div style="min-width:0;">'
+      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">'
+      + '<span style="font-size:14px;font-weight:700;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + _safeHtml(c.client_name) + '</span>'
+      + (c.contact_name ? '<span style="color:#64748b;font-size:12px;white-space:nowrap;">' + _safeHtml(c.contact_name) + '</span>' : '')
+      + (c.contact_phone ? '<span style="color:#94a3b8;font-size:11px;font-family:monospace;white-space:nowrap;">' + _safeHtml(c.contact_phone) + '</span>' : '')
       + '</div>'
-      + '<div style="display:flex;align-items:center;gap:12px;font-size:13px;">'
-      + '<span>项目 <b>' + (item.project_count || 0) + '</b></span>'
-      + '<span>合同 <b>' + money(item.total_contract) + '</b></span>'
-      + '<span style="' + receivableStyle + '">应收 ' + money(item.receivable) + '</span>'
-      + '</div>'
-      + '</div>'
-      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;flex-wrap:wrap;gap:4px;">'
-      + '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">'
-      + domains
-      + '<span style="color:#aaa;font-size:12px;margin-left:8px;">最近项目 ' + escapeHtml(item.last_project_date || '-') + '</span>'
-      + '</div>'
-      + '<div style="display:flex;align-items:center;gap:6px;">'
-      + urgeBadge + feedbackBadge + ' ' + accountTag
-      + '</div>'
-      + '</div>'
+      + '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">' + tags
+      + (c.last_project_date ? '<span style="color:#cbd5e1;font-size:11px;margin-left:4px;">最近 ' + _safeHtml(c.last_project_date) + '</span>' : '')
+      + '</div></div>'
+
+      // 项目数
+      + '<div style="text-align:center;font-size:14px;font-weight:600;color:#334155;">' + (c.project_count || 0) + '</div>'
+      // 合同总额
+      + '<div style="text-align:right;font-size:13px;color:#334155;">' + _money(c.total_contract) + '</div>'
+      // 已收款
+      + '<div style="text-align:right;font-size:13px;color:#16a34a;">' + _money(c.total_paid) + '</div>'
+      // 应收款
+      + '<div style="text-align:right;font-size:13px;font-weight:' + recvWeight + ';color:' + recvColor + ';">' + _money(c.receivable) + '</div>'
+      // 状态
+      + '<div style="display:flex;align-items:center;justify-content:center;gap:4px;flex-wrap:wrap;">' + (badges || '<span style="color:#cbd5e1;font-size:12px;">—</span>') + '</div>'
+
       + '</div>';
   });
-  container.innerHTML = html;
+
+  box.innerHTML = html;
 }
 
-/* ---------- 5. 搜索过滤 ---------- */
+/* ========== 5. 搜索 ========== */
 function filterCustomerList() {
   clearTimeout(customerSearchTimer);
   customerSearchTimer = setTimeout(function() {
-    var keyword = (document.getElementById('customer-search')?.value || '').trim().toLowerCase();
-    if (!keyword) {
-      renderCustomerList(customerListData);
-      return;
-    }
-    var filtered = customerListData.filter(function(item) {
-      var name = (item.client_name || '').toLowerCase();
-      var contact = (item.contact_name || '').toLowerCase();
-      var phone = (item.contact_phone || '').toLowerCase();
-      return name.indexOf(keyword) >= 0 || contact.indexOf(keyword) >= 0 || phone.indexOf(keyword) >= 0;
-    });
-    renderCustomerList(filtered);
+    var kw = (document.getElementById('customer-search')?.value || '').trim().toLowerCase();
+    if (!kw) { renderCustomerList(customerListData); return; }
+    renderCustomerList(customerListData.filter(function(c) {
+      return (c.client_name || '').toLowerCase().indexOf(kw) >= 0
+        || (c.contact_name || '').toLowerCase().indexOf(kw) >= 0
+        || (c.contact_phone || '').toLowerCase().indexOf(kw) >= 0;
+    }));
   }, 200);
 }
 
-/* ---------- 6. 客户详情 ---------- */
+/* ========== 6. 客户详情 ========== */
 function showCustomerDetail(clientName) {
   document.getElementById('customer-list-view').style.display = 'none';
   document.getElementById('customer-detail-view').style.display = '';
-  var contentEl = document.getElementById('customer-detail-content');
-  contentEl.innerHTML = '<div style="text-align:center;padding:40px;color:#999;">加载中...</div>';
+  var box = document.getElementById('customer-detail-content');
+  box.innerHTML = '<div style="text-align:center;padding:60px;color:#94a3b8;">加载中...</div>';
 
   fetch('/admin/api/customer_management/detail?client_name=' + encodeURIComponent(clientName))
     .then(function(r) { return r.json(); })
@@ -139,220 +150,206 @@ function showCustomerDetail(clientName) {
     })
     .catch(function(err) {
       console.error(err);
-      contentEl.innerHTML = '<div style="text-align:center;padding:40px;color:#cf1322;">加载详情失败: ' + escapeHtml(err.message) + '</div>';
+      box.innerHTML = '<div style="text-align:center;padding:60px;color:#dc2626;">加载失败: ' + _safeHtml(err.message) + '</div>';
     });
 }
 
 function renderCustomerDetail(data) {
-  var profile = data.profile || {};
+  var p = data.profile || {};
   var projects = data.projects || [];
   var urgeLogs = data.urge_logs || [];
   var feedbacks = data.feedbacks || [];
   var reports = data.reports || [];
   var account = data.account || {};
-  var contentEl = document.getElementById('customer-detail-content');
+  var box = document.getElementById('customer-detail-content');
 
-  var html = '';
+  var h = '';
 
-  // 4a: 头部信息卡
-  var accountStatus = account && account.user_id
-    ? '<span style="color:#389e0d;">✅ 已开通</span>'
-    : '<span style="color:#999;">未开通</span>';
-  var lastDate = '';
-  if (projects.length) {
-    var dates = projects.map(function(p) { return p.last_project_date || p.updated_at || ''; }).filter(Boolean).sort();
-    lastDate = dates.length ? dates[dates.length - 1].slice(0, 10) : '-';
-  }
+  /* --- 头部信息卡 --- */
+  var acctBadge = account && account.user_id
+    ? '<span style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;border-radius:999px;padding:3px 10px;font-size:12px;">✅ 已开通 · ' + _safeHtml(account.user_id) + '</span>'
+    : '<span style="background:#f8fafc;color:#94a3b8;border:1px solid #e2e8f0;border-radius:999px;padding:3px 10px;font-size:12px;">未开通账号</span>';
 
-  html += '<div style="background:#fff;border-radius:10px;padding:20px 24px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">'
-    + '<div style="font-size:18px;font-weight:700;margin-bottom:8px;">🏢 ' + escapeHtml(profile.client_name || '') + '</div>'
-    + '<div style="display:flex;gap:24px;flex-wrap:wrap;font-size:13px;color:#555;">'
-    + '<span>联系人: <b>' + escapeHtml(profile.recipient_name || '-') + '</b></span>'
-    + '<span>电话: <b>' + escapeHtml(profile.recipient_phone || '-') + '</b></span>'
-    + '<span>账号: ' + accountStatus + '</span>'
-    + '<span>最近项目: ' + escapeHtml(lastDate || '-') + '</span>'
+  h += '<div style="background:linear-gradient(135deg,#1e40af 0%,#3b82f6 100%);border-radius:14px;padding:24px 28px;margin-bottom:16px;color:#fff;">'
+    + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
+    + '<div>'
+    + '<div style="font-size:22px;font-weight:800;margin-bottom:6px;">' + _safeHtml(p.client_name || '') + '</div>'
+    + '<div style="display:flex;gap:20px;font-size:13px;opacity:0.9;">'
+    + '<span>📞 ' + _safeHtml(p.recipient_name || '-') + ' · ' + _safeHtml(p.recipient_phone || '-') + '</span>'
+    + '<span>📍 ' + _safeHtml(p.recipient_address || '-') + '</span>'
+    + '</div></div>'
+    + '<div>' + acctBadge + '</div>'
+    + '</div>'
+    + '<div style="display:flex;gap:32px;margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.2);font-size:14px;">'
+    + '<div><div style="opacity:0.7;font-size:12px;margin-bottom:2px;">项目总数</div><div style="font-weight:700;font-size:18px;">' + projects.length + '</div></div>'
+    + '<div><div style="opacity:0.7;font-size:12px;margin-bottom:2px;">合同总额</div><div style="font-weight:700;font-size:18px;">' + _money(projects.reduce(function(s,pr){return s+(parseFloat(pr.contract_amount)||0);},0)) + '</div></div>'
+    + '<div><div style="opacity:0.7;font-size:12px;margin-bottom:2px;">催单次数</div><div style="font-weight:700;font-size:18px;">' + urgeLogs.length + '</div></div>'
+    + '<div><div style="opacity:0.7;font-size:12px;margin-bottom:2px;">反馈次数</div><div style="font-weight:700;font-size:18px;">' + feedbacks.length + '</div></div>'
     + '</div></div>';
 
-  // 4b: 基础信息（可编辑）
-  var selfMaintained = profile.updated_at
-    ? '<span style="color:#389e0d;font-size:12px;margin-left:8px;">客户自维护 ✅</span>'
-    : '';
+  /* --- 开票/收件信息 --- */
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">';
+  // 开票
+  h += '<div style="background:#fff;border-radius:12px;padding:20px 24px;border:1px solid #f1f5f9;">'
+    + '<div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:14px;display:flex;align-items:center;gap:6px;">🧾 开票信息'
+    + '<button class="btn btn-sm" onclick="toggleCustomerProfileEdit(true)" id="customer-profile-edit-btn" style="margin-left:auto;font-size:12px;">编辑</button>'
+    + '<button class="btn btn-sm" onclick="saveCustomerProfile(\'' + _safeHtml(p.client_name||'').replace(/'/g,"\\'") + '\')" id="customer-profile-save-btn" style="display:none;background:#1677ff;color:#fff;font-size:12px;">保存</button>'
+    + '<button class="btn btn-sm" onclick="toggleCustomerProfileEdit(false)" id="customer-profile-cancel-btn" style="display:none;font-size:12px;">取消</button>'
+    + '</div>'
+    + '<div id="customer-profile-form">'
+    + _pField('invoice_company', '公司全称', p.invoice_company)
+    + _pField('invoice_tax_no', '税号', p.invoice_tax_no)
+    + _pField('invoice_address_phone', '地址电话', p.invoice_address_phone)
+    + _pField('invoice_bank', '开户行', p.invoice_bank)
+    + _pField('invoice_bank_account', '银行账号', p.invoice_bank_account)
+    + '</div></div>';
+  // 收件
+  h += '<div style="background:#fff;border-radius:12px;padding:20px 24px;border:1px solid #f1f5f9;">'
+    + '<div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:14px;">📦 收件信息</div>'
+    + '<div id="customer-profile-form-recv">'
+    + _pField('recipient_name', '收件人', p.recipient_name)
+    + _pField('recipient_phone', '电话', p.recipient_phone)
+    + _pField('recipient_address', '地址', p.recipient_address)
+    + '</div></div>';
+  h += '</div>';
 
-  html += '<div style="background:#fff;border-radius:10px;padding:20px 24px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">'
-    + '<div style="font-size:16px;font-weight:700;margin-bottom:12px;">📋 基础信息' + selfMaintained + '</div>'
-    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;" id="customer-profile-form">'
-    // 左栏 - 开票信息
-    + '<div>'
-    + '<div style="font-size:14px;font-weight:600;margin-bottom:8px;color:#333;">开票信息</div>'
-    + _profileField('invoice_company', '公司名称', profile.invoice_company)
-    + _profileField('invoice_tax_no', '税号', profile.invoice_tax_no)
-    + _profileField('invoice_address_phone', '地址电话', profile.invoice_address_phone)
-    + _profileField('invoice_bank', '开户行', profile.invoice_bank)
-    + _profileField('invoice_bank_account', '银行账号', profile.invoice_bank_account)
-    + '</div>'
-    // 右栏 - 收件信息
-    + '<div>'
-    + '<div style="font-size:14px;font-weight:600;margin-bottom:8px;color:#333;">收件信息</div>'
-    + _profileField('recipient_name', '收件人', profile.recipient_name)
-    + _profileField('recipient_phone', '电话', profile.recipient_phone)
-    + _profileField('recipient_address', '地址', profile.recipient_address)
-    + '</div>'
-    + '</div>'
-    + '<div style="margin-top:12px;text-align:right;">'
-    + '<button class="btn btn-sm" id="customer-profile-edit-btn" onclick="toggleCustomerProfileEdit(true)" style="margin-right:8px;">编辑</button>'
-    + '<button class="btn btn-sm" id="customer-profile-save-btn" onclick="saveCustomerProfile(\'' + escapeHtml(profile.client_name || '').replace(/'/g, "\\'") + '\')" style="display:none;background:#1677ff;color:#fff;">保存</button>'
-    + '<button class="btn btn-sm" id="customer-profile-cancel-btn" onclick="toggleCustomerProfileEdit(false)" style="display:none;">取消</button>'
-    + '</div>'
-    + '</div>';
-
-  // 4c: 项目列表
-  html += '<div style="background:#fff;border-radius:10px;padding:20px 24px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">'
-    + '<div style="font-size:16px;font-weight:700;margin-bottom:12px;">📂 关联项目</div>';
+  /* --- 项目列表 --- */
+  h += '<div style="background:#fff;border-radius:12px;padding:20px 24px;margin-bottom:16px;border:1px solid #f1f5f9;">'
+    + '<div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:14px;">📂 关联项目 <span style="color:#94a3b8;font-weight:400;font-size:13px;">(' + projects.length + ')</span></div>';
   if (projects.length) {
-    html += '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">'
-      + '<thead><tr style="border-bottom:1px solid #f0f0f0;">'
-      + '<th style="text-align:left;padding:8px 6px;color:#666;font-weight:500;">项目编号</th>'
-      + '<th style="text-align:left;padding:8px 6px;color:#666;font-weight:500;">项目名称</th>'
-      + '<th style="text-align:left;padding:8px 6px;color:#666;font-weight:500;">检测领域</th>'
-      + '<th style="text-align:left;padding:8px 6px;color:#666;font-weight:500;">检测阶段</th>'
-      + '<th style="text-align:left;padding:8px 6px;color:#666;font-weight:500;">报告状态</th>'
-      + '<th style="text-align:right;padding:8px 6px;color:#666;font-weight:500;">合同额</th>'
-      + '<th style="text-align:right;padding:8px 6px;color:#666;font-weight:500;">已收</th>'
-      + '<th style="text-align:right;padding:8px 6px;color:#666;font-weight:500;">应收</th>'
-      + '<th style="text-align:center;padding:8px 6px;color:#666;font-weight:500;">催单</th>'
-      + '<th style="text-align:center;padding:8px 6px;color:#666;font-weight:500;">来源</th>'
+    h += '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">'
+      + '<thead><tr style="background:#f8fafc;border-bottom:2px solid #e2e8f0;">'
+      + '<th style="text-align:left;padding:10px 8px;color:#64748b;font-weight:600;font-size:12px;">项目编号</th>'
+      + '<th style="text-align:left;padding:10px 8px;color:#64748b;font-weight:600;font-size:12px;">项目名称</th>'
+      + '<th style="text-align:center;padding:10px 8px;color:#64748b;font-weight:600;font-size:12px;">检测阶段</th>'
+      + '<th style="text-align:center;padding:10px 8px;color:#64748b;font-weight:600;font-size:12px;">报告状态</th>'
+      + '<th style="text-align:right;padding:10px 8px;color:#64748b;font-weight:600;font-size:12px;">合同额</th>'
+      + '<th style="text-align:right;padding:10px 8px;color:#64748b;font-weight:600;font-size:12px;">应收</th>'
+      + '<th style="text-align:center;padding:10px 8px;color:#64748b;font-weight:600;font-size:12px;">催单</th>'
       + '</tr></thead><tbody>';
-    projects.forEach(function(p) {
-      var ca = parseFloat(p.contract_amount) || 0;
-      var pa = parseFloat(p.paid_amount) || 0;
-      var ra = ca - pa;
-      var raStyle = ra > 0 ? 'color:#cf1322;' : 'color:#389e0d;';
-      var fmtAmt = function(v) { var n = parseFloat(v) || 0; return n ? '¥' + n.toLocaleString('zh-CN', {minimumFractionDigits: 0, maximumFractionDigits: 2}) : '-'; };
-      var urgeCell = p.has_urge
-        ? '<span style="cursor:pointer;font-size:16px;" title="点击清除催单" onclick="event.stopPropagation();clearCustomerUrge(' + (p.id) + ',\'' + escapeHtml(profile.client_name || '').replace(/'/g, "\\'") + '\')">🔔</span>'
-        : '';
-      var sourceCell = p.source === '客户需求'
-        ? '<span style="background:#e6f4ff;color:#0958d9;border-radius:999px;padding:1px 7px;font-size:11px;">客户需求</span>'
-        : '';
-      html += '<tr style="border-bottom:1px solid #f5f5f5;transition:background 0.1s;" onmouseenter="this.style.background=\'#fafafa\'" onmouseleave="this.style.background=\'\'">'
-        + '<td style="padding:8px 6px;font-family:monospace;font-size:12px;color:#0958d9;">' + escapeHtml(p.project_no || '-') + '</td>'
-        + '<td style="padding:8px 6px;">' + escapeHtml(p.project_name || '-') + '</td>'
-        + '<td style="padding:8px 6px;">' + escapeHtml(p.detection_domain || '-') + '</td>'
-        + '<td style="padding:8px 6px;">' + escapeHtml(p.inspection_stage || '-') + '</td>'
-        + '<td style="padding:8px 6px;">' + escapeHtml(p.report_status || '-') + '</td>'
-        + '<td style="padding:8px 6px;text-align:right;font-family:monospace;">' + fmtAmt(ca) + '</td>'
-        + '<td style="padding:8px 6px;text-align:right;font-family:monospace;color:#389e0d;">' + fmtAmt(pa) + '</td>'
-        + '<td style="padding:8px 6px;text-align:right;font-family:monospace;' + raStyle + '">' + fmtAmt(ra) + '</td>'
-        + '<td style="padding:8px 6px;text-align:center;">' + urgeCell + '</td>'
-        + '<td style="padding:8px 6px;text-align:center;">' + sourceCell + '</td>'
+    projects.forEach(function(pr, i) {
+      var ca = parseFloat(pr.contract_amount) || 0;
+      var pa = parseFloat(pr.paid_amount) || 0;
+      var recv = ca - pa;
+      var recvStyle = recv > 0 ? 'color:#dc2626;font-weight:600;' : 'color:#16a34a;';
+      var bgColor = i % 2 === 0 ? '#fff' : '#f8fafc';
+
+      var stageBadge = _stageBadge(pr.inspection_stage || '');
+      var reportBadge = _reportBadge(pr.report_status || '');
+      var urgeMark = pr.has_urge ? '<span style="color:#dc2626;cursor:pointer;" title="点击清除催单" onclick="event.stopPropagation();clearUrge(' + pr.id + ',\'' + _safeHtml(pr.client_name||p.client_name||'').replace(/'/g,"\\'") + '\')">🔔 有催单</span>' : '<span style="color:#cbd5e1;">—</span>';
+
+      h += '<tr style="border-bottom:1px solid #f1f5f9;background:' + bgColor + ';">'
+        + '<td style="padding:10px 8px;color:#3b82f6;font-weight:500;white-space:nowrap;">' + _safeHtml(pr.project_no || '-') + '</td>'
+        + '<td style="padding:10px 8px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + _safeHtml(pr.project_name || '-') + '</td>'
+        + '<td style="padding:10px 8px;text-align:center;">' + stageBadge + '</td>'
+        + '<td style="padding:10px 8px;text-align:center;">' + reportBadge + '</td>'
+        + '<td style="padding:10px 8px;text-align:right;">' + _money(ca) + '</td>'
+        + '<td style="padding:10px 8px;text-align:right;' + recvStyle + '">' + _money(recv) + '</td>'
+        + '<td style="padding:10px 8px;text-align:center;font-size:12px;">' + urgeMark + '</td>'
         + '</tr>';
     });
-    html += '</tbody></table></div>';
+    h += '</tbody></table></div>';
   } else {
-    html += '<div style="color:#999;padding:12px 0;">暂无关联项目</div>';
+    h += '<div style="padding:30px;text-align:center;color:#94a3b8;">暂无项目</div>';
   }
-  html += '</div>';
+  h += '</div>';
 
-  // 4d: 催单记录
-  html += '<div style="background:#fff;border-radius:10px;padding:20px 24px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">'
-    + '<div style="font-size:16px;font-weight:700;margin-bottom:12px;">🔔 催单记录</div>';
+  /* --- 反馈记录 --- */
+  if (feedbacks.length) {
+    h += '<div style="background:#fff;border-radius:12px;padding:20px 24px;margin-bottom:16px;border:1px solid #f1f5f9;">'
+      + '<div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:14px;">💬 反馈记录 <span style="color:#94a3b8;font-weight:400;font-size:13px;">(' + feedbacks.length + ')</span></div>';
+    feedbacks.forEach(function(fb) {
+      var statusColor = fb.status === '待处理' ? '#dc2626' : '#16a34a';
+      h += '<div style="padding:12px 16px;border-radius:8px;border:1px solid #f1f5f9;margin-bottom:8px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
+        + '<span style="font-weight:600;font-size:13px;">' + _safeHtml(fb.project_name || '-') + '</span>'
+        + '<span style="font-size:11px;color:' + statusColor + ';font-weight:600;">' + _safeHtml(fb.status || '') + '</span>'
+        + '</div>'
+        + '<div style="font-size:13px;color:#334155;margin-bottom:4px;">' + _safeHtml(fb.content || '') + '</div>'
+        + '<div style="font-size:11px;color:#94a3b8;">' + _safeHtml(fb.created_at || '') + '</div>';
+      if (fb.reply) {
+        h += '<div style="margin-top:8px;padding:8px 12px;background:#f0fdf4;border-radius:6px;font-size:12px;color:#16a34a;">↩️ ' + _safeHtml(fb.reply) + '</div>';
+      } else if (fb.status === '待处理') {
+        h += '<div style="margin-top:8px;">'
+          + '<input type="text" id="fb-reply-' + fb.id + '" placeholder="输入回复..." style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;width:70%;margin-right:6px;">'
+          + '<button class="btn btn-sm" onclick="replyFeedback(' + fb.id + ',\'' + _safeHtml(p.client_name||'').replace(/'/g,"\\'") + '\')" style="background:#1677ff;color:#fff;font-size:12px;">回复</button>'
+          + '</div>';
+      }
+      h += '</div>';
+    });
+    h += '</div>';
+  }
+
+  /* --- 催单记录 --- */
   if (urgeLogs.length) {
-    html += '<div style="border-left:2px solid #d9d9d9;padding-left:16px;">';
-    urgeLogs.forEach(function(log) {
-      html += '<div style="position:relative;margin-bottom:12px;padding-left:12px;">'
-        + '<div style="position:absolute;left:-22px;top:4px;width:8px;height:8px;border-radius:50%;background:#1677ff;"></div>'
-        + '<div style="font-size:13px;color:#333;">' + escapeHtml(log.urge_type === 'report' ? '催报告' : log.urge_type === 'invoice' ? '催发票' : '催单') + '</div>'
-        + '<div style="font-size:11px;color:#aaa;margin-top:2px;">' + escapeHtml(log.created_at || '') + '</div>'
+    h += '<div style="background:#fff;border-radius:12px;padding:20px 24px;margin-bottom:16px;border:1px solid #f1f5f9;">'
+      + '<div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:14px;">⚡ 催单记录 <span style="color:#94a3b8;font-weight:400;font-size:13px;">(' + urgeLogs.length + ')</span></div>';
+    urgeLogs.forEach(function(u) {
+      h += '<div style="display:flex;gap:12px;padding:8px 0;border-bottom:1px solid #f8fafc;font-size:13px;">'
+        + '<span style="color:#94a3b8;font-size:12px;white-space:nowrap;">' + _safeHtml((u.created_at||'').slice(0,16)) + '</span>'
+        + '<span style="color:#334155;">' + _safeHtml(u.project_name || '-') + '</span>'
+        + (u.remark ? '<span style="color:#64748b;font-size:12px;">— ' + _safeHtml(u.remark) + '</span>' : '')
         + '</div>';
     });
-    html += '</div>';
-  } else {
-    html += '<div style="color:#999;padding:4px 0;font-size:13px;">暂无催单记录</div>';
+    h += '</div>';
   }
-  html += '</div>';
 
-  // 4e: 反馈记录
-  html += '<div style="background:#fff;border-radius:10px;padding:20px 24px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">'
-    + '<div style="font-size:16px;font-weight:700;margin-bottom:12px;">💬 反馈记录</div>';
-  if (feedbacks.length) {
-    feedbacks.forEach(function(fb) {
-      var borderColor = fb.status === '未处理' ? '#fa8c16' : '#f0f0f0';
-      html += '<div style="border:1px solid ' + borderColor + ';border-radius:8px;padding:14px;margin-bottom:10px;">'
-        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'
-        + '<span style="background:#e6f4ff;color:#0958d9;border-radius:999px;padding:1px 7px;font-size:11px;">' + escapeHtml(fb.feedback_type || '反馈') + '</span>'
-        + '<span style="font-weight:600;font-size:14px;">' + escapeHtml(fb.title || '') + '</span>'
-        + '<span style="margin-left:auto;font-size:11px;color:#aaa;">' + escapeHtml(fb.created_at || '') + '</span>'
-        + '<span style="font-size:11px;padding:1px 6px;border-radius:999px;' + (fb.status === '未处理' ? 'background:#fff7e6;color:#d46b08;' : 'background:#f6ffed;color:#389e0d;') + '">' + escapeHtml(fb.status || '') + '</span>'
-        + '</div>'
-        + '<div style="font-size:13px;color:#444;margin-bottom:8px;">' + escapeHtml(fb.content || '') + '</div>';
-      if (fb.reply) {
-        html += '<div style="background:#f6ffed;border-radius:6px;padding:8px 12px;font-size:12px;color:#333;"><b>回复:</b> ' + escapeHtml(fb.reply) + '</div>';
-      }
-      html += '<div style="margin-top:8px;" id="feedback-reply-area-' + fb.id + '">'
-        + '<button class="btn btn-sm" onclick="toggleFeedbackReply(' + fb.id + ')" style="font-size:12px;">回复</button>'
-        + '<div id="feedback-reply-box-' + fb.id + '" style="display:none;margin-top:8px;">'
-        + '<textarea id="feedback-reply-text-' + fb.id + '" style="width:100%;height:60px;border:1px solid #d9d9d9;border-radius:6px;padding:8px;font-size:13px;resize:vertical;" placeholder="输入回复内容..."></textarea>'
-        + '<div style="margin-top:6px;display:flex;align-items:center;gap:8px;">'
-        + '<select id="feedback-reply-status-' + fb.id + '" style="border:1px solid #d9d9d9;border-radius:6px;padding:4px 8px;font-size:12px;">'
-        + '<option value="已处理">已处理</option><option value="处理中">处理中</option><option value="未处理">未处理</option></select>'
-        + '<button class="btn btn-sm" onclick="submitFeedbackReply(' + fb.id + ',\'' + escapeHtml(profile.client_name || '').replace(/'/g, "\\'") + '\')" style="background:#1677ff;color:#fff;font-size:12px;">提交</button>'
-        + '</div></div></div>';
-      html += '</div>';
-    });
-  } else {
-    html += '<div style="color:#999;padding:4px 0;font-size:13px;">暂无反馈记录</div>';
-  }
-  html += '</div>';
-
-  // 4f: 报告记录
-  html += '<div style="background:#fff;border-radius:10px;padding:20px 24px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,0.06);">'
-    + '<div style="font-size:16px;font-weight:700;margin-bottom:12px;">📄 报告记录</div>';
+  /* --- 导出报告 --- */
   if (reports.length) {
-    html += '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">'
-      + '<thead><tr style="border-bottom:1px solid #f0f0f0;">'
-      + '<th style="text-align:left;padding:8px 6px;color:#666;font-weight:500;">项目名称</th>'
-      + '<th style="text-align:left;padding:8px 6px;color:#666;font-weight:500;">检测类型</th>'
-      + '<th style="text-align:left;padding:8px 6px;color:#666;font-weight:500;">报告编号</th>'
-      + '<th style="text-align:left;padding:8px 6px;color:#666;font-weight:500;">导出时间</th>'
-      + '<th style="text-align:left;padding:8px 6px;color:#666;font-weight:500;">预览</th>'
-      + '</tr></thead><tbody>';
-    reports.forEach(function(rpt) {
-      var previewLink = rpt.feishu_url
-        ? '<a href="' + escapeHtml(rpt.feishu_url) + '" target="_blank" style="color:#1677ff;text-decoration:none;">查看</a>'
-        : '-';
-      html += '<tr style="border-bottom:1px solid #f5f5f5;transition:background 0.1s;" onmouseenter="this.style.background=\'#fafafa\'" onmouseleave="this.style.background=\'\'">'
-        + '<td style="padding:8px 6px;">' + escapeHtml(rpt.project_name || '-') + '</td>'
-        + '<td style="padding:8px 6px;">' + escapeHtml(rpt.detection_type || '-') + '</td>'
-        + '<td style="padding:8px 6px;font-family:monospace;">' + escapeHtml(rpt.report_no || '-') + '</td>'
-        + '<td style="padding:8px 6px;">' + escapeHtml((rpt.export_time || '').replace('T', ' ').slice(0, 16) || '-') + '</td>'
-        + '<td style="padding:8px 6px;">' + previewLink + '</td>'
-        + '</tr>';
+    h += '<div style="background:#fff;border-radius:12px;padding:20px 24px;margin-bottom:16px;border:1px solid #f1f5f9;">'
+      + '<div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:14px;">📄 导出报告 <span style="color:#94a3b8;font-weight:400;font-size:13px;">(' + reports.length + ')</span></div>';
+    reports.forEach(function(r) {
+      h += '<div style="display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid #f8fafc;font-size:13px;">'
+        + '<span style="color:#3b82f6;font-weight:500;">' + _safeHtml(r.report_no || '-') + '</span>'
+        + '<span style="color:#334155;">' + _safeHtml(r.project_name || '') + '</span>'
+        + '<span style="color:#94a3b8;font-size:12px;margin-left:auto;">' + _safeHtml((r.export_time||'').slice(0,16)) + '</span>'
+        + (r.feishu_url ? '<a href="' + _safeHtml(r.feishu_url) + '" target="_blank" style="color:#3b82f6;font-size:12px;text-decoration:none;">查看</a>' : '')
+        + '</div>';
     });
-    html += '</tbody></table></div>';
-  } else {
-    html += '<div style="color:#999;padding:4px 0;font-size:13px;">暂无报告记录</div>';
+    h += '</div>';
   }
-  html += '</div>';
 
-  contentEl.innerHTML = html;
+  box.innerHTML = h;
 }
 
-/* ---------- 辅助：表单字段渲染 ---------- */
-function _profileField(name, label, value) {
-  return '<div style="margin-bottom:8px;">'
-    + '<label style="display:block;font-size:12px;color:#888;margin-bottom:2px;">' + escapeHtml(label) + '</label>'
-    + '<input type="text" data-profile-field="' + name + '" value="' + escapeHtml(value || '') + '" disabled '
-    + 'style="width:100%;padding:6px 10px;border:1px solid #f0f0f0;border-radius:6px;font-size:13px;background:#fafafa;color:#444;box-sizing:border-box;transition:all 0.15s;" />'
+/* --- 表单字段 --- */
+function _pField(name, label, value) {
+  return '<div style="margin-bottom:10px;">'
+    + '<label style="display:block;font-size:11px;color:#94a3b8;margin-bottom:2px;">' + label + '</label>'
+    + '<input type="text" data-profile-field="' + name + '" value="' + _safeHtml(value || '') + '" disabled '
+    + 'style="width:100%;padding:7px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;color:#334155;background:#f8fafc;box-sizing:border-box;transition:all .15s;">'
     + '</div>';
 }
 
-/* ---------- 7. 编辑/保存客户档案 ---------- */
+/* --- 状态徽章 --- */
+function _stageBadge(stage) {
+  var map = {
+    '待检测': { bg: '#fef3c7', c: '#d97706', b: '#fde68a' },
+    '检测中': { bg: '#dbeafe', c: '#2563eb', b: '#bfdbfe' },
+    '已完成': { bg: '#dcfce7', c: '#16a34a', b: '#bbf7d0' }
+  };
+  var s = map[stage] || { bg: '#f1f5f9', c: '#64748b', b: '#e2e8f0' };
+  return '<span style="display:inline-block;background:' + s.bg + ';color:' + s.c + ';border:1px solid ' + s.b + ';border-radius:999px;padding:2px 10px;font-size:11px;font-weight:600;white-space:nowrap;">' + _safeHtml(stage || '-') + '</span>';
+}
+
+function _reportBadge(status) {
+  var map = {
+    '未出具': { bg: '#f1f5f9', c: '#64748b', b: '#e2e8f0' },
+    '已出具': { bg: '#dbeafe', c: '#2563eb', b: '#bfdbfe' },
+    '待客户确认': { bg: '#fef3c7', c: '#d97706', b: '#fde68a' },
+    '客户已确认': { bg: '#dcfce7', c: '#16a34a', b: '#bbf7d0' }
+  };
+  var s = map[status] || { bg: '#f1f5f9', c: '#64748b', b: '#e2e8f0' };
+  return '<span style="display:inline-block;background:' + s.bg + ';color:' + s.c + ';border:1px solid ' + s.b + ';border-radius:999px;padding:2px 10px;font-size:11px;font-weight:600;white-space:nowrap;">' + _safeHtml(status || '-') + '</span>';
+}
+
+/* ========== 7. 编辑/保存 profile ========== */
 function toggleCustomerProfileEdit(editing) {
-  var fields = document.querySelectorAll('#customer-profile-form input[data-profile-field]');
-  fields.forEach(function(el) {
-    el.disabled = !editing;
-    el.style.background = editing ? '#fff' : '#fafafa';
-    el.style.borderColor = editing ? '#d9d9d9' : '#f0f0f0';
+  var fields = document.querySelectorAll('[data-profile-field]');
+  fields.forEach(function(f) {
+    f.disabled = !editing;
+    f.style.background = editing ? '#fff' : '#f8fafc';
+    f.style.borderColor = editing ? '#3b82f6' : '#e2e8f0';
   });
   var editBtn = document.getElementById('customer-profile-edit-btn');
   var saveBtn = document.getElementById('customer-profile-save-btn');
@@ -363,10 +360,9 @@ function toggleCustomerProfileEdit(editing) {
 }
 
 function saveCustomerProfile(clientName) {
-  var fields = document.querySelectorAll('#customer-profile-form input[data-profile-field]');
   var payload = { client_name: clientName };
-  fields.forEach(function(el) {
-    payload[el.getAttribute('data-profile-field')] = el.value || '';
+  document.querySelectorAll('[data-profile-field]').forEach(function(f) {
+    payload[f.getAttribute('data-profile-field')] = f.value;
   });
   fetch('/admin/api/customer_management/profile', {
     method: 'PUT',
@@ -376,114 +372,91 @@ function saveCustomerProfile(clientName) {
     .then(function(r) { return r.json(); })
     .then(function(d) {
       if (!d.success) throw new Error(d.error || '保存失败');
-      showToast('保存成功', 'success');
+      if (typeof showToast === 'function') showToast('保存成功', 'success');
       toggleCustomerProfileEdit(false);
+      showCustomerDetail(clientName); // 刷新
     })
     .catch(function(err) {
-      console.error(err);
-      showToast(err.message || '保存失败', 'error');
+      if (typeof showToast === 'function') showToast(err.message || '保存失败', 'error');
     });
 }
 
-/* ---------- 8. 清除催单 ---------- */
-function clearCustomerUrge(projectId, clientName) {
+/* ========== 8. 清除催单 ========== */
+function clearUrge(projectId, clientName) {
   if (!confirm('确认清除该项目的催单标记？')) return;
   fetch('/admin/api/customer_management/clear_urge/' + projectId, { method: 'POST' })
     .then(function(r) { return r.json(); })
     .then(function(d) {
       if (!d.success) throw new Error(d.error || '操作失败');
-      showToast('催单已清除', 'success');
+      if (typeof showToast === 'function') showToast('催单标记已清除', 'success');
       showCustomerDetail(clientName);
     })
     .catch(function(err) {
-      console.error(err);
-      showToast(err.message || '操作失败', 'error');
+      if (typeof showToast === 'function') showToast(err.message || '操作失败', 'error');
     });
 }
 
-/* ---------- 9. 反馈回复 ---------- */
-function toggleFeedbackReply(fbId) {
-  var box = document.getElementById('feedback-reply-box-' + fbId);
-  if (box) {
-    box.style.display = box.style.display === 'none' ? '' : 'none';
-  }
-}
-
-function submitFeedbackReply(fbId, clientName) {
-  var text = document.getElementById('feedback-reply-text-' + fbId)?.value || '';
-  var status = document.getElementById('feedback-reply-status-' + fbId)?.value || '已处理';
-  if (!text.trim()) {
-    showToast('请输入回复内容', 'error');
-    return;
-  }
+/* ========== 9. 回复反馈 ========== */
+function replyFeedback(fbId, clientName) {
+  var input = document.getElementById('fb-reply-' + fbId);
+  var reply = input ? input.value.trim() : '';
+  if (!reply) { if (typeof showToast === 'function') showToast('请输入回复内容', 'error'); return; }
   fetch('/admin/api/customer_management/feedback/' + fbId + '/reply', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ reply: text, status: status })
+    body: JSON.stringify({ reply: reply, status: '已处理' })
   })
     .then(function(r) { return r.json(); })
     .then(function(d) {
-      if (!d.success) throw new Error(d.error || '提交失败');
-      showToast('回复已提交', 'success');
+      if (!d.success) throw new Error(d.error || '回复失败');
+      if (typeof showToast === 'function') showToast('已回复', 'success');
       showCustomerDetail(clientName);
     })
     .catch(function(err) {
-      console.error(err);
-      showToast(err.message || '提交失败', 'error');
+      if (typeof showToast === 'function') showToast(err.message || '回复失败', 'error');
     });
 }
 
-/* ---------- 10. 返回列表 ---------- */
+/* ========== 10. 返回列表 ========== */
 function backToCustomerList() {
   document.getElementById('customer-detail-view').style.display = 'none';
   document.getElementById('customer-list-view').style.display = '';
   loadCustomerList();
 }
 
-/* ---------- 11. 新增客户 ---------- */
+/* ========== 11. 新增客户 ========== */
 function openCustomerCreateModal() {
-  // 创建 modal
   var existing = document.getElementById('customer-create-modal');
   if (existing) existing.remove();
 
   var modal = document.createElement('div');
   modal.id = 'customer-create-modal';
-  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:10000;';
-  modal.innerHTML = '<div style="background:#fff;border-radius:12px;padding:28px 32px;width:420px;max-width:90vw;box-shadow:0 8px 32px rgba(0,0,0,0.15);">'
-    + '<div style="font-size:16px;font-weight:700;margin-bottom:16px;">➕ 新增客户</div>'
-    + '<div style="margin-bottom:12px;">'
-    + '<label style="display:block;font-size:12px;color:#666;margin-bottom:4px;">客户名称 <span style="color:#cf1322;">*</span></label>'
-    + '<input id="new-customer-name" type="text" style="width:100%;padding:8px 12px;border:1px solid #d9d9d9;border-radius:6px;font-size:14px;box-sizing:border-box;" placeholder="公司/单位名称" />'
-    + '</div>'
-    + '<div style="margin-bottom:12px;">'
-    + '<label style="display:block;font-size:12px;color:#666;margin-bottom:4px;">联系人</label>'
-    + '<input id="new-customer-contact" type="text" style="width:100%;padding:8px 12px;border:1px solid #d9d9d9;border-radius:6px;font-size:14px;box-sizing:border-box;" placeholder="收件人姓名" />'
-    + '</div>'
-    + '<div style="margin-bottom:12px;">'
-    + '<label style="display:block;font-size:12px;color:#666;margin-bottom:4px;">电话</label>'
-    + '<input id="new-customer-phone" type="text" style="width:100%;padding:8px 12px;border:1px solid #d9d9d9;border-radius:6px;font-size:14px;box-sizing:border-box;" placeholder="联系电话" />'
-    + '</div>'
-    + '<div style="margin-bottom:16px;">'
-    + '<label style="display:block;font-size:12px;color:#666;margin-bottom:4px;">地址</label>'
-    + '<input id="new-customer-address" type="text" style="width:100%;padding:8px 12px;border:1px solid #d9d9d9;border-radius:6px;font-size:14px;box-sizing:border-box;" placeholder="收件地址" />'
-    + '</div>'
-    + '<div style="display:flex;justify-content:flex-end;gap:8px;">'
-    + '<button class="btn btn-sm" onclick="closeCustomerCreateModal()">取消</button>'
-    + '<button class="btn btn-sm" onclick="submitCustomerCreate()" style="background:#1677ff;color:#fff;">创建</button>'
-    + '</div>'
-    + '</div>';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.4);display:flex;align-items:center;justify-content:center;z-index:10000;backdrop-filter:blur(2px);';
+  modal.innerHTML = '<div style="background:#fff;border-radius:16px;padding:28px 32px;width:440px;max-width:92vw;box-shadow:0 20px 60px rgba(0,0,0,0.15);">'
+    + '<div style="font-size:17px;font-weight:700;color:#0f172a;margin-bottom:20px;">➕ 新增客户</div>'
+    + _createField('new-customer-name', '客户名称', '公司/单位名称', true)
+    + _createField('new-customer-contact', '联系人', '收件人姓名', false)
+    + _createField('new-customer-phone', '电话', '联系电话', false)
+    + _createField('new-customer-address', '地址', '收件地址', false)
+    + '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;">'
+    + '<button class="btn btn-sm" onclick="closeCustomerCreateModal()" style="padding:8px 20px;">取消</button>'
+    + '<button class="btn btn-sm" onclick="submitCustomerCreate()" style="padding:8px 20px;background:#2563eb;color:#fff;border:none;">创建</button>'
+    + '</div></div>';
   document.body.appendChild(modal);
-  // 点击蒙层关闭
-  modal.addEventListener('click', function(e) {
-    if (e.target === modal) closeCustomerCreateModal();
-  });
-  // 自动聚焦
-  setTimeout(function() { document.getElementById('new-customer-name')?.focus(); }, 100);
+  modal.addEventListener('click', function(e) { if (e.target === modal) closeCustomerCreateModal(); });
+  setTimeout(function() { var el = document.getElementById('new-customer-name'); if (el) el.focus(); }, 100);
+}
+
+function _createField(id, label, placeholder, required) {
+  return '<div style="margin-bottom:14px;">'
+    + '<label style="display:block;font-size:12px;color:#64748b;margin-bottom:4px;font-weight:500;">' + label + (required ? ' <span style="color:#dc2626;">*</span>' : '') + '</label>'
+    + '<input id="' + id + '" type="text" placeholder="' + placeholder + '" style="width:100%;padding:9px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box;transition:border-color .15s;" onfocus="this.style.borderColor=\'#3b82f6\'" onblur="this.style.borderColor=\'#e2e8f0\'">'
+    + '</div>';
 }
 
 function closeCustomerCreateModal() {
-  var modal = document.getElementById('customer-create-modal');
-  if (modal) modal.remove();
+  var m = document.getElementById('customer-create-modal');
+  if (m) m.remove();
 }
 
 function submitCustomerCreate() {
@@ -491,31 +464,21 @@ function submitCustomerCreate() {
   var contact = (document.getElementById('new-customer-contact')?.value || '').trim();
   var phone = (document.getElementById('new-customer-phone')?.value || '').trim();
   var address = (document.getElementById('new-customer-address')?.value || '').trim();
-
-  if (!name) {
-    showToast('客户名称不能为空', 'error');
-    return;
-  }
+  if (!name) { if (typeof showToast === 'function') showToast('客户名称不能为空', 'error'); return; }
 
   fetch('/admin/api/customer_management/create', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      client_name: name,
-      recipient_name: contact,
-      recipient_phone: phone,
-      recipient_address: address
-    })
+    body: JSON.stringify({ client_name: name, recipient_name: contact, recipient_phone: phone, recipient_address: address })
   })
     .then(function(r) { return r.json(); })
     .then(function(d) {
       if (!d.success) throw new Error(d.error || '创建失败');
-      showToast('客户创建成功', 'success');
+      if (typeof showToast === 'function') showToast('客户创建成功', 'success');
       closeCustomerCreateModal();
       loadCustomerList();
     })
     .catch(function(err) {
-      console.error(err);
-      showToast(err.message || '创建失败', 'error');
+      if (typeof showToast === 'function') showToast(err.message || '创建失败', 'error');
     });
 }
