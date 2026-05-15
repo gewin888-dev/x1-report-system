@@ -449,6 +449,47 @@
             margin-top: 2px;
             flex-shrink: 0;
         }
+        /* ===== Feedback Item Row ===== */
+        .rf-item {
+            background: #fafafa;
+            border: 1px solid #f0f0f0;
+            border-radius: 8px;
+            padding: 12px 14px;
+            margin-bottom: 8px;
+            position: relative;
+        }
+        .rf-item-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .rf-item-header .rf-num {
+            background: #1677ff;
+            color: #fff;
+            width: 22px; height: 22px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px; font-weight: 600; flex-shrink: 0;
+        }
+        .rf-item-header select {
+            flex: 1;
+            padding: 4px 8px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        .rf-item-remove {
+            position: absolute; top: 8px; right: 10px;
+            background: none; border: none; color: #999;
+            font-size: 18px; cursor: pointer; line-height: 1;
+        }
+        .rf-item-remove:hover { color: #ff4d4f; }
+        .rf-item textarea {
+            width: 100%; border: 1px solid #d9d9d9;
+            border-radius: 4px; padding: 8px;
+            font-size: 13px; resize: vertical; min-height: 50px;
+        }
 
         /* ===== Feedback Item ===== */
         .feedback-item {
@@ -892,29 +933,20 @@
 
 <!-- ===== Modal: 报告反馈 ===== -->
 <div class="modal-overlay" id="report-feedback-modal">
-    <div class="modal">
+    <div class="modal" style="max-width:560px;">
         <div class="modal-header">
             <h3>✍️ 报告修正意见</h3>
             <button class="modal-close" onclick="closeReportFeedbackModal()">&times;</button>
         </div>
         <div class="modal-body">
             <div class="modal-desc">
-                请详细描述您对报告的修正意见，我们将尽快处理并重新出具报告。
+                请逐条添加需要修正的问题，我们将逐项处理并重新出具报告。
             </div>
-            <div class="form-group">
-                <label>问题类型</label>
-                <select id="rf-type">
-                    <option value="数据有误">数据有误</option>
-                    <option value="格式问题">格式问题</option>
-                    <option value="信息缺失">信息缺失</option>
-                    <option value="其他">其他</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>详细说明 <span style="color:#ff4d4f;">*</span></label>
-                <textarea id="rf-content" rows="5" placeholder="请详细描述需要修正的内容，例如：\n• 第X页第X行检测数据与实际不符\n• 委托单位名称有误…"></textarea>
-            </div>
-            <div class="form-group">
+            <div id="rf-items-list"></div>
+            <button type="button" class="btn btn-default" style="width:100%;border:1px dashed #d9d9d9;color:#1677ff;margin-top:8px;" onclick="addFeedbackItem()">
+                ➕ 添加一条问题
+            </button>
+            <div class="form-group" style="margin-top:16px;">
                 <label>联系方式（选填）</label>
                 <input type="text" id="rf-contact" placeholder="手机号或微信，方便我们确认细节">
             </div>
@@ -974,7 +1006,7 @@
 </script>
 
 <!-- ===== Business JS ===== -->
-<script src="/static/customer.js?v=20260515b"></script>
+<script src="/static/customer.js?v=20260515c"></script>
 
 </body>
 </html>

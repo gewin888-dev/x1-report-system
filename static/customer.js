@@ -342,12 +342,47 @@
       .catch(function () { showToast('无法连接服务器，请检查网络', 'error'); });
   };
 
-  /* --- 报告反馈弹窗 --- */
+  /* --- 报告反馈弹窗（多条问题） --- */
+  var _rfItemCount = 0;
+
+  window.addFeedbackItem = function () {
+    _rfItemCount++;
+    var n = _rfItemCount;
+    var list = document.getElementById('rf-items-list');
+    var div = document.createElement('div');
+    div.className = 'rf-item';
+    div.id = 'rf-item-' + n;
+    div.innerHTML = '<div class="rf-item-header">'
+      + '<span class="rf-num">' + n + '</span>'
+      + '<select data-role="rf-type">'
+      + '<option value="数据有误">数据有误</option>'
+      + '<option value="格式问题">格式问题</option>'
+      + '<option value="信息缺失">信息缺失</option>'
+      + '<option value="其他">其他</option>'
+      + '</select>'
+      + '</div>'
+      + '<textarea data-role="rf-desc" rows="2" placeholder="请描述具体问题，如：第X页第X行数据与实际不符"></textarea>'
+      + (n > 1 ? '<button type="button" class="rf-item-remove" onclick="removeFeedbackItem(' + n + ')">&times;</button>' : '');
+    list.appendChild(div);
+  };
+
+  window.removeFeedbackItem = function (n) {
+    var el = document.getElementById('rf-item-' + n);
+    if (el) el.remove();
+    // 重新编号
+    var items = document.querySelectorAll('#rf-items-list .rf-item');
+    items.forEach(function (item, i) {
+      var num = item.querySelector('.rf-num');
+      if (num) num.textContent = i + 1;
+    });
+  };
+
   window.openReportFeedback = function (projectId) {
     _currentReportProjectId = projectId;
-    document.getElementById('rf-type').value = '数据有误';
-    document.getElementById('rf-content').value = '';
+    _rfItemCount = 0;
+    document.getElementById('rf-items-list').innerHTML = '';
     document.getElementById('rf-contact').value = '';
+    addFeedbackItem(); // 默认一条
     document.getElementById('report-feedback-modal').classList.add('show');
   };
 
@@ -357,15 +392,25 @@
   };
 
   window.submitReportFeedback = function () {
-    var content = (document.getElementById('rf-content').value || '').trim();
-    if (!content) { showToast('请填写详细说明', 'error'); return; }
-    var feedbackType = (document.getElementById('rf-type').value || '');
+    var items = document.querySelectorAll('#rf-items-list .rf-item');
+    var problems = [];
+    var hasEmpty = false;
+    items.forEach(function (item, i) {
+      var type = (item.querySelector('[data-role="rf-type"]').value || '');
+      var desc = (item.querySelector('[data-role="rf-desc"]').value || '').trim();
+      if (!desc) { hasEmpty = true; return; }
+      problems.push('问题' + (i + 1) + '【' + type + '】' + desc);
+    });
+    if (hasEmpty || problems.length === 0) {
+      showToast('每条问题的描述不能为空', 'error');
+      return;
+    }
     var contact = (document.getElementById('rf-contact').value || '').trim();
-    var fullContent = '【' + feedbackType + '】' + content + (contact ? '\n联系方式：' + contact : '');
+    var fullContent = problems.join('\n') + (contact ? '\n联系方式：' + contact : '');
     api('POST', '/customer/api/projects/' + _currentReportProjectId + '/report_feedback', { content: fullContent })
       .then(function (d) {
         closeReportFeedbackModal();
-        showToast(d.message || '反馈已提交，我们将尽快处理', 'success');
+        showToast(d.message || '反馈已提交（共' + problems.length + '条），我们将尽快处理', 'success');
         loadProjects();
       })
       .catch(function (e) { showToast(e.message || '提交失败，请重试', 'error'); });
