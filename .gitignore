@@ -74,3 +74,4 @@ users.json
 # Package lock (if not using npm build)
 package-lock.json
 EXTRA2
+data/flask_secret_key.txt
