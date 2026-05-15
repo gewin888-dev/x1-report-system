@@ -700,7 +700,11 @@ TEMPLATE_MAP = {
         'name': 'GMP车间',
         'domain': 'pharma',
         'path': '制药工业/',
-        'files': ['GMP车间检测报告模板.docx']
+        'files': [
+            '制药工业GMP车间A级检测报告模板.docx',
+            '制药工业GMP车间B级C级检测报告模板.docx',
+            '制药工业GMP车间D级检测报告模板.docx'
+        ]
     },
     'veterinary_gmp_workshop': {
         'name': '兽药GMP车间',
@@ -717,86 +721,90 @@ TEMPLATE_MAP = {
         'domain': 'hospital',
         'path': '医院洁净部/',
         'files': [
-            '洁净手术部-百级手术室检测报告模板.docx',
-            '洁净手术部-千级手术室检测报告模板.docx',
-            '洁净手术部-万级手术室检测报告模板.docx',
-            '洁净手术部-十万级手术室检测报告模板.docx'
+            '医院洁净部洁净手术部手术室百级检测报告模板.docx',
+            '医院洁净部洁净手术部手术室千级检测报告模板.docx',
+            '医院洁净部洁净手术部手术室万级检测报告模板.docx',
+            '医院洁净部洁净手术部手术室十万级检测报告模板.docx',
+            '医院洁净部洁净手术部洁净辅房检测报告模板.docx',
+            '医院洁净部洁净手术部眼科手术室百级检测报告模板.docx'
         ]
     },
     'clean_function_room': {
         'name': '洁净功能室',
         'domain': 'hospital',
         'path': '医院洁净部/',
-        'files': [
-            '通用洁净功能用房检测报告模板.docx',
-            '消毒供应中心检测报告模板.docx',
-            'ICU病房检测报告模板.docx',
-            '透析室检测报告模板.docx'
-        ]
+        'files': ['医院洁净部洁净功能用房检测报告模板.docx']
     },
     'negative_pressure': {
         'name': '负压病房',
         'domain': 'hospital',
         'path': '医院洁净部/',
-        'files': ['负压病房检测报告模板.docx']
+        'files': ['医院洁净部负压病房检测报告模板.docx']
     },
     'bsl': {
         'name': '生物安全实验室',
         'domain': 'biosafety',
         'path': '生物安全/',
-        'files': ['实验室检测报告模板.docx']
+        'files': ['生物安全实验室ISO6、ISO7、ISO8、ISO9检测报告模板.docx']
     },
     'animal_room': {
         'name': '动物房',
         'domain': 'biosafety',
         'path': '生物安全/',
         'files': [
-            '动物房普通环境检测报告模板.docx',
-            '动物房屏障环境主房间检测报告模板.docx',
-            '动物房隔离环境检测报告模板.docx'
+            '生物安全动物房普通环境检测报告模板.docx',
+            '生物安全动物房屏障环境主房间检测报告模板.docx',
+            '生物安全动物房隔离环境检测报告模板.docx',
+            '生物安全动物房屏障环境洁净辅房检测报告模板.docx'
         ]
     },
     'bsc': {
         'name': '生物安全柜',
         'domain': 'biosafety',
         'path': '生物安全/',
-        'files': ['生物安全柜检测报告模板.docx']
+        'files': ['生物安全生物安全柜检测报告模板.docx']
     },
     'clean_bench': {
         'name': '洁净工作台',
         'domain': 'biosafety',
         'path': '生物安全/',
-        'files': ['洁净工作台检测报告模板.docx']
+        'files': ['生物安全洁净工作台检测报告模板.docx']
     },
     'ivc': {
         'name': 'IVC笼具',
         'domain': 'biosafety',
         'path': '生物安全/',
-        'files': ['IVC笼具检测报告模板.docx']
+        'files': ['生物安全IVC笼具检测报告模板.docx']
     },
     'pass_box': {
         'name': '传递窗',
         'domain': 'pharma',
         'path': '制药工业/',
-        'files': ['传递窗检测报告模板.docx']
+        'files': ['制药工业传递窗检测报告模板.docx']
     },
     'laminar_hood': {
         'name': '层流罩',
         'domain': 'pharma',
         'path': '制药工业/',
-        'files': ['层流罩检测报告模板.docx']
+        'files': ['制药工业层流罩检测报告模板.docx']
     },
     'food_workshop': {
         'name': '食品车间',
         'domain': 'food',
         'path': '食品加工/',
-        'files': ['洁净车间检测报告模板.docx']
+        'files': [
+            '食品加工洁净车间百级检测报告模板.docx',
+            '食品加工洁净车间万级十万级三十万级检测报告模板.docx'
+        ]
     },
     'electronics_workshop': {
         'name': '电子车间',
         'domain': 'electronics',
         'path': '精密制造/',
-        'files': ['洁净车间.docx']
+        'files': [
+            '精密制造电子洁净车间ISO5检测报告模板.docx',
+            '精密制造电子洁净车间ISO6、ISO7、ISO8、ISO9检测报告模板.docx'
+        ]
     },
 }
 
