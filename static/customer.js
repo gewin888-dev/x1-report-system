@@ -41,12 +41,18 @@
     var rs = (project.report_status || '').toLowerCase();
     var is_ = (project.inspection_stage || '').toLowerCase();
 
-    if (rs === '已发送' || rs === 'sent') return 5;
-    if (rs === '已出报告' || rs === 'completed' || rs === 'done') return 4;
-    if (rs === '报告编制中' || rs === 'drafting' || is_ === '报告编制中') return 3;
-    if (is_ === '检测中' || is_ === 'testing') return 2;
-    if (is_ === '已派单' || is_ === 'assigned') return 1;
-    return 0; // 待审核
+    // 第6步: 已发送
+    if (rs === '已发送' || rs === '已发送客户' || rs === 'sent') return 5;
+    // 第5步: 已出报告
+    if (rs === '已出报告' || rs === '已出具' || rs === 'completed' || rs === 'done') return 4;
+    // 第4步: 报告编制中
+    if (rs === '报告编制中' || rs === '编制中' || rs === '审核中' || rs === '待修改' || rs === '待出具' || rs === 'drafting' || is_ === '报告编制中') return 3;
+    // 第3步: 检测中 (含补测)
+    if (is_ === '检测中' || is_ === '补测中' || is_ === 'testing') return 2;
+    // 第2步: 已派单 (后台对应: 已排期/待进场)
+    if (is_ === '已派单' || is_ === '已排期' || is_ === '待进场' || is_ === 'assigned') return 1;
+    // 第1步: 待审核 (未安排/未开始 或空值)
+    return 0;
   }
 
   function renderProgressBar(project) {
