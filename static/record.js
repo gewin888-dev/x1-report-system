@@ -7677,6 +7677,7 @@ function doTaskAction(taskId, action){
     .then(function(res){
       if(!res.ok || !res.data.success) throw new Error(res.data.error || '操作失败');
       loadMyTasks(_myTasksFilter);
+      if(typeof pollTaskCount === 'function') pollTaskCount();
     })
     .catch(function(err){
       console.error(err);
@@ -7751,6 +7752,7 @@ function prefillFromTask(taskId){
     } catch(e){}
   }
 
+  window.pollTaskCount = pollTaskCount;
   function pollTaskCount(){
     fetch('/api/my_tasks/pending_count')
       .then(function(r){ return r.json(); })
@@ -7773,10 +7775,10 @@ function prefillFromTask(taskId){
 
   // 页面加载后立即查一次，然后每 60 秒轮询
   if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', function(){ pollTaskCount(); setInterval(pollTaskCount, 60000); });
+    document.addEventListener('DOMContentLoaded', function(){ pollTaskCount(); setInterval(pollTaskCount, 30000); });
   } else {
     pollTaskCount();
-    setInterval(pollTaskCount, 60000);
+    setInterval(pollTaskCount, 30000);
   }
 
   // 切到任务 tab 时刷新
