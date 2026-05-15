@@ -229,7 +229,6 @@
           + '<td>' + escapeHtml(r.project_name) + '</td>'
           + '<td>' + escapeHtml(r.detection_type || r.detection_object || '') + '</td>'
           + '<td>' + escapeHtml(r.detection_date || r.export_time || '') + '</td>'
-          + '<td>' + escapeHtml(r.report_no || r.report_number || '') + '</td>'
           + '<td><span style="display:inline-block;padding:2px 10px;border-radius:10px;font-size:12px;font-weight:500;' + statusCls + '">' + escapeHtml(status) + '</span></td>'
           + '<td style="white-space:nowrap;">' + previewBtn + ' ' + downloadBtn + '</td>'
           + '</tr>';
