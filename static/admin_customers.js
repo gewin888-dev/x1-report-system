@@ -56,8 +56,8 @@ function renderCustomerList(items) {
   }
 
   // 表头
-  var html = '<div style="display:grid;grid-template-columns:2fr 70px 95px 95px 95px 110px 50px;gap:0;padding:0 20px;margin-bottom:4px;font-size:12px;color:#94a3b8;font-weight:500;">'
-    + '<div>客户</div><div style="text-align:center;">项目数</div><div style="text-align:right;">合同总额</div><div style="text-align:right;">已收款</div><div style="text-align:right;">应收款</div><div style="text-align:center;">状态</div></div>';
+  var html = '<table style="width:100%;border-collapse:separate;border-spacing:0 6px;"><colgroup><col style="width:36%"><col style="width:8%"><col style="width:12%"><col style="width:12%"><col style="width:12%"><col style="width:14%"><col style="width:6%"></colgroup>'
+    + '<thead><tr style="font-size:12px;color:#94a3b8;font-weight:500;"><td style="padding:0 20px;">客户</td><td style="text-align:center;">项目数</td><td style="text-align:right;padding-right:12px;">合同总额</td><td style="text-align:right;padding-right:12px;">已收款</td><td style="text-align:right;padding-right:12px;">应收款</td><td style="text-align:center;">状态</td><td></td></tr></thead><tbody>';
 
   items.forEach(function(c) {
     var receivable = parseFloat(c.receivable) || 0;
@@ -86,15 +86,13 @@ function renderCustomerList(items) {
       badges += '<span style="display:inline-flex;align-items:center;gap:2px;background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;border-radius:999px;padding:2px 8px;font-size:11px;">✅ 已开通</span>';
     }
 
-    html += '<div onclick="showCustomerDetail(\'' + _safeHtml(c.client_name).replace(/'/g, "\\'") + '\')"'
-      + ' style="display:grid;grid-template-columns:2fr 70px 95px 95px 95px 110px 50px;gap:0;align-items:center;'
-      + 'background:#fff;border-radius:10px;padding:14px 20px;margin-bottom:6px;cursor:pointer;'
-      + 'border:1px solid #f1f5f9;transition:all .15s;box-shadow:0 1px 2px rgba(0,0,0,0.03);"'
-      + ' onmouseenter="this.style.borderColor=\'#bfdbfe\';this.style.boxShadow=\'0 2px 8px rgba(59,130,246,0.08)\'"'
-      + ' onmouseleave="this.style.borderColor=\'#f1f5f9\';this.style.boxShadow=\'0 1px 2px rgba(0,0,0,0.03)\'">'
+    html += '<tr onclick="showCustomerDetail(\'' + _safeHtml(c.client_name).replace(/'/g, "\\'") + '\')"'
+      + ' style="background:#fff;cursor:pointer;transition:all .15s;"'
+      + ' onmouseenter="this.style.background=\'#f8fafc\'"'
+      + ' onmouseleave="this.style.background=\'#fff\'">'
 
       // 客户信息列
-      + '<div style="min-width:0;">'
+      + '<td style="padding:14px 20px;">'  + '<div style="min-width:0;">'
       + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">'
       + '<span style="font-size:14px;font-weight:700;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + _safeHtml(c.client_name) + '</span>'
       + (c.contact_name ? '<span style="color:#64748b;font-size:12px;white-space:nowrap;">' + _safeHtml(c.contact_name) + '</span>' : '')
@@ -105,20 +103,22 @@ function renderCustomerList(items) {
       + '</div></div>'
 
       // 项目数
-      + '<div style="text-align:center;font-size:14px;font-weight:600;color:#334155;">' + (c.project_count || 0) + '</div>'
+      + '</div></td>'
+      + '<td style="text-align:center;font-size:14px;font-weight:600;color:#334155;vertical-align:middle;">' + (c.project_count || 0) + '</td>'
       // 合同总额
-      + '<div style="text-align:right;font-size:13px;color:#334155;">' + _money(c.total_contract) + '</div>'
+      + '<td style="text-align:right;font-size:13px;color:#334155;padding-right:12px;vertical-align:middle;">' + _money(c.total_contract) + '</td>'
       // 已收款
-      + '<div style="text-align:right;font-size:13px;color:#16a34a;">' + _money(c.total_paid) + '</div>'
+      + '<td style="text-align:right;font-size:13px;color:#16a34a;padding-right:12px;vertical-align:middle;">' + _money(c.total_paid) + '</td>'
       // 应收款
-      + '<div style="text-align:right;font-size:13px;font-weight:' + recvWeight + ';color:' + recvColor + ';">' + _money(c.receivable) + '</div>'
+      + '<td style="text-align:right;font-size:13px;font-weight:' + recvWeight + ';color:' + recvColor + ';padding-right:12px;vertical-align:middle;">' + _money(c.receivable) + '</td>'
       // 状态
-      + '<div style="display:flex;align-items:center;justify-content:center;gap:4px;flex-wrap:wrap;">' + (badges || '<span style="color:#cbd5e1;font-size:12px;">—</span>') + '</div>'
-      + '<div style="text-align:center;"><button onclick="event.stopPropagation();deleteCustomer(\x27' + _safeHtml(c.client_name).replace(/'/g, "\\'") + '\x27)" style="padding:3px 8px;font-size:11px;color:#94a3b8;border:1px solid #e2e8f0;border-radius:6px;background:#fff;cursor:pointer;transition:all .15s;" onmouseenter="this.style.color=\x27#dc2626\x27;this.style.borderColor=\x27#fca5a5\x27" onmouseleave="this.style.color=\x27#94a3b8\x27;this.style.borderColor=\x27#e2e8f0\x27">删除</button></div>'
+      + '<td style="text-align:center;vertical-align:middle;"><div style="display:flex;align-items:center;justify-content:center;gap:4px;flex-wrap:wrap;">' + (badges || '<span style="color:#cbd5e1;font-size:12px;">—</span>') + '</div></td>'
+      + '<td style="text-align:center;vertical-align:middle;"><button onclick="event.stopPropagation()" ;deleteCustomer(\x27' + _safeHtml(c.client_name).replace(/'/g, "\\'") + '\x27)" style="padding:3px 8px;font-size:11px;color:#94a3b8;border:1px solid #e2e8f0;border-radius:6px;background:#fff;cursor:pointer;transition:all .15s;" onmouseenter="this.style.color=\x27#dc2626\x27;this.style.borderColor=\x27#fca5a5\x27" onmouseleave="this.style.color=\x27#94a3b8\x27;this.style.borderColor=\x27#e2e8f0\x27">删除</button></div>'
 
-      + '</div>';
+      + '</td></tr>';
   });
 
+  html += '</tbody></table>';
   box.innerHTML = html;
 }
 
@@ -151,7 +151,7 @@ function showCustomerDetail(clientName) {
     })
     .catch(function(err) {
       console.error(err);
-      box.innerHTML = '<div style="text-align:center;padding:60px;color:#dc2626;">加载失败: ' + _safeHtml(err.message) + '</div>';
+      box.innerHTML = '<div style="text-align:center;padding:60px;color:#dc2626;">加载失败: ' + _safeHtml(err.message) + '</td></tr>';
     });
 }
 
@@ -267,14 +267,14 @@ function renderCustomerDetail(data) {
         + '<span style="font-size:11px;color:' + statusColor + ';font-weight:600;">' + _safeHtml(fb.status || '') + '</span>'
         + '</div>'
         + '<div style="font-size:13px;color:#334155;margin-bottom:4px;">' + _safeHtml(fb.content || '') + '</div>'
-        + '<div style="font-size:11px;color:#94a3b8;">' + _safeHtml(fb.created_at || '') + '</div>';
+        + '<div style="font-size:11px;color:#94a3b8;">' + _safeHtml(fb.created_at || '') + '</td></tr>';
       if (fb.reply) {
-        h += '<div style="margin-top:8px;padding:8px 12px;background:#f0fdf4;border-radius:6px;font-size:12px;color:#16a34a;">↩️ ' + _safeHtml(fb.reply) + '</div>';
+        h += '<div style="margin-top:8px;padding:8px 12px;background:#f0fdf4;border-radius:6px;font-size:12px;color:#16a34a;">↩️ ' + _safeHtml(fb.reply) + '</td></tr>';
       } else if (fb.status === '待处理') {
         h += '<div style="margin-top:8px;">'
           + '<input type="text" id="fb-reply-' + fb.id + '" placeholder="输入回复..." style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;width:70%;margin-right:6px;">'
           + '<button class="btn btn-sm" onclick="replyFeedback(' + fb.id + ',\'' + _safeHtml(p.client_name||'').replace(/'/g,"\\'") + '\')" style="background:#1677ff;color:#fff;font-size:12px;">回复</button>'
-          + '</div>';
+          + '</td></tr>';
       }
       h += '</div>';
     });
@@ -290,7 +290,7 @@ function renderCustomerDetail(data) {
         + '<span style="color:#94a3b8;font-size:12px;white-space:nowrap;">' + _safeHtml((u.created_at||'').slice(0,16)) + '</span>'
         + '<span style="color:#334155;">' + _safeHtml(u.project_name || '-') + '</span>'
         + (u.remark ? '<span style="color:#64748b;font-size:12px;">— ' + _safeHtml(u.remark) + '</span>' : '')
-        + '</div>';
+        + '</td></tr>';
     });
     h += '</div>';
   }
@@ -305,7 +305,7 @@ function renderCustomerDetail(data) {
         + '<span style="color:#334155;">' + _safeHtml(r.project_name || '') + '</span>'
         + '<span style="color:#94a3b8;font-size:12px;margin-left:auto;">' + _safeHtml((r.export_time||'').slice(0,16)) + '</span>'
         + (r.feishu_url ? '<a href="' + _safeHtml(r.feishu_url) + '" target="_blank" style="color:#3b82f6;font-size:12px;text-decoration:none;">查看</a>' : '')
-        + '</div>';
+        + '</td></tr>';
     });
     h += '</div>';
   }
@@ -319,7 +319,7 @@ function _pField(name, label, value) {
     + '<label style="display:block;font-size:11px;color:#94a3b8;margin-bottom:2px;">' + label + '</label>'
     + '<input type="text" data-profile-field="' + name + '" value="' + _safeHtml(value || '') + '" disabled '
     + 'style="width:100%;padding:7px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;color:#334155;background:#f8fafc;box-sizing:border-box;transition:all .15s;">'
-    + '</div>';
+    + '</td></tr>';
 }
 
 /* --- 状态徽章 --- */
@@ -452,7 +452,7 @@ function _createField(id, label, placeholder, required) {
   return '<div style="margin-bottom:14px;">'
     + '<label style="display:block;font-size:12px;color:#64748b;margin-bottom:4px;font-weight:500;">' + label + (required ? ' <span style="color:#dc2626;">*</span>' : '') + '</label>'
     + '<input id="' + id + '" type="text" placeholder="' + placeholder + '" style="width:100%;padding:9px 12px;border:1px solid #e2e8f0;border-radius:8px;font-size:14px;box-sizing:border-box;transition:border-color .15s;" onfocus="this.style.borderColor=\'#3b82f6\'" onblur="this.style.borderColor=\'#e2e8f0\'">'
-    + '</div>';
+    + '</td></tr>';
 }
 
 function closeCustomerCreateModal() {
