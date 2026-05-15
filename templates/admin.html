@@ -850,7 +850,7 @@ input[type="text"]:focus,input[type="password"]:focus,input[type="number"]:focus
             <div class="form-group"><label>姓名</label><input type="text" id="fm-display" oninput="syncUserModalPreview()"></div>
             <div class="form-group"><label>角色</label><select id="fm-role" onchange="syncUserModalPreview()"><option value="inspector">检测员</option><option value="supervisor">主管</option><option value="viewer">访客</option><option value="customer">客户</option><option value="admin">管理员</option></select></div>
             <div class="form-group"><label>部门</label><input type="text" id="fm-department" oninput="syncUserModalPreview()"></div>
-            <div class="form-group" id="fm-client-name-group" style="display:none"><label>绑定客户名称</label><input type="text" id="fm-client-name" placeholder="即 business_projects 中的委托单位名"></div>
+            <div class="form-group" id="fm-client-name-group" style="display:none"><label>绑定客户名称</label><input type="text" id="fm-client-name" list="client-name-datalist" placeholder="请选择或输入客户名称"><datalist id="client-name-datalist"></datalist></div>
           </div>
         </div>
         <div class="user-detail-section">
@@ -937,7 +937,7 @@ function syncUserModalPreview(){
   var username=(document.getElementById('fm-username')||{}).value||'';
   var display=(document.getElementById('fm-display')||{}).value||'';
   var role=(document.getElementById('fm-role')||{}).value||'inspector';
-  var cng=document.getElementById('fm-client-name-group'); if(cng) cng.style.display=role==='customer'?'':'none';
+  var cng=document.getElementById('fm-client-name-group'); if(cng){ cng.style.display=role==='customer'?'':'none'; if(role==='customer') _loadClientNameList(); }
   var dept=(document.getElementById('fm-department')||{}).value||'';
   var nameEl=document.getElementById('user-detail-preview-name');
   var roleEl=document.getElementById('user-detail-preview-role');
@@ -945,6 +945,22 @@ function syncUserModalPreview(){
   if(nameEl) nameEl.textContent=display||username||'新增用户';
   if(roleEl) roleEl.textContent='角色：'+(roleMap[role]||role||'-');
   if(deptEl) deptEl.textContent='部门：'+(dept||'-');
+}
+var _clientListLoaded=false;
+function _loadClientNameList(){
+  if(_clientListLoaded)return;
+  fetch('/admin/api/customer_management/list').then(function(r){return r.json()}).then(function(d){
+    if(!d.success)return;
+    var dl=document.getElementById('client-name-datalist');
+    if(!dl)return;
+    dl.innerHTML='';
+    (d.items||[]).forEach(function(c){
+      var o=document.createElement('option');
+      o.value=c.client_name;
+      dl.appendChild(o);
+    });
+    _clientListLoaded=true;
+  }).catch(function(){});
 }
 function switchPanel(name,el){
   if(name==='projects' && typeof initProjectPanel==='function'){ setTimeout(function(){ initProjectPanel(); }, 0); }
@@ -1192,7 +1208,7 @@ function showUserModal(user){
   document.getElementById('fm-role').value=user?user.role:'inspector';
   document.getElementById('fm-department').value=user?user.department:'';
   var cnEl=document.getElementById('fm-client-name'); if(cnEl) cnEl.value=user?user.client_name||'':'';
-  var cng=document.getElementById('fm-client-name-group'); if(cng) cng.style.display=(user&&user.role==='customer')?'':'none';
+  var cng=document.getElementById('fm-client-name-group'); if(cng){ var isCustomer=user?user.role==='customer':false; cng.style.display=isCustomer?'':'none'; if(isCustomer) _loadClientNameList(); }
   document.getElementById('fm-password').value='';
   document.getElementById('fm-pw-hint').textContent=user?'留空则不修改密码':'建议设置一个便于首次登录后立即修改的临时密码';
   syncUserModalPreview();
