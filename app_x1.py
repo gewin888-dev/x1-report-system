@@ -1826,7 +1826,7 @@ def admin_api_business_project_delete(project_id):
 
 @app.route('/admin/api/business_projects/<int:project_id>/upload_report', methods=['POST'])
 @login_required
-@require_permission('admin.projects.manage')
+@require_permission('admin.projects.upload_report')
 def admin_api_upload_report(project_id):
     """上传报告文件（补录场景），支持 .docx / .pdf"""
     conn = get_x1_data_conn()
@@ -1941,7 +1941,7 @@ def admin_api_inspectors():
 
 @app.route('/admin/api/customers')
 @login_required
-@require_permission('admin.projects.view')
+@require_permission('admin.customers.view')
 def admin_api_customers():
     """返回客户账号列表（含 client_name 绑定）"""
     try:
@@ -5287,6 +5287,7 @@ def api_x_inspectors():
 
 @app.route('/api/x/transfer_draft', methods=['POST'])
 @login_required
+@require_permission('draft.transfer')
 def api_x_transfer_draft():
     """转让草稿给其他检测员：修改草稿的 inspector，转让后原主人不再能编辑"""
     data = request.get_json(silent=True) or {}
@@ -5321,6 +5322,7 @@ def api_x_transfer_draft():
 
 @app.route('/api/x/save_draft', methods=['POST'])
 @login_required
+@require_permission('draft.write')
 def api_x_save_draft():
     data = request.get_json(silent=True) or {}
     project = data.get('project') if isinstance(data.get('project'), dict) else data
@@ -5355,6 +5357,7 @@ def api_x_save_draft():
 
 @app.route('/api/x/list_drafts')
 @login_required
+@require_permission('draft.read')
 def api_x_list_drafts():
     drafts = []
     auto_cutoff = datetime.now().timestamp() - 7 * 24 * 60 * 60
@@ -5389,6 +5392,7 @@ def api_x_list_drafts():
 
 @app.route('/api/x/load_draft/<draft_id>')
 @login_required
+@require_permission('draft.read')
 def api_x_load_draft(draft_id):
     target = _x_draft_path(draft_id)
     if not target.exists():
@@ -5674,6 +5678,7 @@ def api_record_export_excel():
 
 @app.route('/api/x/build_export', methods=['POST'])
 @login_required
+@require_permission('record.export')
 def api_x_build_export():
     data = request.get_json(silent=True) or {}
     project = data.get('project') if isinstance(data.get('project'), dict) else data
@@ -6237,6 +6242,7 @@ def api_x_submit_export():
 
 @app.route('/api/x/template_probe', methods=['POST'])
 @login_required
+@require_permission('record.export')
 def api_x_template_probe():
     data = request.get_json(silent=True) or {}
     project = normalize_project_payload(data.get('project', data) or {}, source='template_probe')
@@ -6423,6 +6429,7 @@ def admin_api_template_versions(template_id):
 
 @app.route('/download/<filename>')
 @login_required
+@require_permission('files.download.own')
 def download_file(filename):
     """下载导出的报告文件"""
     if not _setting_enabled('security.allow_file_download', True):
@@ -6476,6 +6483,7 @@ def admin_api_open_file(filename):
 
 @app.route('/admin/api/download_feishu_file')
 @login_required
+@require_permission('admin.records.open_feishu')
 def admin_api_download_feishu_file():
     """从飞书云盘下载文件并返回给当前浏览器（多人多端场景）
     
@@ -6515,6 +6523,7 @@ def admin_api_download_feishu_file():
 
 @app.route('/admin/api/open_feishu_file', methods=['POST'])
 @login_required
+@require_permission('admin.records.open_feishu')
 def admin_api_open_feishu_file():
     """从飞书云盘下载文件并用 WPS 打开"""
     data = request.get_json(silent=True) or {}
@@ -6535,6 +6544,7 @@ def admin_api_open_feishu_file():
 
 @app.route('/api/preview/<filename>')
 @login_required
+@require_permission('files.preview.own')
 def preview_file(filename):
     """在线预览 docx/xlsx 文件（返回 HTML）"""
     if not _setting_enabled('security.allow_file_preview', True):

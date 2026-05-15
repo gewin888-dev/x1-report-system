@@ -4,6 +4,7 @@
 """
 
 from flask import render_template, request, jsonify
+from auth import require_permission
 from flask_login import current_user, login_required
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -411,6 +412,7 @@ def register_customer_routes(app):
 
     @app.route('/customer/api/projects', methods=['POST'])
     @customer_required
+    @require_permission('customer.projects')
     def customer_create_project():
         client_name = _get_client_name()
         if not client_name:
@@ -466,6 +468,7 @@ def register_customer_routes(app):
 
     @app.route('/customer/api/projects/<int:project_id>/urge', methods=['POST'])
     @customer_required
+    @require_permission('customer.urge')
     def customer_urge_project(project_id):
         client_name = _get_client_name()
         if not client_name:
@@ -565,6 +568,7 @@ def register_customer_routes(app):
 
     @app.route('/customer/api/feedback', methods=['POST'])
     @customer_required
+    @require_permission('customer.feedback')
     def customer_create_feedback():
         client_name = _get_client_name()
         if not client_name:
@@ -638,6 +642,7 @@ def register_customer_routes(app):
 
     @app.route('/customer/api/projects/<int:project_id>/report_feedback', methods=['POST'])
     @customer_required
+    @require_permission('customer.feedback')
     def customer_submit_report_feedback(project_id):
         """客户提交报告修正意见，状态回退到“待修改”"""
         client_name = _get_client_name()
@@ -680,6 +685,7 @@ def register_customer_routes(app):
 
     @app.route('/customer/api/projects/<int:project_id>/confirm_report', methods=['POST'])
     @customer_required
+    @require_permission('customer.confirm')
     def customer_confirm_report(project_id):
         """客户确认报告无误，同意出具正式报告"""
         client_name = _get_client_name()
@@ -726,6 +732,7 @@ def register_customer_routes(app):
 
     @app.route('/customer/api/projects/<int:project_id>/preview_pdf', methods=['GET'])
     @customer_required
+    @require_permission('customer.report.preview')
     def customer_preview_pdf(project_id):
         """客户预览报告PDF——仅在报告已出具后可用"""
         from flask import send_file as _send_file
@@ -823,6 +830,7 @@ def register_customer_routes(app):
 
     @app.route('/customer/api/projects/<int:project_id>/download_report', methods=['GET'])
     @customer_required
+    @require_permission('customer.report.download')
     def customer_download_report(project_id):
         """客户下载报告文件（DOCX/PDF原件）"""
         from flask import send_file as _send_file

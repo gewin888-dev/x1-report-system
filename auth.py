@@ -30,7 +30,13 @@ DEFAULT_ROLE_PERMISSIONS = {
         # 客户管理
         'admin.customers.view', 'admin.customers.manage',
         # 文件下载
-        'admin.files.download'
+        'admin.files.download',
+        # 客户反馈回复
+        'admin.customers.feedback_reply',
+        # 上传历史报告
+        'admin.projects.upload_report',
+        # 系统监控
+        'admin.monitor.view'
     },
     'viewer': {
         'admin.access', 'admin.stats.view', 'admin.records.view', 'admin.logs.view', 'admin.logs.delete',
@@ -45,13 +51,14 @@ DEFAULT_ROLE_PERMISSIONS = {
         'admin.files.download'
     },
     'inspector': {
-        'draft.read', 'draft.write', 'record.export', 'files.download.own', 'files.preview.own',
+        'draft.read', 'draft.write', 'draft.transfer', 'record.export', 'files.download.own', 'files.preview.own',
         'record.export.void', 'record.scope.self', 'admin.records.scope.self',
         # 检测员任务执行
         'tasks.execute'
     },
     'customer': {
-        'customer.access', 'customer.profile', 'customer.history', 'customer.projects', 'customer.feedback'
+        'customer.access', 'customer.profile', 'customer.history', 'customer.projects', 'customer.feedback',
+        'customer.urge', 'customer.confirm', 'customer.report.preview', 'customer.report.download'
     }
 }
 
