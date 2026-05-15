@@ -698,6 +698,7 @@
         <button class="tab-btn active" data-tab="tab-profile">📋 基础信息</button>
         <button class="tab-btn" data-tab="tab-history">📊 历史记录</button>
         <button class="tab-btn" data-tab="tab-projects">🚀 检测项目</button>
+        <button class="tab-btn" data-tab="tab-notifications">🔔 消息<span id="cust-notif-badge" style="display:none;background:#dc2626;color:#fff;font-size:10px;border-radius:99px;padding:1px 5px;margin-left:4px;vertical-align:super;"></span></button>
         <button class="tab-btn" data-tab="tab-feedback">💬 投诉建议</button>
     </div>
 
@@ -829,6 +830,17 @@
                 <span class="icon">📋</span>
                 暂无检测项目，点击上方"我要下单"开始
             </div>
+        </div>
+    </div>
+
+    <!-- ===== Tab: 消息通知 ===== -->
+    <div class="tab-panel" id="tab-notifications">
+        <div class="card">
+            <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
+                <span><span class="icon">🔔</span> 消息通知</span>
+                <button onclick="custMarkAllRead()" style="background:none;border:none;color:#1677ff;font-size:12px;cursor:pointer;">全部已读</button>
+            </div>
+            <div id="cust-notif-list" style="min-height:100px;"></div>
         </div>
     </div>
 
@@ -1016,7 +1028,66 @@
 </script>
 
 <!-- ===== Business JS ===== -->
-<script src="/static/customer.js?v=20260515h"></script>
+<script src="/static/customer.js?v=20260515h">
+// ====== 客户端消息通知 ======
+function loadCustNotifications(){
+  api('/api/notifications?limit=30').then(function(d){
+    var box = document.getElementById('cust-notif-list');
+    if(!box) return;
+    var items = d.items || [];
+    if(!items.length){
+      box.innerHTML = '<div style="text-align:center;padding:40px;color:#94a3b8;font-size:13px;">暂无消息通知</div>';
+      return;
+    }
+    var html = '';
+    items.forEach(function(n){
+      var bg = n.is_read ? '#fff' : '#eff6ff';
+      var border = n.is_read ? '#f3f4f6' : '#bfdbfe';
+      var catIcon = {registration:'📋',urge:'⚡',feedback:'✍️',report:'📄',system:'🔔'}[n.category] || '🔔';
+      html += '<div style="padding:12px 14px;border:1px solid '+border+';border-radius:10px;background:'+bg+';margin-bottom:8px;cursor:pointer;" onclick="custReadNotif('+n.id+')">';
+      html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">';
+      html += '<div style="font-size:14px;font-weight:600;color:#0f172a;">'+catIcon+' '+(n.title||'')+'</div>';
+      html += '<div style="font-size:11px;color:#94a3b8;white-space:nowrap;">'+(n.created_at||'').slice(5,16)+'</div>';
+      html += '</div>';
+      if(n.content) html += '<div style="font-size:13px;color:#475569;margin-top:4px;line-height:1.5;">'+(n.content||'')+'</div>';
+      html += '</div>';
+    });
+    box.innerHTML = html;
+  });
+}
+
+function custReadNotif(id){
+  api('/api/notifications/'+id+'/read', 'POST').then(function(){ pollCustNotifCount(); loadCustNotifications(); });
+}
+
+function custMarkAllRead(){
+  api('/api/notifications/read_all', 'POST').then(function(){ pollCustNotifCount(); loadCustNotifications(); });
+}
+
+function pollCustNotifCount(){
+  api('/api/notifications/unread_count').then(function(d){
+    var badge = document.getElementById('cust-notif-badge');
+    if(!badge) return;
+    var count = d.count || 0;
+    if(count > 0){
+      badge.textContent = count;
+      badge.style.display = '';
+    } else {
+      badge.style.display = 'none';
+    }
+  }).catch(function(){});
+}
+
+// 初始化时轮询
+(function(){
+  var origInit = window._custInit || function(){};
+  window._custInit = function(){ origInit(); pollCustNotifCount(); setInterval(pollCustNotifCount, 60000); };
+})();
+// 切换到通知 tab 时加载
+var _origTabSwitch = window._onTabSwitch;
+window._onTabSwitch = function(tab){ if(_origTabSwitch) _origTabSwitch(tab); if(tab==='tab-notifications') loadCustNotifications(); };
+
+</script>
 
 </body>
 </html>

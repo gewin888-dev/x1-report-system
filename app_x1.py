@@ -37,6 +37,10 @@ from payload_normalizer import normalize_project_payload, validate_normalized_pr
 from database import init_database, get_db
 from auth import init_login_manager, get_user, verify_password, require_role, require_permission, DEFAULT_ROLE_PERMISSIONS, can_view_record
 from monitor import log_action, log_error, monitor_performance, get_system_health
+from notifications import (create_notification, get_notifications, get_unread_count,
+    mark_read, mark_all_read, ensure_notifications_table,
+    notify_new_registration, notify_customer_urge, notify_report_feedback,
+    notify_report_ready, notify_registration_approved, notify_registration_rejected)
 BASE_DIR = Path(__file__).parent
 CFG = load_x1_config(BASE_DIR)
 APP_VERSION = CFG.get('version', 'X4.6.3')
@@ -696,6 +700,42 @@ def enforce_csrf_for_authenticated_writes():
 
 
 
+
+# ==================== 通知 API ====================
+
+@app.route('/api/notifications')
+@login_required
+def api_notifications():
+    """获取当前用户的通知列表"""
+    limit = request.args.get('limit', 30, type=int)
+    unread_only = request.args.get('unread_only', '') == '1'
+    items = get_notifications(current_user.id, current_user.role, limit=limit, unread_only=unread_only)
+    return jsonify({'success': True, 'items': items})
+
+
+@app.route('/api/notifications/unread_count')
+@login_required
+def api_notifications_unread_count():
+    """获取未读通知数"""
+    count = get_unread_count(current_user.id, current_user.role)
+    return jsonify({'success': True, 'count': count})
+
+
+@app.route('/api/notifications/<int:nid>/read', methods=['POST'])
+@login_required
+def api_notification_mark_read(nid):
+    """标记单条已读"""
+    mark_read(nid, current_user.id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/notifications/read_all', methods=['POST'])
+@login_required
+def api_notification_read_all():
+    """全部标记已读"""
+    mark_all_read(current_user.id, current_user.role)
+    return jsonify({'success': True})
+
 @app.route('/admin/api/registrations')
 @login_required
 @require_permission('admin.users.manage')
@@ -750,6 +790,7 @@ def admin_api_approve_registration(reg_id):
         )
         conn.commit()
     log_action(current_user.id, 'approve_registration', reg['username'], f"审核通过客户注册：{reg['company']} / {reg['contact_name']}")
+    notify_registration_approved(reg['username'])
     return jsonify({'success': True, 'message': '已通过审核，客户可登录使用'})
 
 
@@ -776,6 +817,7 @@ def admin_api_reject_registration(reg_id):
         )
         conn.commit()
     log_action(current_user.id, 'reject_registration', reg['username'], f"驳回客户注册：{reg['company']}，原因：{reason}")
+    notify_registration_rejected(reg['username'], reason)
     return jsonify({'success': True, 'message': '已驳回'})
 
 
@@ -933,6 +975,7 @@ def api_register():
             conn.commit()
 
         log_action(username, 'customer_register', '', f'客户自助注册：{company} / {contact_name} / {phone}')
+        notify_new_registration(company, contact_name, username)
         return jsonify({'success': True, 'message': '注册成功，等待审核'})
     except Exception as e:
         return jsonify({'success': False, 'message': f'注册失败：{str(e)}'})

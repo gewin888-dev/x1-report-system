@@ -116,6 +116,7 @@
         if (tabId === 'tab-history' && !tabLoaded['tab-history']) { loadHistory(); tabLoaded['tab-history'] = true; }
         if (tabId === 'tab-projects') { loadProjects(); }
         if (tabId === 'tab-feedback') { loadFeedback(); }
+        if (tabId === 'tab-notifications' && typeof loadCustNotifications === 'function') { loadCustNotifications(); }
       });
     });
   }
@@ -606,5 +607,8 @@
 
   /* ========== 启动 ========== */
 
-  document.addEventListener('DOMContentLoaded', init);
+  document.addEventListener('DOMContentLoaded', function(){
+    init();
+    if(typeof pollCustNotifCount === 'function'){ pollCustNotifCount(); setInterval(pollCustNotifCount, 60000); }
+  });
 })();

@@ -5,6 +5,7 @@
 
 from flask import render_template, request, jsonify
 from auth import require_permission
+from notifications import notify_customer_urge, notify_report_feedback, notify_report_ready
 from flask_login import current_user, login_required
 from pathlib import Path
 from datetime import datetime, timedelta
@@ -528,6 +529,10 @@ def register_customer_routes(app):
             else:
                 message = '普迪公司财务会尽快开具发票。'
 
+            try:
+                notify_customer_urge(client_name, project.get('project_name') or str(project_id))
+            except Exception:
+                pass
             return jsonify({'success': True, 'message': message})
         finally:
             conn.close()
@@ -679,6 +684,10 @@ def register_customer_routes(app):
             from monitor import log_action
             log_action(client_name, '客户报告反馈', f'project_id={project_id}', content[:100])
 
+            try:
+                notify_report_feedback(client_name, str(project_id))
+            except Exception:
+                pass
             return jsonify({'success': True, 'message': '反馈已提交，报告将进入修改流程'})
         finally:
             conn.close()
