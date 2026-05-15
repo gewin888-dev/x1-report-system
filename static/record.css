@@ -451,8 +451,8 @@ input[type="number"] {
   .top-bar .user-info { font-size: 12px; }
   
   /* 标签页 */
-  .tab-bar { padding: 8px 12px; overflow-x: auto; }
-  .tab-btn { padding: 8px 12px; font-size: 13px; white-space: nowrap; }
+  .tab-bar { padding: 6px 8px; overflow: hidden; gap: 4px; }
+  .tab-btn { padding: 8px 4px; font-size: 12px; white-space: nowrap; min-width: 0; }
   
   /* 表单区域 */
   .form-section { padding: 12px; }
@@ -493,8 +493,8 @@ input[type="number"] {
   .top-bar .user-info { font-size: 12px; }
   
   /* 标签页 */
-  .tab-bar { padding: 8px 12px; overflow-x: auto; }
-  .tab-btn { padding: 8px 12px; font-size: 13px; white-space: nowrap; }
+  .tab-bar { padding: 6px 8px; overflow: hidden; gap: 4px; }
+  .tab-btn { padding: 8px 4px; font-size: 12px; white-space: nowrap; min-width: 0; }
   
   /* 表单区域 */
   .form-section { padding: 12px; }
@@ -838,3 +838,8 @@ input[type="number"] {
 }
 
 
+
+  @media (max-width: 380px) {
+    .tab-bar .tab-btn .tab-icon { display: none; }
+    .tab-bar .tab-btn { gap: 2px; font-size: 11px; padding: 8px 2px; }
+  }
