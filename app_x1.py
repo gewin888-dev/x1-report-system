@@ -112,7 +112,7 @@ TASK_TYPE_LABELS = {
 
 TASK_STATUS_LABELS = {
     'pending_assign': '待指派',
-    'assigned': '已指派',
+    'assigned': '已派单',
     'accepted': '已接单',
     'in_progress': '执行中',
     'completed': '已完成',

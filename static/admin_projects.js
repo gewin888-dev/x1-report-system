@@ -124,7 +124,7 @@ function deleteProject(id){ if(!confirm('确认删除该项目吗？')) return; 
 
 const TASK_STATUS_PALETTE = {
   '待指派': 'background:#fafafa;color:#666;border:1px solid #d9d9d9;',
-  '已指派': 'background:#e6f4ff;color:#0958d9;border:1px solid #91caff;',
+  '已派单': 'background:#e6f4ff;color:#0958d9;border:1px solid #91caff;',
   '已接单': 'background:#e6f4ff;color:#0958d9;border:1px solid #91caff;',
   '执行中': 'background:#fff7e6;color:#d46b08;border:1px solid #ffd591;',
   '已完成': 'background:#f6ffed;color:#389e0d;border:1px solid #b7eb8f;',
