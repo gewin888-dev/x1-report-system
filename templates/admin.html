@@ -295,11 +295,108 @@ input[type="text"]:focus,input[type="password"]:focus,input[type="number"]:focus
 </div>
 
 <div class="modal-overlay" id="project-modal">
-  <div class="modal page-shell section-card" style="width:960px;max-width:96vw;max-height:90vh;overflow-y:auto;padding:22px;border-radius:18px;">
+  <div class="modal page-shell section-card" style="width:960px;max-width:96vw;max-height:90vh;padding:0;border-radius:18px;display:flex;flex-direction:column;overflow:hidden;">
 
-    <!-- 顶部标题栏 -->
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <!-- 顶部标题栏 (固定) -->
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:18px 22px 14px;border-bottom:1px solid #e5e7eb;background:#fff;border-radius:18px 18px 0 0;flex-shrink:0;">
       <div>
+        <h4 id="project-modal-title" style="margin:0;font-size:18px;font-weight:800;color:#111827;">新增项目</h4>
+        <div id="project-modal-subtitle" style="font-size:12px;color:#94a3b8;margin-top:4px;">维护项目基础信息与推进状态</div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-sm" id="project-top-edit-btn" style="display:none">编辑</button>
+        <button class="btn btn-sm" id="project-top-close-btn" onclick="closeProjectModal()">✕</button>
+      </div>
+    </div>
+
+    <!-- 中间内容区 (可滚动) -->
+    <div style="flex:1;overflow-y:auto;padding:18px 22px;">
+    <input type="hidden" id="project-id">
+    <input type="hidden" id="project-modal-mode" value="edit">
+
+    <!-- ① 基础信息 -->
+    <div style="margin-bottom:16px;padding:16px;border:1px solid #e5e7eb;border-radius:12px;background:#fafbfc;">
+      <div style="font-size:14px;font-weight:700;color:#111827;margin-bottom:14px;">📌 基础信息</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px;">项目名称</label><input id="project-name" style="width:100%;"></div>
+        <div><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px;">客户 / 委托单位</label><input id="project-client-name" list="client-name-datalist" onchange="onClientNameSelect()" oninput="onClientNameSelect()" style="width:100%;"><datalist id="client-name-datalist"></datalist></div>
+        <div><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px;">项目地址</label><input id="project-address" style="width:100%;"></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px;">联系人</label><input id="project-contact-name" style="width:100%;"></div>
+          <div><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px;">联系方式</label><input id="project-contact-phone" style="width:100%;"></div>
+        </div>
+        <div><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px;">检测领域</label><input id="project-detection-domain" style="width:100%;"></div>
+        <div><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px;">检测对象 / 类型</label><input id="project-detection-type" style="width:100%;"></div>
+        <div><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px;">检测日期</label><input id="project-expected-date" type="date" style="width:100%;"></div>
+        <div><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px;">负责人</label><input id="project-owner-form" style="width:100%;"></div>
+      </div>
+      <div style="margin-top:12px;"><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px;">项目说明 / 特殊要求</label><textarea id="project-desc" rows="2" style="width:100%;resize:vertical;"></textarea></div>
+    </div>
+
+    <!-- ② 经营状态（左）+ 报告（右）并排 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+      <div style="padding:16px;border:1px solid #e5e7eb;border-radius:12px;background:#fafbfc;">
+        <div style="font-size:14px;font-weight:700;color:#111827;margin-bottom:14px;">💰 经营状态</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px;">合同情况</label><select id="project-contract-status-form" style="width:100%;"></select></div>
+          <div><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px;">合同金额</label><input id="project-contract-amount" type="number" step="0.01" min="0" style="width:100%;text-align:right;"></div>
+          <div><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px;">已收款</label><input id="project-paid-amount" type="number" step="0.01" min="0" style="width:100%;text-align:right;"></div>
+          <div><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px;">开票情况</label><select id="project-invoice-status-form" style="width:100%;"></select></div>
+          <div><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px;">收款状态</label><select id="project-payment-status-form" style="width:100%;"></select></div>
+        </div>
+      </div>
+      <div style="padding:16px;border:1px solid #e5e7eb;border-radius:12px;background:#fafbfc;">
+        <div style="font-size:14px;font-weight:700;color:#111827;margin-bottom:14px;">🔬 检测与报告</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px;">检测阶段</label><select id="project-inspection-stage-form" style="width:100%;"></select></div>
+          <div><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px;">报告状态</label><select id="project-report-status-form" style="width:100%;"></select></div>
+        </div>
+        <div style="margin-top:12px;padding:10px;background:#fff;border:1px dashed #d9d9d9;border-radius:8px;">
+          <div style="font-size:12px;color:#6b7280;margin-bottom:6px;">📎 上传检测报告 <span style="color:#bbb;font-size:11px;">(.docx / .pdf / .doc)</span></div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <input type="file" id="report-file-input" accept=".docx,.pdf,.doc" style="font-size:11px;flex:1;">
+            <button class="btn btn-primary btn-sm" onclick="uploadReport()" style="white-space:nowrap;font-size:12px;">上传</button>
+          </div>
+          <div id="report-file-status" style="font-size:11px;color:#389e0d;margin-top:4px;display:none;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ③ 备注 -->
+    <div style="margin-bottom:16px;"><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px;">📝 备注</label><textarea id="project-remarks" rows="2" style="width:100%;resize:vertical;"></textarea></div>
+
+    <!-- ④ 任务派单 + 关联报告 -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:0;">
+      <div style="padding:14px 16px;border:1px solid #e5e7eb;border-radius:12px;background:#fff;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <div style="font-size:14px;font-weight:700;color:#111827;">📋 任务派单</div>
+          <button class="btn btn-sm btn-primary" id="project-dispatch-btn" onclick="showDispatchDialog()" style="font-size:12px;">+ 派单</button>
+        </div>
+        <div id="project-task-list" style="font-size:12px;color:#374151;line-height:1.8;">
+          <div style="color:#bbb;padding:6px 0;">加载中...</div>
+        </div>
+      </div>
+      <div style="padding:14px 16px;border:1px solid #e5e7eb;border-radius:12px;background:#fff;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <div style="font-size:14px;font-weight:700;color:#111827;">📄 关联报告</div>
+          <span id="project-report-count" style="font-size:12px;color:#8c8c8c;"></span>
+        </div>
+        <div id="project-report-list" style="font-size:12px;color:#374151;max-height:200px;overflow-y:auto;">
+          <div style="color:#bbb;">加载中…</div>
+        </div>
+      </div>
+    </div>
+    </div><!-- /中间内容区 -->
+
+    <!-- 底部按钮 (固定) -->
+    <div style="display:flex;justify-content:flex-end;gap:10px;padding:14px 22px;border-top:1px solid #e5e7eb;background:#fff;border-radius:0 0 18px 18px;flex-shrink:0;">
+      <button class="btn" id="project-close-btn" onclick="closeProjectModal()">关闭</button>
+      <button class="btn" id="project-cancel-btn" style="display:none" onclick="closeProjectModal()">取消</button>
+      <button class="btn btn-primary" id="project-save-btn" onclick="saveProject()">保存项目</button>
+    </div>
+
+  </div>
+</div>
         <h4 id="project-modal-title" style="margin:0;font-size:18px;font-weight:800;color:#111827;">新增项目</h4>
         <div id="project-modal-subtitle" style="font-size:12px;color:#94a3b8;margin-top:4px;">维护项目基础信息与推进状态</div>
       </div>
