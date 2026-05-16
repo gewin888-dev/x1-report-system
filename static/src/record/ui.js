@@ -1,6 +1,12 @@
 // ui.js - 70 functions
 // Auto-extracted from record.js
 
+// XSS escape helper
+function escHtml(str){
+    if(!str) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 function handleAdminEntry(event){
     if(event) event.preventDefault();
     if(!currentUserProfile){
@@ -1266,8 +1272,8 @@ function buildRecordItem(r){
 
     const rooms = Array.isArray(r.rooms) ? r.rooms : [];
     const roomSummary = rooms.length > 0
-        ? rooms.slice(0,3).map(room => buildRoomHierarchySummary(room)).join('；') + (rooms.length > 3 ? ` 等${rooms.length}项` : '')
-        : (r.detection_type_name || r.detection_type || '未识别对象');
+        ? rooms.slice(0,3).map(room => escHtml(buildRoomHierarchySummary(room))).join('；') + (rooms.length > 3 ? ` 等${rooms.length}项` : '')
+        : escHtml(r.detection_type_name || r.detection_type || '未识别对象');
 
     const savedAt = r.save_time ? r.save_time.replace('T',' ').substring(0,16) : (r.detection_date || '');
     const reportStatus = r.voided ? '已作废' : (statusMeta?.label || (hasReport ? '已生成' : '未生成'));
@@ -1275,11 +1281,11 @@ function buildRecordItem(r){
     const currentStatus = (hasReport || hasExport)
         ? `<div class="record-status-row"><span class="record-status-chip">检测报告：${buildStatusText(reportStatus)}</span><span class="record-status-chip">原始记录：${buildStatusText(recordStatus)}</span></div>`
         : `<div class="record-status-row"><span class="record-status-chip">当前状态：${buildStatusText(statusMeta?.label || '草稿')}</span></div>`;
-    const timeInspectorLine = [`生成时间：${savedAt}`, `检测员：${r.inspector || '-'}`].join(' / ');
-    const clientLine = r.client_name ? `委托单位：${r.client_name}` : '';
-    const headerLine = [r.project_name||'未命名项目', r.report_number||''].filter(Boolean).join(' / ');
-    const voidReasonLine = r.voided && r.void_reason ? `<div class="record-extra record-error">作废理由：${r.void_reason}</div>` : '';
-    const errorLine = r._queueError ? `<div class="record-extra record-error">${r._queueError}</div>` : '';
+    const timeInspectorLine = [`生成时间：${escHtml(savedAt)}`, `检测员：${escHtml(r.inspector) || '-'}`].join(' / ');
+    const clientLine = r.client_name ? `委托单位：${escHtml(r.client_name)}` : '';
+    const headerLine = [escHtml(r.project_name)||'未命名项目', escHtml(r.report_number)||''].filter(Boolean).join(' / ');
+    const voidReasonLine = r.voided && r.void_reason ? `<div class="record-extra record-error">作废理由：${escHtml(r.void_reason)}</div>` : '';
+    const errorLine = r._queueError ? `<div class="record-extra record-error">${escHtml(r._queueError)}</div>` : '';
 
     const autoDraftHint = (draftTypeMeta && draftTypeMeta.label === '自动保存')
         ? `<div class="record-extra" style="color:#999;">${draftTypeMeta.hint}</div>`
@@ -1573,6 +1579,7 @@ function prefillFromTask(taskId){
 
 // Export all functions
 export {
+    escHtml,
     handleAdminEntry,
     updateReportNumber,
     showResetDialog,

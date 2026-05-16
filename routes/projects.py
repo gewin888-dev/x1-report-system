@@ -13,6 +13,7 @@ from flask_login import login_required, current_user
 
 from auth import require_role, require_permission
 from database import get_db
+from notifications import notify_project_report_uploaded, notify_project_status_change
 from monitor import log_action
 from config_loader import load_x1_config
 from helpers.db import get_x1_data_conn
@@ -292,15 +293,23 @@ def admin_api_business_project_create():
 @require_permission('admin.projects.manage')
 def admin_api_business_project_update(project_id):
     data = request.get_json(silent=True) or {}
-    payload = _clean_project_payload(data)
-    if not payload['project_name']:
-        return jsonify({'success': False, 'error': '项目名称不能为空'}), 400
     now = datetime.now().isoformat(timespec='seconds')
     conn = get_x1_data_conn()
     try:
-        exists = conn.execute('SELECT id FROM business_projects WHERE id=?', [project_id]).fetchone()
-        if not exists:
+        row = conn.execute('SELECT * FROM business_projects WHERE id=?', [project_id]).fetchone()
+        if not row:
             return jsonify({'success': False, 'error': '项目不存在'}), 404
+        # 合并：以现有数据为底，用请求数据覆盖（部分更新）
+        existing = dict(row)
+        merged = {k: data[k] if k in data else existing.get(k, '') for k in [
+            'project_name', 'client_name', 'project_address', 'contact_name', 'contact_phone',
+            'detection_domain', 'detection_type', 'expected_detection_date', 'project_desc',
+            'business_stage', 'contract_status', 'contract_amount', 'paid_amount', 'inspection_stage',
+            'report_status', 'invoice_status', 'payment_status', 'owner', 'remarks',
+            'assigned_to', 'assigned_at', 'task_status'
+        ]}
+        if not merged.get('project_name'):
+            return jsonify({'success': False, 'error': '项目名称不能为空'}), 400
         conn.execute('''
             UPDATE business_projects SET
                 project_name=?, client_name=?, project_address=?, contact_name=?, contact_phone=?,
@@ -310,13 +319,23 @@ def admin_api_business_project_update(project_id):
                 assigned_to=?, assigned_at=?, task_status=?, updated_at=?
             WHERE id=?
         ''', [
-            payload['project_name'], payload['client_name'], payload['project_address'], payload['contact_name'], payload['contact_phone'],
-            payload['detection_domain'], payload['detection_type'], payload['expected_detection_date'], payload['project_desc'],
-            payload['business_stage'], payload['contract_status'], payload['contract_amount'], payload['paid_amount'], payload['inspection_stage'],
-            payload['report_status'], payload['invoice_status'], payload['payment_status'], payload['owner'], payload['remarks'],
-            payload['assigned_to'], payload['assigned_at'], payload['task_status'], now, project_id
+            merged['project_name'], merged['client_name'], merged['project_address'], merged['contact_name'], merged['contact_phone'],
+            merged['detection_domain'], merged['detection_type'], merged['expected_detection_date'], merged['project_desc'],
+            merged['business_stage'], merged['contract_status'], merged.get('contract_amount', 0), merged.get('paid_amount', 0), merged.get('inspection_stage', ''),
+            merged.get('report_status', ''), merged.get('invoice_status', ''), merged.get('payment_status', ''), merged.get('owner', ''), merged.get('remarks', ''),
+            merged.get('assigned_to', ''), merged.get('assigned_at', ''), merged.get('task_status', ''), now, project_id
         ])
         conn.commit()
+
+        # 检测阶段或报告状态变更时通知客户
+        try:
+            old_stage = existing.get('inspection_stage', '')
+            new_stage = merged.get('inspection_stage', '')
+            if new_stage and new_stage != old_stage:
+                notify_project_status_change(merged['project_name'], merged['client_name'], old_stage, new_stage)
+        except Exception:
+            pass
+
         row = conn.execute('SELECT * FROM business_projects WHERE id=?', [project_id]).fetchone()
         return jsonify({'success': True, 'item': serialize_business_project(row)})
     finally:
@@ -409,6 +428,12 @@ def admin_api_upload_report(project_id):
         conn.execute(f'UPDATE business_projects SET {set_clause} WHERE id=?',
                      list(updates.values()) + [project_id])
         conn.commit()
+
+        # 通知客户报告已出具
+        try:
+            notify_project_report_uploaded(project['project_name'], project['client_name'])
+        except Exception:
+            pass
 
         return jsonify({
             'success': True,

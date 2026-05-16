@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>客户登录 - 内蒙古普迪检测技术服务有限公司</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Roboto, sans-serif;
+            background: linear-gradient(135deg, #001529 0%, #003a8c 60%, #1677ff 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .login-container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px 36px;
+            width: 100%;
+            max-width: 400px;
+        }
+        @media (max-width: 480px) {
+            body { padding: 12px; }
+            .login-container { padding: 28px 20px; border-radius: 12px; }
+            .logo h2 { font-size: 18px; }
+            .form-group input { padding: 11px 12px; font-size: 14px; }
+            .btn-login { padding: 12px; font-size: 15px; }
+        }
+        .logo {
+            text-align: center;
+            margin-bottom: 28px;
+        }
+        .logo img { max-width: 140px; height: auto; margin-bottom: 12px; }
+        .logo h2 {
+            font-size: 20px;
+            color: #1a1a2e;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        .logo p {
+            font-size: 13px;
+            color: #64748b;
+        }
+        .form-group {
+            margin-bottom: 18px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #374151;
+            margin-bottom: 6px;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1.5px solid #d1d5db;
+            border-radius: 10px;
+            font-size: 15px;
+            transition: border-color .2s, box-shadow .2s;
+            outline: none;
+        }
+        .form-group input:focus {
+            border-color: #1677ff;
+            box-shadow: 0 0 0 3px rgba(22,119,255,.12);
+        }
+        .btn-login {
+            width: 100%;
+            padding: 13px;
+            background: linear-gradient(135deg, #1677ff, #4096ff);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform .1s, box-shadow .2s;
+            margin-top: 6px;
+        }
+        .btn-login:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(22,119,255,.4);
+        }
+        .btn-login:active { transform: translateY(0); }
+        .btn-login:disabled {
+            opacity: .6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .error-msg {
+            background: #fef2f2;
+            color: #dc2626;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            margin-bottom: 16px;
+            display: none;
+            border: 1px solid #fecaca;
+        }
+        .links {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 13px;
+            color: #64748b;
+        }
+        .links a {
+            color: #1677ff;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .links a:hover { text-decoration: underline; }
+        .divider {
+            margin: 0 10px;
+            color: #d1d5db;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">
+            <img src="/static/logo.png" alt="普迪检测" onerror="this.style.display='none'">
+            <h2>客户服务门户</h2>
+            <p>内蒙古普迪检测技术服务有限公司</p>
+        </div>
+
+        <div class="error-msg" id="error-msg"></div>
+
+        <form id="login-form" onsubmit="return doLogin(event)">
+            <div class="form-group">
+                <label for="username">用户名</label>
+                <input type="text" id="username" name="username" placeholder="请输入用户名" required autocomplete="username">
+            </div>
+            <div class="form-group">
+                <label for="password">密码</label>
+                <input type="password" id="password" name="password" placeholder="请输入密码" required autocomplete="current-password">
+            </div>
+            <button type="submit" class="btn-login" id="btn-login">登 录</button>
+        </form>
+
+        <div class="links">
+            <a href="/register">注册新账号</a>
+        </div>
+        <div style="text-align:center;margin-top:16px;">
+            <a href="/" style="color:#888;font-size:13px;text-decoration:none;">← 返回主界面</a>
+        </div>
+    </div>
+
+    <script>
+    function doLogin(e) {
+        e.preventDefault();
+        var btn = document.getElementById('btn-login');
+        var errEl = document.getElementById('error-msg');
+        btn.disabled = true;
+        btn.textContent = '登录中...';
+        errEl.style.display = 'none';
+
+        var username = document.getElementById('username').value.trim();
+        var password = document.getElementById('password').value;
+
+        fetch('/api/customer_login', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({username: username, password: password})
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.success) {
+                window.location.href = '/customer';
+            } else {
+                errEl.textContent = d.message || d.error || '登录失败';
+                errEl.style.display = 'block';
+                btn.disabled = false;
+                btn.textContent = '登 录';
+            }
+        })
+        .catch(function() {
+            errEl.textContent = '网络错误，请重试';
+            errEl.style.display = 'block';
+            btn.disabled = false;
+            btn.textContent = '登 录';
+        });
+        return false;
+    }
+    </script>
+</body>
+</html>

@@ -187,3 +187,55 @@ def notify_registration_rejected(username, reason=''):
         target_user=username,
         link=''
     )
+
+
+def notify_project_status_change(project_name, client_name, old_stage, new_stage):
+    """项目状态变更通知客户"""
+    stage_labels = {
+        '未安排': '等待安排',
+        '已安排': '已安排检测',
+        '检测中': '正在检测',
+        '检测完成': '检测已完成',
+        '报告编制中': '报告编制中',
+        '已出具': '报告已出具',
+        '已发送客户': '报告已发送',
+        '待客户确认': '等待您确认',
+    }
+    label = stage_labels.get(new_stage, new_stage)
+    # 找到该 client_name 对应的客户用户
+    conn = _get_db()
+    try:
+        rows = conn.execute(
+            "SELECT user_id FROM users WHERE role='customer' AND client_name=? AND is_active=1",
+            [client_name]
+        ).fetchall()
+        for row in rows:
+            create_notification(
+                title=f'项目进度更新',
+                content=f'您的项目「{project_name}」状态已更新为：{label}',
+                category='report',
+                target_user=row['user_id'],
+                link='projects'
+            )
+    finally:
+        conn.close()
+
+
+def notify_project_report_uploaded(project_name, client_name):
+    """报告上传完成通知客户"""
+    conn = _get_db()
+    try:
+        rows = conn.execute(
+            "SELECT user_id FROM users WHERE role='customer' AND client_name=? AND is_active=1",
+            [client_name]
+        ).fetchall()
+        for row in rows:
+            create_notification(
+                title=f'检测报告已出具',
+                content=f'您的项目「{project_name}」检测报告已出具，可在线预览或下载',
+                category='report',
+                target_user=row['user_id'],
+                link='projects'
+            )
+    finally:
+        conn.close()

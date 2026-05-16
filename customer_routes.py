@@ -24,7 +24,10 @@ def customer_required(f):
     @login_required
     def decorated(*args, **kwargs):
         if not hasattr(current_user, 'role') or current_user.role not in ('customer', 'admin'):
-            return jsonify({'success': False, 'message': '无权访问'}), 403
+            from flask import redirect
+            if '/api/' in request.path:
+                return jsonify({'success': False, 'error': '无权访问，请登录客户账号'}), 403
+            return redirect('/customer/login')
         return f(*args, **kwargs)
     return decorated
 
@@ -885,3 +888,38 @@ def customer_download_report(project_id):
                 continue
 
     return jsonify({'success': False, 'error': '报告文件不存在，请联系检测中心'}), 404
+
+
+# ============================================================
+# 客户修改密码
+# ============================================================
+@customer_bp.route('/customer/api/change_password', methods=['POST'])
+@login_required
+@customer_required
+def customer_change_password():
+    """客户修改自己的密码"""
+    data = request.get_json(silent=True) or {}
+    old_password = (data.get('old_password') or '').strip()
+    new_password = (data.get('new_password') or '').strip()
+
+    if not old_password or not new_password:
+        return jsonify({'success': False, 'error': '请填写原密码和新密码'}), 400
+    if len(new_password) < 6:
+        return jsonify({'success': False, 'error': '新密码至少6位'}), 400
+
+    from werkzeug.security import check_password_hash, generate_password_hash
+    from database import get_db
+
+    try:
+        with get_db() as conn:
+            row = conn.execute('SELECT password_hash FROM users WHERE user_id = ?', [current_user.id]).fetchone()
+            if not row:
+                return jsonify({'success': False, 'error': '用户不存在'}), 404
+            if not check_password_hash(row['password_hash'], old_password):
+                return jsonify({'success': False, 'error': '原密码错误'}), 400
+            conn.execute('UPDATE users SET password_hash = ? WHERE user_id = ?',
+                         [generate_password_hash(new_password, method='pbkdf2:sha256'), current_user.id])
+            conn.commit()
+        return jsonify({'success': True, 'message': '密码修改成功'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'修改失败：{str(e)}'}), 500

@@ -837,8 +837,8 @@ def login_page():
             _clear_login_attempts(client_ip)
             
             if request.is_json:
-                return jsonify({'success': True, 'redirect': '/'})
-            return redirect(url_for('index'))
+                return jsonify({'success': True, 'redirect': '/home'})
+            return redirect('/home')
         
         _record_login_failure(client_ip)
         log_action(username or 'unknown', 'login_failed', client_ip, f'密码错误 (IP: {client_ip})')
@@ -848,6 +848,41 @@ def login_page():
         return redirect(url_for('login_page'))
     
     return render_template('login.html', version=APP_VERSION)
+
+
+@app.route('/customer/login')
+def customer_login_page():
+    """客户专属登录页面"""
+    return render_template('customer_login.html', version=APP_VERSION)
+
+
+@app.route('/api/customer_login', methods=['POST'])
+def api_customer_login():
+    """客户登录 API（仅允许 customer 角色）"""
+    data = request.get_json(silent=True) or {}
+    username = (data.get('username') or '').strip()
+    password = (data.get('password') or '').strip()
+
+    client_ip = request.remote_addr or '0.0.0.0'
+    if _is_login_rate_limited(client_ip):
+        return jsonify({'success': False, 'message': f'登录尝试过于频繁，请 {_LOGIN_LOCKOUT_SECONDS // 60} 分钟后再试'}), 429
+
+    if not username or not password:
+        return jsonify({'success': False, 'message': '请输入用户名和密码'}), 400
+
+    if verify_password(username, password):
+        user = get_user(username)
+        if user.role != 'customer':
+            return jsonify({'success': False, 'message': '此入口仅限客户使用，员工请使用员工登录'}), 403
+        if not user.is_active:
+            return jsonify({'success': False, 'message': '账号待审核或已停用，请联系检测中心'}), 403
+        login_user(user)
+        log_action(username, 'login', '', '客户门户登录')
+        _clear_login_attempts(client_ip)
+        return jsonify({'success': True})
+
+    _record_login_failure(client_ip)
+    return jsonify({'success': False, 'message': '用户名或密码错误'}), 401
 
 
 @app.route('/register')
@@ -929,12 +964,15 @@ def _ensure_registration_table(conn):
     )""")
 
 
-@app.route('/logout')
+@app.route('/logout', methods=['GET', 'POST'])
 @login_required
 def logout():
     username = current_user.id
+    role = getattr(current_user, 'role', 'admin')
     log_action(username, 'logout', '', '登出')
     logout_user()
+    if role == 'customer':
+        return redirect('/customer/login')
     return redirect(url_for('login_page'))
 
 
@@ -972,6 +1010,14 @@ def api_save_compat():
     target = _x_draft_path(payload['draft_id'])
     with open(target, 'w', encoding='utf-8') as f:
         json.dump(payload, f, ensure_ascii=False, indent=2)
+    # 操作日志
+    project_name = (project.get('project_name') or project.get('name') or '')[:50]
+    log_action(
+        current_user.id if current_user.is_authenticated else 'unknown',
+        '保存记录',
+        payload['draft_id'],
+        f'{draft_kind} | {project_name}'
+    )
     return jsonify({
         'success': True,
         'ok': True,
@@ -984,6 +1030,15 @@ def api_save_compat():
 
 
 @app.route('/')
+def landing():
+    """公开首页 - 选择员工/客户入口"""
+    if current_user.is_authenticated:
+        if current_user.role == 'customer':
+            return redirect('/customer')
+        return redirect('/home')
+    return render_template('landing.html')
+
+@app.route('/home')
 @login_required
 def index():
     if current_user.role == 'customer':
@@ -1515,10 +1570,12 @@ def admin_api_docs(doc_name):
 def admin_api_workspace_doc():
     allowed = {
         'X1_系统当前版本说明.md', 'X1_版本号管理规则.md',
-        'X1_系统架构说明.md', 'X1_系统接口说明.md',
-        'X1_生产主链设计说明.md', 'X1_代码统计.md',
+        'ARCHITECTURE.md', 'API.md', 'HOST_MODE.md',
         'X1 常见问题排障手册.md', 'X1 运维启动-停止-验活说明.md',
         'X1 部署与迁移说明.md', 'X1 飞书上传失败治理 SOP.md',
+        'X1_全量代码审计报告_2026-05-16_v2.md',
+        'X1_架构重构计划_2026-05-16.md',
+        'X1_飞书月目录自动切换运维说明_2026-05-12.md',
     }
     requested = request.args.get('path', '').strip()
     if not requested:

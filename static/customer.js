@@ -102,7 +102,42 @@
     bindProfileButtons();
     bindModals();
     bindLogout();
+    checkFirstVisitGuide();
   }
+
+  /* ========== 新客户引导 ========== */
+  function checkFirstVisitGuide() {
+    if (localStorage.getItem('x1_customer_guided')) return;
+    // 检查是否有项目，没有则显示引导
+    api('GET', '/customer/api/projects').then(function (d) {
+      var list = d.items || d.list || [];
+      if (list.length === 0) showWelcomeGuide();
+    }).catch(function () {});
+  }
+
+  function showWelcomeGuide() {
+    var overlay = document.createElement('div');
+    overlay.id = 'welcome-guide-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;';
+    overlay.innerHTML = '<div style="background:#fff;border-radius:16px;padding:32px 24px;max-width:420px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3);">' +
+      '<div style="font-size:48px;margin-bottom:16px;">👋</div>' +
+      '<h2 style="font-size:20px;color:#1a1a2e;margin-bottom:12px;">欢迎使用普迪检测客户服务平台</h2>' +
+      '<p style="font-size:14px;color:#64748b;line-height:1.8;margin-bottom:24px;">' +
+      '您可以在这里：<br>' +
+      '🚀 <b>提交检测项目</b> — 在线下单<br>' +
+      '📊 <b>跟踪项目进度</b> — 实时查看状态<br>' +
+      '📄 <b>预览/下载报告</b> — 报告出具后即可查看<br>' +
+      '🔔 <b>消息通知</b> — 进度更新自动推送</p>' +
+      '<button onclick="dismissGuide()" style="padding:12px 32px;background:linear-gradient(135deg,#1677ff,#4096ff);color:#fff;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;">开始使用</button>' +
+      '</div>';
+    document.body.appendChild(overlay);
+  }
+
+  window.dismissGuide = function () {
+    localStorage.setItem('x1_customer_guided', '1');
+    var el = document.getElementById('welcome-guide-overlay');
+    if (el) el.remove();
+  };
 
   /* ========== Tab 切换（补充加载逻辑） ========== */
 
@@ -277,20 +312,21 @@
         var canConfirm = canPreview;
         var reportBtns = '';
         if (canPreview) {
-          reportBtns += '<button class="btn btn-preview" onclick="previewReport(' + p.id + ')">🔍 预览报告</button>';
+          reportBtns += '<button class="btn btn-sm btn-preview" onclick="previewReport(' + p.id + ')">🔍 预览</button>';
           reportBtns += '<button class="btn btn-sm" onclick="downloadReport(' + p.id + ')" style="background:#f0f5ff;color:#1677ff;border:1px solid #91caff;">⬇️ 下载</button>';
         } else {
-          reportBtns += '<button class="btn btn-sm btn-disabled" disabled>🔍 预览报告</button>';
+          reportBtns += '<button class="btn btn-sm btn-disabled" disabled>🔍 预览</button>';
+          reportBtns += '<button class="btn btn-sm btn-disabled" disabled>⬇️ 下载</button>';
         }
         if (canFeedback) {
-          reportBtns += '<button class="btn btn-feedback" onclick="openReportFeedback(' + p.id + ')">✍️ 报告反馈</button>';
+          reportBtns += '<button class="btn btn-sm btn-feedback" onclick="openReportFeedback(' + p.id + ')">✍️ 反馈</button>';
         } else {
-          reportBtns += '<button class="btn btn-sm btn-disabled" disabled>✍️ 报告反馈</button>';
+          reportBtns += '<button class="btn btn-sm btn-disabled" disabled>✍️ 反馈</button>';
         }
         if (canConfirm) {
-          reportBtns += '<button class="btn btn-confirm" onclick="openConfirmReport(' + p.id + ')">✅ 确认报告</button>';
+          reportBtns += '<button class="btn btn-sm btn-confirm" onclick="openConfirmReport(' + p.id + ')">✅ 确认</button>';
         } else {
-          reportBtns += '<button class="btn btn-sm btn-disabled" disabled>✅ 确认报告</button>';
+          reportBtns += '<button class="btn btn-sm btn-disabled" disabled>✅ 确认</button>';
         }
 
         return '<div class="project-card">'
@@ -307,9 +343,9 @@
           + '<span>下单日期：' + escapeHtml((p.created_at || '').slice(0, 10)) + '</span>'
           + '</div>'
           + renderProgressBar(p)
-          + '<div class="project-card-actions" style="justify-content:space-between;">'
-          + '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + urgeBtns + '</div>'
-          + '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + reportBtns + '</div>'
+          + '<div class="project-card-actions">'
+          + '<div class="action-group">' + urgeBtns + '</div>'
+          + '<div class="action-group">' + reportBtns + '</div>'
           + '</div>'
           + '</div>';
       }).join('');
@@ -588,9 +624,9 @@
     var btn = document.getElementById('btn-logout');
     btn && btn.addEventListener('click', function () {
       api('POST', '/logout').then(function () {
-        window.location.href = '/login';
+        window.location.href = '/customer/login';
       }).catch(function () {
-        window.location.href = '/login';
+        window.location.href = '/customer/login';
       });
     });
   }
