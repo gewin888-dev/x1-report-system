@@ -1,6 +1,6 @@
 {
   "app_name": "X1 检测记录系统",
-  "version": "X4.7",
+  "version": "X4.8",
   "host": "0.0.0.0",
   "port": 8082,
   "paths": {
@@ -15,5 +15,12 @@
     "templates": "templates",
     "static": "static"
   },
-  "template_base": "~/公司资料/检测部/检测报告模板"
+  "template_base": "~/公司资料/检测部/检测报告模板",
+  "archive": {
+    "formal_report_archive": "/Users/fuwuqi/公司资料/检测部/检测报告",
+    "formal_raw_archive": "/Users/fuwuqi/公司资料/检测部/原始记录"
+  },
+  "feishu": {
+    "enabled": true
+  }
 }

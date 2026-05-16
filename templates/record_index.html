@@ -17,7 +17,7 @@
             <div class="header-inline-toprow" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:nowrap;">
                 <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
                     <img src="/static/logo.png" alt="普迪检测" style="height:46px;width:auto;background:rgba(255,255,255,.92);border-radius:6px;padding:3px;">
-                    <span style="font-size:18px;font-weight:700;color:#fff;white-space:nowrap;">普迪检测 <span style="font-size:13px;font-weight:500;opacity:.8;">X4.7</span></span>
+                    <span style="font-size:18px;font-weight:700;color:#fff;white-space:nowrap;">普迪检测 <span style="font-size:13px;font-weight:500;opacity:.8;">{{ version }}</span></span>
                 </div>
                 <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;font-size:11px;color:#ccc;white-space:nowrap;">
                     <span>检测员：<span id="currentUser"></span></span><span id="syncBadge" style="display:none;background:#f44336;color:white;padding:1px 6px;border-radius:8px;font-size:10px;">离线</span><span id="pendingCount" style="display:none;background:#ff9800;color:white;padding:1px 6px;border-radius:8px;font-size:10px;cursor:pointer;" onclick="syncPendingRecords()">0</span>
@@ -168,8 +168,11 @@
         }
     },true);
     </script>
-    <script src="/static/standards_db.js?v=4.7"></script>
-    <script src="/static/x-model.js?v=1.0.1"></script>
+    <script src="/static/standards_db.js?v={{ version }}"></script>
+    <script>
+      window.X1_SCHEMA_VERSION = "{{ version }}";
+    </script>
+    <script src="/static/x-model.js?v={{ version }}"></script>
     <script src="/static/record.js?v=10.9.6"></script>
 </body>
 </html>

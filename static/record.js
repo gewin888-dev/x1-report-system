@@ -5059,6 +5059,20 @@ function collectData(){
                 const bg=bgInput?bgInput.value:'';
                 const indoor=indoorInput?indoorInput.value:'';
                 if(bg||indoor) params[p.key]={type:'noise_corrected',background:bg,indoor:indoor,result};
+            } else if(itype==='airchange_speed_only'){
+                const vents=[];
+                pb.querySelectorAll('[data-vent-row]').forEach(row=>{
+                    const a=row.querySelector('[data-va]')?.value;
+                    const s=row.querySelector('[data-vs]')?.value;
+                    if(a||s) vents.push({area:a,speed:s});
+                });
+                if(vents.length) params[p.key]={type:'airchange_speed_only',vents,result};
+            } else if(itype==='pass_box_volume'){
+                const l=pb.querySelector('[data-dim="length"]')?.value||'';
+                const w=pb.querySelector('[data-dim="width"]')?.value||'';
+                const h=pb.querySelector('[data-dim="height"]')?.value||'';
+                const vol=(parseFloat(l)&&parseFloat(w)&&parseFloat(h))?(parseFloat(l)*parseFloat(w)*parseFloat(h)).toFixed(4):'';
+                if(l||w||h) params[p.key]={type:'pass_box_volume',length:l,width:w,height:h,volume:vol,result};
             }
         });
 
@@ -6220,13 +6234,19 @@ async function voidReportRecord(recordId){
 
 function openFileWithWPS(filename){
     fetch('/admin/api/open_file/'+encodeURIComponent(filename), {method:'POST', credentials:'same-origin'})
-      .then(function(r){ return r.json(); })
-      .then(function(d){
+      .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, status:r.status, data:d}; }); })
+      .then(function(res){
+        var d = res.data || {};
         if(d && d.success){
           showToast((d.message || '已用 WPS 打开文件'), 'success');
-        } else {
-          showToast((d && d.error) || '打开失败', 'error');
+          return;
         }
+        if(res.status === 409){
+          showToast((d.error || '当前主机不支持本机打开，改为浏览器下载'), 'info');
+          window.location.href = '/download/' + encodeURIComponent(filename);
+          return;
+        }
+        showToast((d && d.error) || '打开失败', 'error');
       })
       .catch(function(){ showToast('打开失败', 'error'); });
 }
@@ -6249,17 +6269,7 @@ function openFeishuFile(feishuUrl){
         return resp.blob().then(function(blob){ return {blob:blob, fname:fname, ct:ct}; });
       })
       .then(function(r){
-        if(navigator.canShare){
-          var file = new File([r.blob], r.fname, {type: r.ct});
-          if(navigator.canShare({files:[file]})){
-            navigator.share({files:[file], title:r.fname}).then(function(){
-              showToast('文件已分享', 'success');
-            }).catch(function(e){
-              if(e.name !== 'AbortError') showToast('分享失败: '+e.message, 'error');
-            });
-            return;
-          }
-        }
+        // 直接 blob 下载（所有设备统一行为）
         var url = URL.createObjectURL(r.blob);
         var a = document.createElement('a');
         a.href = url;

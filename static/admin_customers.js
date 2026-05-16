@@ -111,7 +111,7 @@ function renderCustomerList(items) {
       + '<td style="text-align:right;font-size:13px;font-weight:' + recvWeight + ';color:' + recvColor + ';padding-right:12px;vertical-align:middle;">' + _money(c.receivable) + '</td>'
       // 状态
       + '<td style="text-align:center;vertical-align:middle;padding:14px 4px;"><div style="display:inline-flex;align-items:center;justify-content:center;gap:4px;flex-wrap:nowrap;">' + (badges || '<span style="color:#cbd5e1;font-size:12px;">—</span>') + '</div></td>'
-      + '<td style="text-align:center;vertical-align:middle;"><button onclick="event.stopPropagation()" ;deleteCustomer(\x27' + _safeHtml(c.client_name).replace(/'/g, "\\'") + '\x27)" style="padding:3px 8px;font-size:11px;color:#94a3b8;border:1px solid #e2e8f0;border-radius:6px;background:#fff;cursor:pointer;transition:all .15s;" onmouseenter="this.style.color=\x27#dc2626\x27;this.style.borderColor=\x27#fca5a5\x27" onmouseleave="this.style.color=\x27#94a3b8\x27;this.style.borderColor=\x27#e2e8f0\x27">删除</button></div>'
+      + '<td style="text-align:center;vertical-align:middle;"><button onclick="event.stopPropagation();deleteCustomer(\x27' + _safeHtml(c.client_name).replace(/'/g, "\\'") + '\x27)" style="padding:3px 8px;font-size:11px;color:#94a3b8;border:1px solid #e2e8f0;border-radius:6px;background:#fff;cursor:pointer;transition:all .15s;" onmouseenter="this.style.color=\x27#dc2626\x27;this.style.borderColor=\x27#fca5a5\x27" onmouseleave="this.style.color=\x27#94a3b8\x27;this.style.borderColor=\x27#e2e8f0\x27">删除</button></div>'
 
       + '</td></tr>';
   });

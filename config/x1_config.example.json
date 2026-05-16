@@ -1,0 +1,19 @@
+{
+  "app_name": "X1 检测记录系统",
+  "version": "X4.7.2",
+  "host": "0.0.0.0",
+  "port": 8082,
+  "paths": {
+    "records": "records_x1",
+    "reports": "reports_x1",
+    "logs": "logs_x1",
+    "cache": "cache_x1",
+    "temp": "temp_x1",
+    "uploads": "uploads_x1",
+    "adapters": "adapters",
+    "docs": "docs",
+    "templates": "templates",
+    "static": "static"
+  },
+  "template_base": "~/公司资料/检测部/检测报告模板"
+}

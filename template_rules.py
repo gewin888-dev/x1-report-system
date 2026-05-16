@@ -23,19 +23,19 @@ TEMPLATE_RULE_REGISTRY = {
         },
         'auxiliary-room': {
             'Ⅰ级（局部5级其他6级）': {
-                'template_key': 'hospital/operating_room/aux/level1-local5-surround6',
+                'template_key': 'hospital/operating_room/aux/level1',
                 'template_name': '洁净手术部-辅房I级',
             },
             'Ⅱ级（7级）': {
-                'template_key': 'hospital/operating_room/aux/level2-iso7',
+                'template_key': 'hospital/operating_room/aux/level2',
                 'template_name': '洁净手术部-辅房II级',
             },
             'Ⅲ级（8级）': {
-                'template_key': 'hospital/operating_room/aux/level3-iso8',
+                'template_key': 'hospital/operating_room/aux/level3',
                 'template_name': '洁净手术部-辅房III级',
             },
             'Ⅳ级（8.5级）': {
-                'template_key': 'hospital/operating_room/aux/level4-iso85',
+                'template_key': 'hospital/operating_room/aux/level4',
                 'template_name': '洁净手术部-辅房IV级',
             },
         },
@@ -123,19 +123,19 @@ TEMPLATE_RULE_REGISTRY = {
     'pharma.gmp_workshop': {
         'grade-default': {
             'A级': {
-                'template_key': 'pharma/gmp_workshop/grade/a',
+                'template_key': 'pharma/gmp_workshop/a',
                 'template_name': 'GMP车间-A级',
             },
             'B级': {
-                'template_key': 'pharma/gmp_workshop/grade/b',
+                'template_key': 'pharma/gmp_workshop/b/c',
                 'template_name': 'GMP车间-B级',
             },
             'C级': {
-                'template_key': 'pharma/gmp_workshop/grade/c',
+                'template_key': 'pharma/gmp_workshop/b/c',
                 'template_name': 'GMP车间-C级',
             },
             'D级': {
-                'template_key': 'pharma/gmp_workshop/grade/d',
+                'template_key': 'pharma/gmp_workshop/d',
                 'template_name': 'GMP车间-D级',
             },
         },
@@ -374,6 +374,18 @@ def resolve_template_rule(project: Dict[str, Any]) -> Dict[str, Any]:
                        .get(surgery_aux_clean_class, {}))
             rule['template_key'] = matched.get('template_key', f"operating_room:aux:{surgery_aux_clean_class or 'unknown'}")
             rule['template_name'] = matched.get('template_name', '')
+        elif surgery_room_type == '眼科手术室':
+            variant = 'eye-room'
+            rule['template_variant'] = variant
+            rule['report_context_mode'] = 'operating-room-eye'
+            # 眼科手术室直接映射到 hospital/operating_room/eye/levelN
+            level_map = {'百级': 'level1', 'I级': 'level1', 'Ⅰ级': 'level1',
+                         '千级': 'level2', 'II级': 'level2', 'Ⅱ级': 'level2',
+                         '万级': 'level3', 'III级': 'level3', 'Ⅲ级': 'level3',
+                         '十万级': 'level4', 'IV级': 'level4', 'Ⅳ级': 'level4'}
+            level_suffix = level_map.get(level_name, 'level1')
+            rule['template_key'] = f"hospital/operating_room/eye/{level_suffix}"
+            rule['template_name'] = f'眼科手术室-{level_name}'
         else:
             variant = 'main-room'
             rule['template_variant'] = variant
@@ -490,7 +502,7 @@ def resolve_template_rule(project: Dict[str, Any]) -> Dict[str, Any]:
         rule['report_context_mode'] = 'pharma-gmp-grade'
         matched = (TEMPLATE_RULE_REGISTRY.get(family, {}).get(variant, {})
                    .get(gmp_grade, {}))
-        rule['template_key'] = matched.get('template_key', f"pharma/gmp_workshop/grade/{gmp_grade.lower() if gmp_grade else 'unknown'}")
+        rule['template_key'] = matched.get('template_key', f"pharma/gmp_workshop/{gmp_grade.lower() if gmp_grade else 'unknown'}")
         rule['template_name'] = matched.get('template_name', 'GMP车间检测报告模板.docx')
         rule['facts']['gmp_grade'] = gmp_grade
 

@@ -738,7 +738,7 @@ input[type="text"]:focus,input[type="password"]:focus,input[type="number"]:focus
 <div class="page-toolbar" style="margin-bottom:16px">
 <input id="standards-search" type="text" placeholder="搜索标准编号 / 标准名称 / 领域 / 覆盖对象" oninput="filterStandards()" style="width:100%;padding:10px 12px;border:1px solid #d9d9d9;border-radius:8px;font-size:14px;outline:none">
 </div>
-<table><thead><tr><th style="width:15%">标准编号</th><th style="width:20%">标准名称</th><th style="width:13%">适用领域</th><th style="width:44%">覆盖对象</th><th style="width:8%;text-align:right">操作</th></tr></thead><tbody id="tb-standards"></tbody></table>
+<table><thead><tr><th style="width:15%">标准编号</th><th style="width:22%">标准名称</th><th style="width:15%">适用领域</th><th style="width:48%">覆盖对象</th></tr></thead><tbody id="tb-standards"></tbody></table>
 </div>
 </div>
 
@@ -1906,8 +1906,20 @@ function openRecordAsset(kind, target, failMessage){
   if(kind === 'local'){
     if(!target){ showToast(failMessage || '文件保存失败', 'error'); return; }
     fetch('/admin/api/open_file/'+encodeURIComponent(target), {method:'POST', credentials:'same-origin'})
-      .then(function(r){ return r.json(); })
-      .then(function(d){ if(d && d.success){ showToast((d.message || '已调用本机软件打开文件'), 'success'); } else { showToast((d && d.error) || failMessage || '打开失败', 'error'); } })
+      .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, status:r.status, data:d}; }); })
+      .then(function(res){
+        var d = res.data || {};
+        if(d.success){
+          showToast((d.message || '已调用本机软件打开文件'), 'success');
+          return;
+        }
+        if(res.status === 409){
+          showToast((d.error || '当前主机不支持本机打开，改为浏览器下载'), 'info');
+          window.location.href = '/download/' + encodeURIComponent(target);
+          return;
+        }
+        showToast(d.error || failMessage || '打开失败', 'error');
+      })
       .catch(function(){ showToast(failMessage || '打开失败', 'error'); });
     return;
   }
@@ -1930,19 +1942,7 @@ function openRecordAsset(kind, target, failMessage){
         return resp.blob().then(function(blob){ return {blob:blob, fname:fname, ct:ct}; });
       })
       .then(function(r){
-        // 统一优先用 Web Share API（弹出系统原生分享面板，用户自选 App 打开）
-        if(navigator.canShare){
-          var file = new File([r.blob], r.fname, {type: r.ct});
-          if(navigator.canShare({files:[file]})){
-            navigator.share({files:[file], title:r.fname}).then(function(){
-              showToast('文件已分享', 'success');
-            }).catch(function(e){
-              if(e.name !== 'AbortError') showToast('分享失败: '+e.message, 'error');
-            });
-            return;
-          }
-        }
-        // 不支持 Web Share 时回退 blob 下载
+        // 直接 blob 下载（所有设备统一行为）
         var url = URL.createObjectURL(r.blob);
         var a = document.createElement('a');
         a.href = url;
@@ -3454,7 +3454,7 @@ function renderStandards(stds){
   stds.forEach(s=>{
     var domainTags=(s.domains||[]).map(d=>'<span class="tag tag-domain">'+d+'</span>').join('');
     var objTags=(s.objects||[]).map(o=>'<span class="tag">'+(OBJ_NAMES[o]||o)+'</span>').join('');
-    html+='<tr><td><strong>'+s.code+'</strong></td><td style="font-size:12px;color:#555">'+(STD_NAMES[s.code]||'—')+'</td><td>'+(domainTags||'<span style="color:#999">—</span>')+'</td><td>'+objTags+'</td><td style="text-align:right"><button class="btn btn-sm" onclick="viewStandard(\''+s.code+'\')" >查看</button></td></tr>';
+    html+='<tr style="cursor:pointer" onclick="viewStandard(\''+s.code+'\')" onmouseover="this.style.background=\'#f0f5ff\'" onmouseout="this.style.background=\'\'" ><td><strong>'+s.code+'</strong></td><td style="font-size:12px;color:#555">'+(STD_NAMES[s.code]||'—')+'</td><td>'+(domainTags||'<span style="color:#999">—</span>')+'</td><td>'+objTags+'</td></tr>';
   });
   document.getElementById('tb-standards').innerHTML=html||'<tr><td colspan="5" class="empty">暂无匹配标准</td></tr>';
 }
@@ -4038,7 +4038,7 @@ function submitBackupChoice(mode){
     return;
   }
   if(mode==='update'){
-    var currentVersion = ((window.currentSettingsData||{})['basic.version']||{}).value || (document.getElementById('sys-version') ? document.getElementById('sys-version').textContent : 'X4.6') || 'X4.6';
+    var currentVersion = ((window.currentSettingsData||{})['basic.version']||{}).value || (document.getElementById('sys-version') ? document.getElementById('sys-version').textContent : '{{ version }}') || '{{ version }}';
     var nextVersion = prompt('请输入新的版本号：', currentVersion);
     if(nextVersion === null) return;
     nextVersion = (nextVersion||'').trim();

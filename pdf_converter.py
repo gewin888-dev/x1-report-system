@@ -2,9 +2,13 @@
 """docx → PDF 转换工具（macOS Pages.app）"""
 
 import subprocess
-import tempfile
-import shutil
 from pathlib import Path
+
+from config_loader import load_x1_config
+
+BASE_DIR = Path(__file__).resolve().parent
+CFG = load_x1_config(BASE_DIR)
+HOST_MODE = str(CFG.get('host_mode', 'desktop') or 'desktop').strip().lower()
 
 
 def convert_docx_to_pdf(docx_path: str, pdf_path: str = None) -> str:
@@ -27,7 +31,11 @@ def convert_docx_to_pdf(docx_path: str, pdf_path: str = None) -> str:
         dst = src.with_suffix('.pdf')
     
     dst.parent.mkdir(parents=True, exist_ok=True)
-    
+
+    if HOST_MODE != 'desktop':
+        print('[pdf_converter] server 模式下禁用 Pages PDF 转换')
+        return ''
+
     script = f'''
 set inputFile to POSIX file "{src}"
 set outputFile to POSIX file "{dst}"

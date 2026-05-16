@@ -11,7 +11,8 @@
     "version": "v3",
     "last_verified_at": "2026-05-08 11:15:57",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_relpath": "制药工业/制药工业GMP车间A级检测报告模板.docx"
   },
   "pharma/gmp_workshop/b/c": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/制药工业/制药工业GMP车间B级C级检测报告模板.docx",
@@ -25,7 +26,8 @@
     "version": "v3",
     "last_verified_at": "2026-05-07 17:07:45",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_relpath": "制药工业/制药工业GMP车间B级C级检测报告模板.docx"
   },
   "pharma/gmp_workshop/d": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/制药工业/制药工业GMP车间D级检测报告模板.docx",
@@ -39,7 +41,8 @@
     "version": "v3",
     "last_verified_at": "2026-05-07 17:07:53",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_relpath": "制药工业/制药工业GMP车间D级检测报告模板.docx"
   },
   "hospital/clean_function_room/default": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/医院洁净部/医院洁净部洁净功能用房检测报告模板.docx",
@@ -53,7 +56,8 @@
     "version": "v3",
     "last_verified_at": "2026-05-07 14:56:27",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_relpath": "医院洁净部/医院洁净部洁净功能用房检测报告模板.docx"
   },
   "hospital/negative_pressure/default": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/医院洁净部/医院洁净部负压病房检测报告模板.docx",
@@ -67,7 +71,8 @@
     "version": "v3",
     "last_verified_at": "2026-05-07 14:57:33",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_relpath": "医院洁净部/医院洁净部负压病房检测报告模板.docx"
   },
   "biosafety/bsl/default": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/生物安全/生物安全实验室ISO6、ISO7、ISO8、ISO9检测报告模板.docx",
@@ -81,7 +86,8 @@
     "version": "v3",
     "last_verified_at": "2026-05-07 14:59:55",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_relpath": "生物安全/生物安全实验室ISO6、ISO7、ISO8、ISO9检测报告模板.docx"
   },
   "biosafety/animal_room/default": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/生物安全/生物安全动物房普通环境检测报告模板.docx",
@@ -95,7 +101,8 @@
     "version": "v3",
     "last_verified_at": "2026-05-07 22:23:48",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_relpath": "生物安全/生物安全动物房普通环境检测报告模板.docx"
   },
   "biosafety/animal_room/default/pz": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/生物安全/生物安全动物房屏障环境主房间检测报告模板.docx",
@@ -109,7 +116,8 @@
     "version": "v3",
     "last_verified_at": "2026-05-07 15:05:49",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_relpath": "生物安全/生物安全动物房屏障环境主房间检测报告模板.docx"
   },
   "biosafety/animal_room/default/pzf": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/生物安全/生物安全动物房屏障环境洁净辅房检测报告模板.docx",
@@ -123,7 +131,8 @@
     "version": "v3",
     "last_verified_at": "2026-05-07 15:05:37",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_relpath": "生物安全/生物安全动物房屏障环境洁净辅房检测报告模板.docx"
   },
   "biosafety/animal_room/default/gl": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/生物安全/生物安全动物房隔离环境检测报告模板.docx",
@@ -135,9 +144,10 @@
     "type_id": "animal_room",
     "enabled": true,
     "version": "v3",
-    "last_verified_at": "2026-05-07 15:05:24",
+    "last_verified_at": "2026-05-16 18:25:11",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_relpath": "生物安全/生物安全动物房隔离环境检测报告模板.docx"
   },
   "biosafety/bsc/default": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/生物安全/生物安全生物安全柜检测报告模板.docx",
@@ -151,7 +161,8 @@
     "version": "v3",
     "last_verified_at": "2026-05-07 17:10:59",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_relpath": "生物安全/生物安全生物安全柜检测报告模板.docx"
   },
   "biosafety/ivc/default": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/生物安全/生物安全IVC笼具检测报告模板.docx",
@@ -165,7 +176,8 @@
     "version": "v3",
     "last_verified_at": "2026-05-07 15:12:40",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_relpath": "生物安全/生物安全IVC笼具检测报告模板.docx"
   },
   "food/food_workshop/default/1": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/食品加工/食品加工洁净车间百级检测报告模板.docx",
@@ -179,7 +191,8 @@
     "version": "v3",
     "last_verified_at": "2026-05-07 15:15:52",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_relpath": "食品加工/食品加工洁净车间百级检测报告模板.docx"
   },
   "food/food_workshop/default/234": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/食品加工/食品加工洁净车间万级十万级三十万级检测报告模板.docx",
@@ -193,7 +206,8 @@
     "version": "v3",
     "last_verified_at": "2026-05-07 15:16:03",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_relpath": "食品加工/食品加工洁净车间万级十万级三十万级检测报告模板.docx"
   },
   "electronics/electronics_workshop/default/5": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/精密制造/精密制造电子洁净车间ISO5检测报告模板.docx",
@@ -207,7 +221,8 @@
     "version": "v3",
     "last_verified_at": "2026-05-07 15:18:11",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_relpath": "精密制造/精密制造电子洁净车间ISO5检测报告模板.docx"
   },
   "electronics/electronics_workshop/default/6789": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/精密制造/精密制造电子洁净车间ISO6、ISO7、ISO8、ISO9检测报告模板.docx",
@@ -221,7 +236,8 @@
     "version": "v3",
     "last_verified_at": "2026-05-07 15:18:22",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_relpath": "精密制造/精密制造电子洁净车间ISO6、ISO7、ISO8、ISO9检测报告模板.docx"
   },
   "pharma/pass_box/default": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/制药工业/制药工业传递窗检测报告模板.docx",
@@ -235,7 +251,8 @@
     "version": "v3",
     "last_verified_at": "2026-05-07 15:22:05",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_relpath": "制药工业/制药工业传递窗检测报告模板.docx"
   },
   "biosafety/clean_bench/default": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/生物安全/生物安全洁净工作台检测报告模板.docx",
@@ -249,7 +266,8 @@
     "version": "v3",
     "last_verified_at": "2026-05-07 15:23:23",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_relpath": "生物安全/生物安全洁净工作台检测报告模板.docx"
   },
   "biosafety/bsl/p2": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/生物安全/生物安全实验室ISO6、ISO7、ISO8、ISO9检测报告模板.docx",
@@ -265,7 +283,8 @@
     "last_verify_result": "smoke_success",
     "last_verify_error": "",
     "updated_by": "openclaw",
-    "updated_at": "2026-05-07 21:56:00"
+    "updated_at": "2026-05-07 21:56:00",
+    "template_relpath": "生物安全/生物安全实验室ISO6、ISO7、ISO8、ISO9检测报告模板.docx"
   },
   "biosafety/bsl/p3": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/生物安全/生物安全实验室ISO6、ISO7、ISO8、ISO9检测报告模板.docx",
@@ -281,7 +300,8 @@
     "last_verify_result": "smoke_success",
     "last_verify_error": "",
     "updated_by": "openclaw",
-    "updated_at": "2026-05-07 21:56:00"
+    "updated_at": "2026-05-07 21:56:00",
+    "template_relpath": "生物安全/生物安全实验室ISO6、ISO7、ISO8、ISO9检测报告模板.docx"
   },
   "electronics/electronics_workshop/iso/6": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/精密制造/精密制造电子洁净车间ISO6、ISO7、ISO8、ISO9检测报告模板.docx",
@@ -297,7 +317,8 @@
     "last_verify_result": "smoke_success",
     "last_verify_error": "",
     "updated_by": "openclaw",
-    "updated_at": "2026-05-07 21:56:00"
+    "updated_at": "2026-05-07 21:56:00",
+    "template_relpath": "精密制造/精密制造电子洁净车间ISO6、ISO7、ISO8、ISO9检测报告模板.docx"
   },
   "electronics/electronics_workshop/iso/7": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/精密制造/精密制造电子洁净车间ISO6、ISO7、ISO8、ISO9检测报告模板.docx",
@@ -313,7 +334,8 @@
     "last_verify_result": "smoke_success",
     "last_verify_error": "",
     "updated_by": "openclaw",
-    "updated_at": "2026-05-07 21:56:00"
+    "updated_at": "2026-05-07 21:56:00",
+    "template_relpath": "精密制造/精密制造电子洁净车间ISO6、ISO7、ISO8、ISO9检测报告模板.docx"
   },
   "electronics/electronics_workshop/iso/8": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/精密制造/精密制造电子洁净车间ISO6、ISO7、ISO8、ISO9检测报告模板.docx",
@@ -329,7 +351,8 @@
     "last_verify_result": "smoke_success",
     "last_verify_error": "",
     "updated_by": "openclaw",
-    "updated_at": "2026-05-07 21:56:00"
+    "updated_at": "2026-05-07 21:56:00",
+    "template_relpath": "精密制造/精密制造电子洁净车间ISO6、ISO7、ISO8、ISO9检测报告模板.docx"
   },
   "electronics/electronics_workshop/iso/9": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/精密制造/精密制造电子洁净车间ISO6、ISO7、ISO8、ISO9检测报告模板.docx",
@@ -345,7 +368,8 @@
     "last_verify_result": "smoke_success",
     "last_verify_error": "",
     "updated_by": "openclaw",
-    "updated_at": "2026-05-07 21:56:00"
+    "updated_at": "2026-05-07 21:56:00",
+    "template_relpath": "精密制造/精密制造电子洁净车间ISO6、ISO7、ISO8、ISO9检测报告模板.docx"
   },
   "hospital/clean_function_room/icu": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/医院洁净部/医院洁净部洁净功能用房检测报告模板.docx",
@@ -361,7 +385,8 @@
     "last_verify_result": "smoke_success",
     "last_verify_error": "",
     "updated_by": "openclaw",
-    "updated_at": "2026-05-07 21:56:00"
+    "updated_at": "2026-05-07 21:56:00",
+    "template_relpath": "医院洁净部/医院洁净部洁净功能用房检测报告模板.docx"
   },
   "hospital/clean_function_room/cssd": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/医院洁净部/医院洁净部洁净功能用房检测报告模板.docx",
@@ -377,7 +402,8 @@
     "last_verify_result": "smoke_success",
     "last_verify_error": "",
     "updated_by": "openclaw",
-    "updated_at": "2026-05-07 21:56:00"
+    "updated_at": "2026-05-07 21:56:00",
+    "template_relpath": "医院洁净部/医院洁净部洁净功能用房检测报告模板.docx"
   },
   "hospital/clean_function_room/dialysis": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/医院洁净部/医院洁净部洁净功能用房检测报告模板.docx",
@@ -393,7 +419,8 @@
     "last_verify_result": "smoke_success",
     "last_verify_error": "",
     "updated_by": "openclaw",
-    "updated_at": "2026-05-07 21:56:00"
+    "updated_at": "2026-05-07 21:56:00",
+    "template_relpath": "医院洁净部/医院洁净部洁净功能用房检测报告模板.docx"
   },
   "hospital/clean_function_room/general": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/医院洁净部/医院洁净部洁净功能用房检测报告模板.docx",
@@ -409,7 +436,8 @@
     "last_verify_result": "smoke_success",
     "last_verify_error": "",
     "updated_by": "openclaw",
-    "updated_at": "2026-05-07 21:56:00"
+    "updated_at": "2026-05-07 21:56:00",
+    "template_relpath": "医院洁净部/医院洁净部洁净功能用房检测报告模板.docx"
   },
   "pharma/gmp_workshop/grade/a": {
     "template_name": "GMP-A模板.docx",
@@ -420,7 +448,8 @@
     "last_verified_at": "2026-05-09 09:23:47",
     "last_verify_result": "smoke_success",
     "last_verify_error": "",
-    "resource_status": "confirmed"
+    "resource_status": "confirmed",
+    "template_project_relpath": "uploads/templates/pharma_gmp_workshop_grade_a.docx"
   },
   "pharma/veterinary_gmp_workshop/grade/a": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/制药工业/制药工业兽药车间A级检测报告模板.docx",
@@ -435,7 +464,8 @@
     "last_verified_at": "2026-05-07 18:04:12",
     "last_verify_result": "smoke_success",
     "last_verify_error": "",
-    "template_key": "pharma/veterinary_gmp_workshop/grade/a"
+    "template_key": "pharma/veterinary_gmp_workshop/grade/a",
+    "template_relpath": "制药工业/制药工业兽药车间A级检测报告模板.docx"
   },
   "pharma/veterinary_gmp_workshop/grade/b-c": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/制药工业/制药工业兽药车间B级C级检测报告模板.docx",
@@ -450,7 +480,8 @@
     "last_verified_at": "2026-05-07 11:16:15",
     "last_verify_result": "smoke_success",
     "last_verify_error": "",
-    "template_key": "pharma/veterinary_gmp_workshop/grade/b-c"
+    "template_key": "pharma/veterinary_gmp_workshop/grade/b-c",
+    "template_relpath": "制药工业/制药工业兽药车间B级C级检测报告模板.docx"
   },
   "pharma/veterinary_gmp_workshop/grade/d": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/制药工业/制药工业兽药车间D级检测报告模板.docx",
@@ -465,7 +496,8 @@
     "last_verified_at": "2026-05-07 11:16:30",
     "last_verify_result": "smoke_success",
     "last_verify_error": "",
-    "template_key": "pharma/veterinary_gmp_workshop/grade/d"
+    "template_key": "pharma/veterinary_gmp_workshop/grade/d",
+    "template_relpath": "制药工业/制药工业兽药车间D级检测报告模板.docx"
   },
   "pharma/laminar_hood/default": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/制药工业/制药工业层流罩检测报告模板.docx",
@@ -480,7 +512,8 @@
     "last_verified_at": "2026-05-07 17:44:22",
     "last_verify_result": "smoke_success",
     "last_verify_error": "",
-    "template_key": "pharma/laminar_hood/default"
+    "template_key": "pharma/laminar_hood/default",
+    "template_relpath": "制药工业/制药工业层流罩检测报告模板.docx"
   },
   "pharma/gmp_workshop/grade/b": {
     "template_name": "GMP-B模板.docx",
@@ -491,7 +524,8 @@
     "last_verified_at": "2026-05-09 09:23:58",
     "last_verify_result": "smoke_success",
     "last_verify_error": "",
-    "resource_status": "confirmed"
+    "resource_status": "confirmed",
+    "template_project_relpath": "uploads/templates/pharma_gmp_workshop_grade_b.docx"
   },
   "food/food_workshop/grade/1": {
     "template_name": "食品-I模板.docx",
@@ -502,7 +536,8 @@
     "last_verified_at": "2026-05-09 08:02:18",
     "last_verify_result": "smoke_success",
     "last_verify_error": "",
-    "resource_status": "confirmed"
+    "resource_status": "confirmed",
+    "template_project_relpath": "uploads/templates/food_food_workshop_grade_1.docx"
   },
   "food/food_workshop/grade/2": {
     "template_name": "食品-II模板.docx",
@@ -513,7 +548,8 @@
     "last_verified_at": "2026-05-09 08:02:28",
     "last_verify_result": "smoke_success",
     "last_verify_error": "",
-    "resource_status": "confirmed"
+    "resource_status": "confirmed",
+    "template_project_relpath": "uploads/templates/food_food_workshop_grade_2.docx"
   },
   "pharma/gmp_workshop/grade/c": {
     "template_name": "GMP-C模板.docx",
@@ -523,7 +559,8 @@
     "version": "v-test",
     "last_verified_at": "",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_project_relpath": "uploads/templates/pharma_gmp_workshop_grade_c.docx"
   },
   "hospital/operating_room/main/level1": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/医院洁净部/医院洁净部洁净手术部手术室百级检测报告模板.docx",
@@ -537,7 +574,8 @@
     "version": "v4",
     "last_verified_at": "2026-05-13 16:41:20",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_relpath": "医院洁净部/医院洁净部洁净手术部手术室百级检测报告模板.docx"
   },
   "hospital/operating_room/main/level2": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/医院洁净部/医院洁净部洁净手术部手术室千级检测报告模板.docx",
@@ -551,7 +589,8 @@
     "version": "v4",
     "last_verified_at": "2026-05-13 16:41:28",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_relpath": "医院洁净部/医院洁净部洁净手术部手术室千级检测报告模板.docx"
   },
   "hospital/operating_room/main/level3": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/医院洁净部/医院洁净部洁净手术部手术室万级检测报告模板.docx",
@@ -565,7 +604,8 @@
     "version": "v4",
     "last_verified_at": "2026-05-13 16:40:30",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_relpath": "医院洁净部/医院洁净部洁净手术部手术室万级检测报告模板.docx"
   },
   "hospital/operating_room/main/level4": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/医院洁净部/医院洁净部洁净手术部手术室十万级检测报告模板.docx",
@@ -579,7 +619,8 @@
     "version": "v4",
     "last_verified_at": "2026-05-13 16:41:36",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_relpath": "医院洁净部/医院洁净部洁净手术部手术室十万级检测报告模板.docx"
   },
   "hospital/operating_room/eye/level1": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/医院洁净部/医院洁净部洁净手术部眼科手术室百级检测报告模板.docx",
@@ -593,7 +634,8 @@
     "version": "v4",
     "last_verified_at": "2026-05-13 16:41:45",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_relpath": "医院洁净部/医院洁净部洁净手术部眼科手术室百级检测报告模板.docx"
   },
   "hospital/operating_room/eye/level2": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/医院洁净部/医院洁净部洁净手术部眼科手术室千级检测报告模板.docx",
@@ -607,7 +649,8 @@
     "version": "v4",
     "last_verified_at": "2026-05-13 16:41:54",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_relpath": "医院洁净部/医院洁净部洁净手术部眼科手术室千级检测报告模板.docx"
   },
   "hospital/operating_room/eye/level3": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/医院洁净部/医院洁净部洁净手术部眼科手术室万级检测报告模板.docx",
@@ -621,7 +664,8 @@
     "version": "v4",
     "last_verified_at": "2026-05-13 16:42:12",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_relpath": "医院洁净部/医院洁净部洁净手术部眼科手术室万级检测报告模板.docx"
   },
   "hospital/operating_room/eye/level4": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/医院洁净部/医院洁净部洁净手术部眼科手术室十万级检测报告模板.docx",
@@ -635,7 +679,8 @@
     "version": "v4",
     "last_verified_at": "2026-05-13 16:42:03",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_relpath": "医院洁净部/医院洁净部洁净手术部眼科手术室十万级检测报告模板.docx"
   },
   "hospital/operating_room/aux/level1": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/医院洁净部/医院洁净部洁净手术部洁净辅房百级检测报告模板.docx",
@@ -649,7 +694,8 @@
     "version": "v4",
     "last_verified_at": "2026-05-13 16:40:49",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_relpath": "医院洁净部/医院洁净部洁净手术部洁净辅房百级检测报告模板.docx"
   },
   "hospital/operating_room/aux/level2": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/医院洁净部/医院洁净部洁净手术部洁净辅房千级检测报告模板.docx",
@@ -663,7 +709,8 @@
     "version": "v4",
     "last_verified_at": "2026-05-13 16:41:00",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_relpath": "医院洁净部/医院洁净部洁净手术部洁净辅房千级检测报告模板.docx"
   },
   "hospital/operating_room/aux/level3": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/医院洁净部/医院洁净部洁净手术部洁净辅房万级检测报告模板.docx",
@@ -677,7 +724,8 @@
     "version": "v4",
     "last_verified_at": "2026-05-13 16:41:13",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_relpath": "医院洁净部/医院洁净部洁净手术部洁净辅房万级检测报告模板.docx"
   },
   "hospital/operating_room/aux/level4": {
     "template_path": "/Users/fuwuqi/公司资料/检测部/检测报告模板/医院洁净部/医院洁净部洁净手术部洁净辅房十万级检测报告模板.docx",
@@ -691,6 +739,7 @@
     "version": "v4",
     "last_verified_at": "2026-05-13 16:41:06",
     "last_verify_result": "smoke_success",
-    "last_verify_error": ""
+    "last_verify_error": "",
+    "template_relpath": "医院洁净部/医院洁净部洁净手术部洁净辅房十万级检测报告模板.docx"
   }
 }

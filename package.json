@@ -1,12 +1,10 @@
 {
-  "name": "x1-offline-test",
-  "private": true,
+  "name": "x1-frontend",
   "version": "1.0.0",
-  "description": "X1 offline browser test harness",
+  "private": true,
   "scripts": {
-    "offline:test": "node test_offline_browser_flow.js"
-  },
-  "devDependencies": {
-    "playwright": "^1.59.1"
+    "build": "esbuild static/src/record/index.js --bundle --outfile=static/dist/record.bundle.js --format=iife --target=es2018",
+    "build:min": "esbuild static/src/record/index.js --bundle --outfile=static/dist/record.bundle.min.js --format=iife --target=es2018 --minify",
+    "watch": "esbuild static/src/record/index.js --bundle --outfile=static/dist/record.bundle.js --format=iife --target=es2018 --watch"
   }
 }

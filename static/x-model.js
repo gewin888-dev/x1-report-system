@@ -1,4 +1,4 @@
-const X1_SCHEMA_VERSION = 'X4.6';
+const X1_SCHEMA_VERSION = (typeof window !== 'undefined' && window.X1_SCHEMA_VERSION) ? window.X1_SCHEMA_VERSION : 'UNKNOWN_VERSION';
 const X1_ALLOWED_RANGE_SOURCES = ['database', 'manual'];
 
 const X1_OBJECT_TEMPLATES = {

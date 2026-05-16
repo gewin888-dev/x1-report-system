@@ -8,23 +8,22 @@ import shutil
 import logging
 from datetime import datetime
 
+from config_loader import load_x1_config
+
 _logger = logging.getLogger('template_resources')
+
+BASE_DIR = Path(__file__).resolve().parent
+CFG = load_x1_config(BASE_DIR)
 
 # 从配置文件读取模板基础路径
 def _get_template_base():
-    config_path = Path(__file__).parent / 'x1_config.json'
-    if config_path.exists():
-        with open(config_path, 'r', encoding='utf-8') as f:
-            config = json.load(f)
-            template_base = config.get('template_base', '~/公司资料/检测部/检测报告模板')
-            return Path(os.path.expanduser(template_base))
-    # 默认回退
-    return Path.home() / '公司资料' / '检测部' / '检测报告模板'
+    template_base = str(CFG.get('template_base', '~/公司资料/检测部/检测报告模板') or '~/公司资料/检测部/检测报告模板')
+    return Path(os.path.expanduser(template_base)).resolve()
 
 BASE = _get_template_base()
-REGISTRY_FILE = Path(__file__).parent / 'template_registry.json'
-TYPE_MAPPINGS_FILE = Path(__file__).parent / 'template_type_mappings.json'
-SEMANTIC_MAPPINGS_FILE = Path(__file__).parent / 'template_semantic_mappings.json'
+REGISTRY_FILE = BASE_DIR / 'template_registry.json'
+TYPE_MAPPINGS_FILE = BASE_DIR / 'template_type_mappings.json'
+SEMANTIC_MAPPINGS_FILE = BASE_DIR / 'template_semantic_mappings.json'
 
 # ─── 启动自检 & 加载防护 ───────────────────────────────────────────
 _HASH_FILE = Path(__file__).parent / 'logs_x1' / 'template_config_hashes.json'
@@ -119,56 +118,93 @@ def _safe_load_json(path: Path, label: str) -> Dict[str, Any]:
         _logger.error(f'{label}: 加载异常 → {e}')
         return {}
 
+
+def _normalize_template_entry(key: str, item: Dict[str, Any]) -> Dict[str, Any]:
+    item = dict(item or {})
+    rel = str(item.get('template_relpath') or '').strip()
+    project_rel = str(item.get('template_project_relpath') or '').strip()
+    path_value = str(item.get('template_path') or '').strip()
+    if rel:
+        item['template_relpath'] = rel.replace('\\', '/')
+        item['template_path'] = str((BASE / item['template_relpath']).resolve())
+    elif project_rel:
+        item['template_project_relpath'] = project_rel.replace('\\', '/')
+        item['template_path'] = str((BASE_DIR / item['template_project_relpath']).resolve())
+    elif path_value:
+        try:
+            p = Path(os.path.expanduser(path_value)).resolve()
+            try:
+                item['template_relpath'] = str(p.relative_to(BASE)).replace('\\', '/')
+            except Exception:
+                try:
+                    item['template_project_relpath'] = str(p.relative_to(BASE_DIR)).replace('\\', '/')
+                except Exception:
+                    pass
+            item['template_path'] = str(p)
+        except Exception:
+            item['template_path'] = path_value
+    return item
+
+
+def _normalize_registry_dict(data: Dict[str, Any]) -> Dict[str, Any]:
+    normalized = {}
+    for key, value in (data or {}).items():
+        if isinstance(value, dict):
+            normalized[key] = _normalize_template_entry(key, value)
+        else:
+            normalized[key] = value
+    return normalized
+
 # 模块加载时执行自检
 _check_config_integrity()
 # ───────────────────────────────────────────────────────────────────
 
 TEMPLATE_RESOURCE_REGISTRY = {
     'hospital/operating_room/main/level1': {
-        'template_path': str(BASE / '医院洁净部' / '洁净手术部-百级手术室检测报告模板.docx'),
-        'template_name': '洁净手术部-百级手术室检测报告模板.docx',
+        'template_path': str(BASE / '医院洁净部' / '医院洁净部洁净手术部手术室百级检测报告模板.docx'),
+        'template_name': '医院洁净部洁净手术部手术室百级检测报告模板.docx',
         'resource_status': 'confirmed',
         'resource_note': '已实测命中本机模板资源。',
     },
     'hospital/operating_room/main/level2': {
-        'template_path': str(BASE / '医院洁净部' / '洁净手术部-千级手术室检测报告模板.docx'),
-        'template_name': '洁净手术部-千级手术室检测报告模板.docx',
+        'template_path': str(BASE / '医院洁净部' / '医院洁净部洁净手术部手术室千级检测报告模板.docx'),
+        'template_name': '医院洁净部洁净手术部手术室千级检测报告模板.docx',
         'resource_status': 'confirmed',
         'resource_note': '已实测命中本机模板资源。',
     },
     'hospital/operating_room/main/level3': {
-        'template_path': str(BASE / '医院洁净部' / '洁净手术部-万级手术室检测报告模板.docx'),
-        'template_name': '洁净手术部-万级手术室检测报告模板.docx',
+        'template_path': str(BASE / '医院洁净部' / '医院洁净部洁净手术部手术室万级检测报告模板.docx'),
+        'template_name': '医院洁净部洁净手术部手术室万级检测报告模板.docx',
         'resource_status': 'confirmed',
         'resource_note': '已实测命中本机模板资源。',
     },
     'hospital/operating_room/main/level4': {
-        'template_path': str(BASE / '医院洁净部' / '洁净手术部-十万级手术室检测报告模板.docx'),
-        'template_name': '洁净手术部-十万级手术室检测报告模板.docx',
+        'template_path': str(BASE / '医院洁净部' / '医院洁净部洁净手术部手术室十万级检测报告模板.docx'),
+        'template_name': '医院洁净部洁净手术部手术室十万级检测报告模板.docx',
         'resource_status': 'confirmed',
         'resource_note': '已实测命中本机模板资源。',
     },
     'hospital/operating_room/aux/level1-local5-surround6': {
-        'template_path': str(BASE / '医院洁净部' / '通用洁净功能用房检测报告模板.docx'),
-        'template_name': '通用洁净功能用房检测报告模板.docx',
+        'template_path': str(BASE / '医院洁净部' / '医院洁净部洁净功能用房检测报告模板.docx'),
+        'template_name': '医院洁净部洁净功能用房检测报告模板.docx',
         'resource_status': 'confirmed',
         'resource_note': '当前先映射到医院洁净部统一洁净功能用房模板，后续再细化辅房专属落点。',
     },
     'hospital/operating_room/aux/level2-iso7': {
-        'template_path': str(BASE / '医院洁净部' / '通用洁净功能用房检测报告模板.docx'),
-        'template_name': '通用洁净功能用房检测报告模板.docx',
+        'template_path': str(BASE / '医院洁净部' / '医院洁净部洁净功能用房检测报告模板.docx'),
+        'template_name': '医院洁净部洁净功能用房检测报告模板.docx',
         'resource_status': 'confirmed',
         'resource_note': '当前先映射到医院洁净部统一洁净功能用房模板，后续再细化辅房专属落点。',
     },
     'hospital/operating_room/aux/level3-iso8': {
-        'template_path': str(BASE / '医院洁净部' / '通用洁净功能用房检测报告模板.docx'),
-        'template_name': '通用洁净功能用房检测报告模板.docx',
+        'template_path': str(BASE / '医院洁净部' / '医院洁净部洁净功能用房检测报告模板.docx'),
+        'template_name': '医院洁净部洁净功能用房检测报告模板.docx',
         'resource_status': 'confirmed',
         'resource_note': '当前先映射到医院洁净部统一洁净功能用房模板，后续再细化辅房专属落点。',
     },
     'hospital/operating_room/aux/level4-iso85': {
-        'template_path': str(BASE / '医院洁净部' / '通用洁净功能用房检测报告模板.docx'),
-        'template_name': '通用洁净功能用房检测报告模板.docx',
+        'template_path': str(BASE / '医院洁净部' / '医院洁净部洁净功能用房检测报告模板.docx'),
+        'template_name': '医院洁净部洁净功能用房检测报告模板.docx',
         'resource_status': 'confirmed',
         'resource_note': '当前先映射到医院洁净部统一洁净功能用房模板，后续再细化辅房专属落点。',
     },
@@ -281,8 +317,8 @@ TEMPLATE_RESOURCE_REGISTRY = {
         'resource_note': '食品车间Ⅳ级当前先映射到食品加工统一洁净车间模板。',
     },
     'hospital/negative_pressure/default': {
-        'template_path': str(BASE / '医院洁净部' / '负压病房检测报告模板.docx'),
-        'template_name': '负压病房检测报告模板.docx',
+        'template_path': str(BASE / '医院洁净部' / '医院洁净部负压病房检测报告模板.docx'),
+        'template_name': '医院洁净部负压病房检测报告模板.docx',
         'resource_status': 'confirmed',
         'resource_note': '已确认医院洁净部存在负压病房模板，当前负压病房统一映射到该模板。',
     },
@@ -353,8 +389,8 @@ TEMPLATE_RESOURCE_REGISTRY = {
         'resource_note': '已确认动物房隔离环境专属模板存在。',
     },
     'pharma/pass_box/default': {
-        'template_path': str(BASE / '制药工业' / '传递窗检测报告模板.docx'),
-        'template_name': '传递窗检测报告模板.docx',
+        'template_path': str(BASE / '制药工业' / '制药工业传递窗检测报告模板.docx'),
+        'template_name': '制药工业传递窗检测报告模板.docx',
         'resource_status': 'confirmed',
         'resource_note': '已确认传递窗模板存在。',
     },
@@ -365,20 +401,20 @@ TEMPLATE_RESOURCE_REGISTRY = {
         'resource_note': '已确认层流罩模板存在。',
     },
     'biosafety/bsc/default': {
-        'template_path': str(BASE / '生物安全' / '生物安全柜检测报告模板.docx'),
-        'template_name': '生物安全柜检测报告模板.docx',
+        'template_path': str(BASE / '生物安全' / '生物安全生物安全柜检测报告模板.docx'),
+        'template_name': '生物安全生物安全柜检测报告模板.docx',
         'resource_status': 'confirmed',
         'resource_note': '生物安全柜检测报告模板，标准 YY 0569-2011。',
     },
     'biosafety/clean_bench/default': {
-        'template_path': str(BASE / '生物安全' / '洁净工作台检测报告模板.docx'),
-        'template_name': '洁净工作台检测报告模板.docx',
+        'template_path': str(BASE / '生物安全' / '生物安全洁净工作台检测报告模板.docx'),
+        'template_name': '生物安全洁净工作台检测报告模板.docx',
         'resource_status': 'confirmed',
         'resource_note': '洁净工作台检测报告模板，标准 GB/T 25915.4-2010。',
     },
     'biosafety/ivc/default': {
-        'template_path': str(BASE / '生物安全' / 'IVC笼具检测报告模板.docx'),
-        'template_name': 'IVC笼具检测报告模板.docx',
+        'template_path': str(BASE / '生物安全' / '生物安全IVC笼具检测报告模板.docx'),
+        'template_name': '生物安全IVC笼具检测报告模板.docx',
         'resource_status': 'confirmed',
         'resource_note': 'IVC独立通气笼具检测报告模板，标准 GB 14925-2010。',
     },
@@ -416,7 +452,7 @@ TEMPLATE_RESOURCE_REGISTRY = {
 
 
 def _load_registry_overlay() -> Dict[str, Any]:
-    return _safe_load_json(REGISTRY_FILE, 'template_registry')
+    return _normalize_registry_dict(_safe_load_json(REGISTRY_FILE, 'template_registry'))
 
 
 def _atomic_save_json(path: Path, data: Dict[str, Any]) -> None:
@@ -428,7 +464,19 @@ def _atomic_save_json(path: Path, data: Dict[str, Any]) -> None:
     tmp.replace(path)  # 原子替换
 
 def _save_registry_overlay(data: Dict[str, Any]) -> None:
-    _atomic_save_json(REGISTRY_FILE, data)
+    normalized = _normalize_registry_dict(data)
+    persist = {}
+    for key, value in normalized.items():
+        if isinstance(value, dict):
+            item = dict(value)
+            if item.get('template_relpath'):
+                item['template_path'] = str((BASE / str(item['template_relpath']).replace('\\', '/')).resolve())
+            elif item.get('template_project_relpath'):
+                item['template_path'] = str((BASE_DIR / str(item['template_project_relpath']).replace('\\', '/')).resolve())
+            persist[key] = item
+        else:
+            persist[key] = value
+    _atomic_save_json(REGISTRY_FILE, persist)
     _save_hashes()  # 每次写入后更新哈希
 
 
