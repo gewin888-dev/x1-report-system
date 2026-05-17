@@ -17,26 +17,26 @@ DEFAULT_ROLE_PERMISSIONS = {
         'admin.standards.view', 'admin.templates.view', 'admin.templates.preview',
         'admin.templates.variables', 'admin.docs.view', 'files.preview', 'record.export.void',
         'record.scope.department', 'admin.migration.check',
-        'admin.settings.view', 'admin.permissions.view', 'admin.records.export',
+        'admin.settings.view', 'admin.records.export',
         'admin.records.open_local', 'admin.records.open_feishu',
         'admin.records.scope.self', 'admin.records.scope.department',
-        'admin.templates.registry.manage', 'admin.templates.verify', 'admin.templates.smoke_export',
+        # 模板管理（细粒度）
+        'admin.templates.registry.create', 'admin.templates.registry.update', 'admin.templates.registry.delete',
+        'admin.templates.verify', 'admin.templates.smoke_export',
         'admin.templates.mapping.type_manage', 'admin.templates.mapping.semantic_manage',
-        'admin.templates.default.set',
-        # 项目管理
-        'admin.projects.view', 'admin.projects.manage',
-        # 任务派单
-        'admin.tasks.view', 'admin.tasks.manage',
-        # 客户管理
-        'admin.customers.view', 'admin.customers.manage',
+        'admin.templates.default.set', 'admin.templates.delete', 'admin.templates.toggle',
+        # 项目管理（细粒度）
+        'admin.projects.view', 'admin.projects.create', 'admin.projects.update', 'admin.projects.delete',
+        # 任务派单（细粒度）
+        'admin.tasks.view', 'admin.tasks.create', 'admin.tasks.update', 'admin.tasks.delete',
+        # 客户管理（细粒度）
+        'admin.customers.view', 'admin.customers.create', 'admin.customers.update', 'admin.customers.delete',
         # 文件下载
         'admin.files.download',
         # 客户反馈回复
         'admin.customers.feedback_reply',
         # 上传历史报告
-        'admin.projects.upload_report',
-        # 系统监控
-        'admin.monitor.view'
+        'admin.projects.upload_report'
     },
     'viewer': {
         'admin.access', 'admin.stats.view', 'admin.records.view', 'admin.logs.view', 'admin.logs.delete',

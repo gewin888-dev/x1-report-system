@@ -186,12 +186,16 @@ function renderCustomerDetail(data) {
     + '<div><div style="opacity:0.7;font-size:12px;margin-bottom:2px;">反馈次数</div><div style="font-weight:700;font-size:18px;">' + feedbacks.length + '</div></div>'
     + '</div></div>';
 
-  /* --- 开票/收件信息 --- */
+  /* --- 开票/收件信息（默认折叠） --- */
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">';
   // 开票
-  h += '<div style="background:#fff;border-radius:12px;padding:20px 24px;border:1px solid #f1f5f9;">'
-    + '<div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:14px;display:flex;align-items:center;gap:6px;">🧾 开票信息'
-    + '<button class="btn btn-sm" onclick="toggleCustomerProfileEdit(true)" id="customer-profile-edit-btn" style="margin-left:auto;font-size:12px;">编辑</button>'
+  h += '<details style="background:#fff;border-radius:12px;border:1px solid #f1f5f9;">'
+    + '<summary style="padding:16px 24px;cursor:pointer;font-size:15px;font-weight:700;color:#0f172a;display:flex;align-items:center;gap:6px;list-style:none;">'
+    + '<span style="transition:transform .2s;display:inline-block;font-size:12px;color:#94a3b8;margin-right:4px;" class="fold-arrow">▶</span>🧾 开票信息'
+    + '</summary>'
+    + '<div style="padding:0 24px 20px;">'
+    + '<div style="display:flex;gap:6px;margin-bottom:12px;justify-content:flex-end;">'
+    + '<button class="btn btn-sm" onclick="toggleCustomerProfileEdit(true)" id="customer-profile-edit-btn" style="font-size:12px;">编辑</button>'
     + '<button class="btn btn-sm" onclick="saveCustomerProfile(\'' + _safeHtml(p.client_name||'').replace(/'/g,"\\'") + '\')" id="customer-profile-save-btn" style="display:none;background:#1677ff;color:#fff;font-size:12px;">保存</button>'
     + '<button class="btn btn-sm" onclick="toggleCustomerProfileEdit(false)" id="customer-profile-cancel-btn" style="display:none;font-size:12px;">取消</button>'
     + '</div>'
@@ -201,15 +205,23 @@ function renderCustomerDetail(data) {
     + _pField('invoice_address_phone', '地址电话', p.invoice_address_phone)
     + _pField('invoice_bank', '开户行', p.invoice_bank)
     + _pField('invoice_bank_account', '银行账号', p.invoice_bank_account)
-    + '</div></div>';
+    + '</div></div></details>';
   // 收件
-  h += '<div style="background:#fff;border-radius:12px;padding:20px 24px;border:1px solid #f1f5f9;">'
-    + '<div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:14px;">📦 收件信息</div>'
+  h += '<details style="background:#fff;border-radius:12px;border:1px solid #f1f5f9;">'
+    + '<summary style="padding:16px 24px;cursor:pointer;font-size:15px;font-weight:700;color:#0f172a;display:flex;align-items:center;gap:6px;list-style:none;">'
+    + '<span style="transition:transform .2s;display:inline-block;font-size:12px;color:#94a3b8;margin-right:4px;" class="fold-arrow">▶</span>📦 收件信息'
+    + '</summary>'
+    + '<div style="padding:0 24px 20px;">'
+    + '<div style="display:flex;gap:6px;margin-bottom:12px;justify-content:flex-end;">'
+    + '<button class="btn btn-sm" onclick="toggleCustomerRecvEdit(true)" id="customer-recv-edit-btn" style="font-size:12px;">编辑</button>'
+    + '<button class="btn btn-sm" onclick="saveCustomerRecv(\'' + _safeHtml(p.client_name||'').replace(/'/g,"\\'") + '\')" id="customer-recv-save-btn" style="display:none;background:#1677ff;color:#fff;font-size:12px;">保存</button>'
+    + '<button class="btn btn-sm" onclick="toggleCustomerRecvEdit(false)" id="customer-recv-cancel-btn" style="display:none;font-size:12px;">取消</button>'
+    + '</div>'
     + '<div id="customer-profile-form-recv">'
-    + _pField('recipient_name', '收件人', p.recipient_name)
-    + _pField('recipient_phone', '电话', p.recipient_phone)
-    + _pField('recipient_address', '地址', p.recipient_address)
-    + '</div></div>';
+    + _rField('recipient_name', '收件人', p.recipient_name)
+    + _rField('recipient_phone', '电话', p.recipient_phone)
+    + _rField('recipient_address', '地址', p.recipient_address)
+    + '</div></div></details>';
   h += '</div>';
 
   /* --- 项目列表 --- */
@@ -320,6 +332,14 @@ function _pField(name, label, value) {
     + '</div>';
 }
 
+function _rField(name, label, value) {
+  return '<div style="margin-bottom:10px;">'
+    + '<label style="display:block;font-size:11px;color:#94a3b8;margin-bottom:2px;">' + label + '</label>'
+    + '<input type="text" data-recv-field="' + name + '" value="' + _safeHtml(value || '') + '" disabled '
+    + 'style="width:100%;padding:7px 10px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;color:#334155;background:#f8fafc;box-sizing:border-box;transition:all .15s;">'
+    + '</div>';
+}
+
 /* --- 状态徽章 --- */
 function _stageBadge(stage) {
   var map = {
@@ -374,6 +394,44 @@ function saveCustomerProfile(clientName) {
       if (typeof showToast === 'function') showToast('保存成功', 'success');
       toggleCustomerProfileEdit(false);
       showCustomerDetail(clientName); // 刷新
+    })
+    .catch(function(err) {
+      if (typeof showToast === 'function') showToast(err.message || '保存失败', 'error');
+    });
+}
+
+/* ========== 7b. 收件信息编辑/保存 ========== */
+function toggleCustomerRecvEdit(editing) {
+  var fields = document.querySelectorAll('[data-recv-field]');
+  fields.forEach(function(f) {
+    f.disabled = !editing;
+    f.style.background = editing ? '#fff' : '#f8fafc';
+    f.style.borderColor = editing ? '#3b82f6' : '#e2e8f0';
+  });
+  var editBtn = document.getElementById('customer-recv-edit-btn');
+  var saveBtn = document.getElementById('customer-recv-save-btn');
+  var cancelBtn = document.getElementById('customer-recv-cancel-btn');
+  if (editBtn) editBtn.style.display = editing ? 'none' : '';
+  if (saveBtn) saveBtn.style.display = editing ? '' : 'none';
+  if (cancelBtn) cancelBtn.style.display = editing ? '' : 'none';
+}
+
+function saveCustomerRecv(clientName) {
+  var payload = { client_name: clientName };
+  document.querySelectorAll('[data-recv-field]').forEach(function(f) {
+    payload[f.getAttribute('data-recv-field')] = f.value;
+  });
+  fetch('/admin/api/customer_management/profile', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.success) throw new Error(d.error || '保存失败');
+      if (typeof showToast === 'function') showToast('收件信息已保存', 'success');
+      toggleCustomerRecvEdit(false);
+      showCustomerDetail(clientName);
     })
     .catch(function(err) {
       if (typeof showToast === 'function') showToast(err.message || '保存失败', 'error');

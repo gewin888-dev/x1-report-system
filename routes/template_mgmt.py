@@ -291,7 +291,7 @@ def admin_api_template_registry_options():
 
 @template_mgmt_bp.route('/admin/api/template-registry/register', methods=['POST'])
 @login_required
-@require_permission('admin.templates.registry.manage')
+@require_permission('admin.templates.registry.create')
 def admin_api_template_registry_register():
     data = request.get_json(silent=True) or {}
     type_id = str(data.get('type_id', '')).strip()
@@ -376,7 +376,7 @@ def admin_api_template_registry_register():
 
 @template_mgmt_bp.route('/admin/api/template-registry/upload-and-register', methods=['POST'])
 @login_required
-@require_permission('admin.templates.registry.manage')
+@require_permission('admin.templates.registry.create')
 def admin_api_template_registry_upload_and_register():
     type_id = str(request.form.get('type_id', '')).strip()
     template_key = str(request.form.get('template_key', '')).strip()
@@ -1074,7 +1074,7 @@ def api_x_template_probe():
 
 @template_mgmt_bp.route('/admin/api/templates/<template_id>/upload', methods=['POST'])
 @login_required
-@require_permission('admin.templates.registry.manage')
+@require_permission('admin.templates.registry.update')
 def admin_api_template_upload(template_id):
     """上传/替换模板文件"""
     if not _setting_enabled('template.allow_upload', True):

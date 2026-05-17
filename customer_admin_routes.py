@@ -268,7 +268,7 @@ def customer_mgmt_detail():
 # ──────────────────────────────────────────────
 @customer_admin_bp.route('/admin/api/customer_management/profile', methods=['PUT'])
 @login_required
-@require_permission('admin.customers.manage')
+@require_permission('admin.customers.update')
 def customer_mgmt_update_profile():
     data = request.get_json() or {}
     client_name = data.get('client_name', '').strip()
@@ -316,7 +316,7 @@ def customer_mgmt_update_profile():
 # ──────────────────────────────────────────────
 @customer_admin_bp.route('/admin/api/customer_management/feedback/<int:feedback_id>/reply', methods=['PUT'])
 @login_required
-@require_permission('admin.customers.manage')
+@require_permission('admin.customers.feedback_reply')
 def customer_mgmt_reply_feedback(feedback_id):
     data = request.get_json() or {}
     reply = data.get('reply', '').strip()
@@ -341,7 +341,7 @@ def customer_mgmt_reply_feedback(feedback_id):
 # ──────────────────────────────────────────────
 @customer_admin_bp.route('/admin/api/customer_management/create', methods=['POST'])
 @login_required
-@require_permission('admin.customers.manage')
+@require_permission('admin.customers.create')
 def customer_mgmt_create():
     data = request.get_json() or {}
     client_name = data.get('client_name', '').strip()
@@ -375,7 +375,7 @@ def customer_mgmt_create():
 # ──────────────────────────────────────────────
 @customer_admin_bp.route('/admin/api/customer_management/clear_urge/<int:project_id>', methods=['POST'])
 @login_required
-@require_permission('admin.customers.manage')
+@require_permission('admin.customers.update')
 def customer_mgmt_clear_urge(project_id):
     conn = _get_x1_conn()
     try:
@@ -390,7 +390,7 @@ def customer_mgmt_clear_urge(project_id):
 # ──────────────────────────────────────────────
 @customer_admin_bp.route('/admin/api/customer_management/delete', methods=['POST'])
 @login_required
-@require_permission('admin.customers.manage')
+@require_permission('admin.customers.delete')
 def customer_mgmt_delete():
     data = request.get_json() or {}
     client_name = data.get('client_name', '').strip()

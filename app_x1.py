@@ -1490,6 +1490,30 @@ def preview_file(filename):
 
 
 # ==================== Blueprint 注册 ====================
+# ==================== /admin/api/backups 备份列表 ====================
+@app.route('/admin/api/backups')
+@login_required
+@require_permission('admin.monitor.view')
+def admin_api_backups():
+    """返回备份目录中的所有备份文件列表"""
+    import os
+    from helpers.settings_utils import _load_system_settings
+    settings_values = _load_system_settings()
+    backup_dir = str(Path(str(settings_values.get('paths.backup_dir', {}).get('value', BASE_DIR / 'backups'))).expanduser())
+    items = []
+    try:
+        for f in sorted(os.listdir(backup_dir), reverse=True):
+            if f.endswith('.tar.gz') or f.endswith('.zip'):
+                fpath = os.path.join(backup_dir, f)
+                stat = os.stat(fpath)
+                size_mb = round(stat.st_size / 1024 / 1024, 1)
+                mtime = datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S')
+                btype = '自动' if '_auto_' in f else '手动'
+                items.append({'filename': f, 'size_mb': size_mb, 'time': mtime, 'type': btype})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+    return jsonify({'success': True, 'items': items, 'backup_dir': backup_dir})
+
 # ==================== /api/x/health 健康检查 ====================
 @app.route('/api/x/health')
 def api_x_health():

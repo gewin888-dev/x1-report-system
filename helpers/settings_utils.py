@@ -267,6 +267,7 @@ def _get_latest_backup(parent_dir):
     parent_dir = Path(parent_dir).expanduser()
     patterns = [
         str(parent_dir / 'X1_*_manual_backup_*.tar.gz'),
+        str(parent_dir / 'X1_auto_*.tar.gz'),
         str(parent_dir / '检测报告生成系统_X*_backup_*.tar.gz'),
     ]
     files = []

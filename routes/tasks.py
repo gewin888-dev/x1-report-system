@@ -34,7 +34,7 @@ def _x_now():
 
 @tasks_bp.route('/admin/api/project_tasks', methods=['POST'])
 @login_required
-@require_permission('admin.tasks.manage')
+@require_permission('admin.tasks.create')
 def create_project_task():
     data = request.get_json(silent=True) or {}
     payload = _clean_project_task_payload(data)
@@ -184,7 +184,7 @@ def get_project_task_detail(task_id):
 
 @tasks_bp.route('/admin/api/project_tasks/<int:task_id>', methods=['PUT'])
 @login_required
-@require_permission('admin.tasks.manage')
+@require_permission('admin.tasks.update')
 def update_project_task(task_id):
     data = request.get_json(silent=True) or {}
     payload = _clean_project_task_payload(data)
@@ -262,7 +262,7 @@ def update_project_task(task_id):
 
 @tasks_bp.route('/admin/api/project_tasks/<int:task_id>/cancel', methods=['POST'])
 @login_required
-@require_permission('admin.tasks.manage')
+@require_permission('admin.tasks.delete')
 def cancel_project_task(task_id):
     data = request.get_json(silent=True) or {}
 

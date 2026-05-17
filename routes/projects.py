@@ -251,7 +251,7 @@ def admin_api_download_file():
 
 @projects_bp.route('/admin/api/business_projects', methods=['POST'])
 @login_required
-@require_permission('admin.projects.manage')
+@require_permission('admin.projects.create')
 def admin_api_business_project_create():
     data = request.get_json(silent=True) or {}
     payload = _clean_project_payload(data)
@@ -290,7 +290,7 @@ def admin_api_business_project_create():
 
 @projects_bp.route('/admin/api/business_projects/<int:project_id>', methods=['PUT'])
 @login_required
-@require_permission('admin.projects.manage')
+@require_permission('admin.projects.update')
 def admin_api_business_project_update(project_id):
     data = request.get_json(silent=True) or {}
     now = datetime.now().isoformat(timespec='seconds')
@@ -348,7 +348,7 @@ def admin_api_business_project_update(project_id):
 
 @projects_bp.route('/admin/api/business_projects/<int:project_id>', methods=['DELETE'])
 @login_required
-@require_permission('admin.projects.manage')
+@require_permission('admin.projects.delete')
 def admin_api_business_project_delete(project_id):
     conn = get_x1_data_conn()
     try:

@@ -794,6 +794,13 @@ input[type="text"]:focus,input[type="password"]:focus,input[type="number"]:focus
 <div style="background:#f0f0f0;height:20px;border-radius:10px;overflow:hidden"><div id="mon-disk-bar" style="height:100%;background:#fa8c16;width:0%;transition:width 0.3s"></div></div>
 </div>
 </div>
+<div class="card section-card">
+  <div class="section-head"><div><div class="section-title">备份记录</div><div class="section-desc">展示所有自动和手动备份文件，包含时间、类型和文件大小。</div></div></div>
+<table style="width:100%;font-size:13px;border-collapse:collapse" id="mon-backup-table">
+<thead><tr style="background:#f8fafc"><th style="padding:10px 8px;text-align:left;border-bottom:1px solid #eee">文件名</th><th style="padding:10px 8px;text-align:left;border-bottom:1px solid #eee">类型</th><th style="padding:10px 8px;text-align:left;border-bottom:1px solid #eee">大小</th><th style="padding:10px 8px;text-align:left;border-bottom:1px solid #eee">时间</th></tr></thead>
+<tbody id="mon-backup-tbody"><tr><td colspan="4" class="empty">加载中...</td></tr></tbody>
+</table>
+</div>
 </div>
 
 <div class="panel" id="panel-customers">
@@ -1549,7 +1556,9 @@ function getRolePermissionMeta(){
     'admin.records.scope.self':'查看个人记录',
     'admin.records.scope.department':'查看部门记录',
     'admin.records.scope.company':'查看公司记录',
-    'admin.templates.registry.manage':'模板注册/上传',
+    'admin.templates.registry.create':'注册新模板',
+    'admin.templates.registry.update':'更新模板文件',
+    'admin.templates.registry.delete':'删除模板注册',
     'admin.templates.toggle':'启停模板',
     'admin.templates.delete':'删除模板',
     'admin.templates.verify':'验证模板',
@@ -1575,11 +1584,17 @@ function getRolePermissionMeta(){
     'record.export':'执行导出',
     'record.export.void':'作废导出记录',
     'admin.projects.view':'查看项目管理',
-    'admin.projects.manage':'管理项目（增删改）',
+    'admin.projects.create':'新建项目',
+    'admin.projects.update':'修改项目',
+    'admin.projects.delete':'删除项目',
     'admin.tasks.view':'查看任务/派单',
-    'admin.tasks.manage':'管理任务（派单/取消）',
+    'admin.tasks.create':'创建任务/派单',
+    'admin.tasks.update':'修改任务',
+    'admin.tasks.delete':'取消任务',
     'admin.customers.view':'查看客户管理',
-    'admin.customers.manage':'管理客户（编辑/回复）',
+    'admin.customers.create':'新建客户',
+    'admin.customers.update':'修改客户信息',
+    'admin.customers.delete':'删除客户',
     'admin.files.download':'下载报告文件',
     'tasks.execute':'执行检测任务（接单/开始/完成）',
     'customer.access':'访问客户界面',
@@ -1608,19 +1623,20 @@ function getRolePermissionGroups(){
   return [
     // ═══ 经营概览 ═══
     {title:'📊 数据统计', keys:['admin.stats.view','admin.monitor.view']},
-    {title:'📁 项目管理', keys:['admin.projects.view','admin.projects.manage','admin.projects.upload_report','admin.tasks.view','admin.tasks.manage']},
-    {title:'🏢 客户管理', keys:['admin.customers.view','admin.customers.manage','admin.customers.feedback_reply']},
+    {title:'📁 项目管理', keys:['admin.projects.view','admin.projects.create','admin.projects.update','admin.projects.delete','admin.projects.upload_report','admin.tasks.view','admin.tasks.create','admin.tasks.update','admin.tasks.delete']},
+    {title:'🏢 客户管理', keys:['admin.customers.view','admin.customers.create','admin.customers.update','admin.customers.delete','admin.customers.feedback_reply']},
     // ═══ 检测业务 ═══
     {title:'📋 报告管理', keys:['admin.records.view','admin.records.delete','admin.records.batch_delete','admin.records.batch_export','admin.records.open_local','admin.records.open_feishu','admin.records.export','admin.records.void_export','admin.feishu.retry','admin.trash.cleanup','admin.files.download']},
-    {title:'📄 模板管理', keys:['admin.templates.view','admin.templates.preview','admin.templates.variables','admin.templates.upload','admin.templates.registry.manage','admin.templates.toggle','admin.templates.delete','admin.templates.verify','admin.templates.smoke_export','admin.templates.mapping.type_manage','admin.templates.mapping.semantic_manage','admin.templates.default.set']},
+    {title:'📄 模板管理', keys:['admin.templates.view','admin.templates.preview','admin.templates.variables','admin.templates.upload','admin.templates.registry.create','admin.templates.registry.update','admin.templates.registry.delete','admin.templates.toggle','admin.templates.delete','admin.templates.verify','admin.templates.smoke_export','admin.templates.mapping.type_manage','admin.templates.mapping.semantic_manage','admin.templates.default.set']},
     {title:'📖 标准数据库', keys:['admin.standards.view']},
+    {title:'🔧 检测任务与草稿', keys:['tasks.execute','draft.read','draft.write','draft.transfer']},
+    {title:'📤 导出与文件', keys:['record.export','record.export.void','files.preview','files.preview.own','files.download.own']},
+    {title:'👁️ 数据可见范围', keys:['record.scope.self','record.scope.department','record.scope.company','admin.records.scope.self','admin.records.scope.department','admin.records.scope.company']},
     // ═══ 系统管理 ═══
     {title:'👤 用户管理', keys:['admin.users.view','admin.users.manage','admin.permissions.view','admin.permissions.manage']},
     {title:'📝 操作日志', keys:['admin.logs.view','admin.logs.delete']},
     {title:'⚙️ 系统设置', keys:['admin.settings.view','admin.settings.edit','admin.maintenance.run','admin.migration.check']},
     {title:'📚 系统文档', keys:['admin.docs.view']},
-    // ═══ 检测员 ═══
-    {title:'🔧 检测员操作', keys:['tasks.execute','draft.read','draft.write','draft.transfer','record.export','record.export.void','files.preview','files.preview.own','files.download.own','record.scope.self','record.scope.department','record.scope.company']},
     // ═══ 客户 ═══
     {title:'🔍 客户界面', keys:['customer.access','customer.profile','customer.history','customer.projects','customer.feedback','customer.urge','customer.confirm','customer.report.preview','customer.report.download']},
     // ═══ 通用 ═══
@@ -1708,9 +1724,6 @@ function renderRolePermissions(){
   var groups = getRolePermissionGroups();
   if(role==='customer'){
     groups = groups.filter(function(g){ return g.keys.some(function(k){ return k.indexOf('customer.')===0; }); });
-  } else if(role==='inspector'){
-    var inspectorPrefixes = ['draft.','record.','files.','tasks.'];
-    groups = groups.filter(function(g){ return g.keys.some(function(k){ return inspectorPrefixes.some(function(p){ return k.indexOf(p)===0; }); }); });
   }
   var groupedKeys = new Set();
   var h='';
@@ -3582,6 +3595,19 @@ function loadMonitor(){
       document.getElementById('mon-disk-bar').style.width=sys.disk_percent+'%';
     }
   }).catch(e=>console.error('加载监控数据失败:',e));
+  // 加载备份记录
+  fetch('/admin/api/backups').then(r=>r.json()).then(function(d){
+    var tbody=document.getElementById('mon-backup-tbody');
+    if(!tbody) return;
+    if(!d.success||!d.items||!d.items.length){ tbody.innerHTML='<tr><td colspan="4" class="empty">暂无备份记录</td></tr>'; return; }
+    tbody.innerHTML=d.items.map(function(it){
+      var typeColor=it.type==='自动'?'#52c41a':'#1677ff';
+      return '<tr><td style="padding:8px;font-family:monospace;font-size:12px">'+it.filename+'</td>'
+        +'<td style="padding:8px"><span style="color:'+typeColor+';font-weight:600">'+it.type+'</span></td>'
+        +'<td style="padding:8px">'+it.size_mb+' MB</td>'
+        +'<td style="padding:8px;color:#666">'+it.time+'</td></tr>';
+    }).join('');
+  }).catch(function(){});
 }
 
 function initLogs(){
@@ -4264,7 +4290,8 @@ ensureCurrentUserProfile().then(function(){
 <script src="/static/admin_stats.js?v=20260509c"></script>
 
 <script src="/static/admin_projects.js?v=20260516v4"></script>
-<script src="/static/admin_customers.js?v=20260516v4"></script>
+<style>details[open]>.fold-arrow,details[open] summary .fold-arrow{transform:rotate(90deg)}</style>
+<script src="/static/admin_customers.js?v=20260517v1"></script>
 <style>
 @media (max-width: 768px) {
   #stats-advanced-mount > div { grid-template-columns: 1fr !important; }
