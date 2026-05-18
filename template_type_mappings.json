@@ -2,23 +2,28 @@
   "gmp_workshop": {
     "allowed_template_keys": [
       "pharma/gmp_workshop/grade/a",
-      "pharma/gmp_workshop/grade/b",
       "pharma/gmp_workshop/grade/c",
-      "pharma/gmp_workshop/grade/d"
+      "pharma/gmp_workshop/grade/d",
+      "pharma/gmp_workshop/grade/a-2",
+      "pharma/gmp_workshop/grade/b-2",
+      "pharma/gmp_workshop/grade/c-2"
     ],
-    "default_template_key": "pharma/gmp_workshop/grade/b",
+    "default_template_key": "",
     "updated_at": "2026-05-06 21:40:00",
-    "updated_by": "test"
+    "updated_by": "slx"
   },
   "veterinary_gmp_workshop": {
     "allowed_template_keys": [
-      "pharma/veterinary_gmp_workshop/grade/a",
       "pharma/veterinary_gmp_workshop/grade/b-c",
-      "pharma/veterinary_gmp_workshop/grade/d"
+      "pharma/veterinary_gmp_workshop/grade/d",
+      "pharma/veterinary_gmp_workshop/grade/a-2",
+      "pharma/veterinary_gmp_workshop/grade/b",
+      "pharma/veterinary_gmp_workshop/grade/c",
+      "pharma/veterinary_gmp_workshop/grade/d-2"
     ],
-    "default_template_key": "pharma/veterinary_gmp_workshop/grade/a",
+    "default_template_key": "",
     "updated_at": "2026-05-07 16:04:30",
-    "updated_by": "admin"
+    "updated_by": "slx"
   },
   "operating_room": {
     "allowed_template_keys": [
@@ -54,12 +59,11 @@
   },
   "laminar_hood": {
     "allowed_template_keys": [
-      "pharma/laminar_hood/default",
       "pharma/laminar_hood/default-2"
     ],
     "updated_at": "",
-    "updated_by": "admin",
-    "default_template_key": "pharma/laminar_hood/default"
+    "updated_by": "slx",
+    "default_template_key": ""
   },
   "clean_function_room": {
     "allowed_template_keys": [
@@ -67,38 +71,40 @@
       "hospital/clean_function_room/cssd",
       "hospital/clean_function_room/dialysis",
       "hospital/clean_function_room/general",
-      "hospital/clean_function_room/default"
+      "hospital/clean_function_room/default-2"
     ],
-    "default_template_key": "hospital/clean_function_room/default",
+    "default_template_key": "",
     "updated_at": "2026-05-07 16:49:00",
-    "updated_by": "admin"
+    "updated_by": "slx"
   },
   "pass_box": {
     "allowed_template_keys": [
-      "pharma/pass_box/default"
+      "pharma/pass_box/default-2"
     ],
     "updated_at": "2026-05-06 23:59:29",
-    "updated_by": "admin",
-    "default_template_key": "pharma/pass_box/default"
+    "updated_by": "slx",
+    "default_template_key": ""
   },
   "animal_room": {
     "allowed_template_keys": [
-      "biosafety/animal_room/default",
       "biosafety/animal_room/default/pz",
       "biosafety/animal_room/default/pzf",
-      "biosafety/animal_room/default/gl"
+      "biosafety/animal_room/default/gl",
+      "biosafety/animal_room/normal",
+      "biosafety/animal_room/barrier_main",
+      "biosafety/animal_room/isolation"
     ],
     "updated_at": "2026-05-07 09:35:16",
-    "updated_by": "admin",
-    "default_template_key": "biosafety/animal_room/default"
+    "updated_by": "slx",
+    "default_template_key": ""
   },
   "ivc": {
     "allowed_template_keys": [
-      "biosafety/ivc/default"
+      "biosafety/ivc/default-2"
     ],
     "updated_at": "",
-    "updated_by": "admin",
-    "default_template_key": "biosafety/ivc/default"
+    "updated_by": "slx",
+    "default_template_key": ""
   },
   "negative_pressure": {
     "allowed_template_keys": [
@@ -120,22 +126,23 @@
   },
   "bsc": {
     "allowed_template_keys": [
-      "biosafety/bsc/default"
+      "biosafety/bsc/default-2"
     ],
     "updated_at": "2026-05-07 17:11:51",
-    "updated_by": "admin",
-    "default_template_key": "biosafety/bsc/default"
+    "updated_by": "slx",
+    "default_template_key": ""
   },
   "food_workshop": {
     "allowed_template_keys": [
-      "food/food_workshop/grade/1",
       "food/food_workshop/grade/2",
       "food/food_workshop/grade/3",
-      "food/food_workshop/grade/4"
+      "food/food_workshop/grade/4",
+      "food/food_workshop/grade/1-2",
+      "food/food_workshop/grade/2-2"
     ],
-    "default_template_key": "food/food_workshop/grade/1",
+    "default_template_key": "",
     "updated_at": "2026-05-07 16:11:00",
-    "updated_by": "admin"
+    "updated_by": "slx"
   },
   "electronics_workshop": {
     "allowed_template_keys": [
@@ -144,18 +151,21 @@
       "electronics/electronics_workshop/iso/7",
       "electronics/electronics_workshop/iso/8",
       "electronics/electronics_workshop/iso/9",
-      "electronics/electronics_workshop/default/5"
+      "electronics/electronics_workshop/iso/6-2",
+      "electronics/electronics_workshop/iso/7-2",
+      "electronics/electronics_workshop/iso/8-2",
+      "electronics/electronics_workshop/iso/9-2"
     ],
-    "default_template_key": "electronics/electronics_workshop/default/5",
+    "default_template_key": "",
     "updated_at": "2026-05-07 16:19:00",
-    "updated_by": "admin"
+    "updated_by": "slx"
   },
   "clean_bench": {
     "allowed_template_keys": [
-      "biosafety/clean_bench/default"
+      "biosafety/clean_bench/default-2"
     ],
     "updated_at": "2026-05-07 22:22:53",
-    "updated_by": "admin",
-    "default_template_key": "biosafety/clean_bench/default"
+    "updated_by": "slx",
+    "default_template_key": ""
   }
 }

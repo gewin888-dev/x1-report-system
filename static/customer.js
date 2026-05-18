@@ -34,25 +34,26 @@
 
   /* ========== 进度条 ========== */
 
-  var STEPS = ['待审核', '已派单', '检测中', '报告编制中', '已出报告', '待确认', '已确认'];
+  var STEPS = ['待审核', '已派单', '检测中', '报告编制中', '待客户确认', '客户已确认', '已出报告'];
 
   function getStepIndex(project) {
     // 根据 report_status / inspection_stage 推断当前步骤
-    var rs = (project.report_status || '').toLowerCase();
-    var is_ = (project.inspection_stage || '').toLowerCase();
+    var rs = (project.report_status || '').trim();
+    var is_ = (project.inspection_stage || '').trim();
 
-    // 第7步: 已确认（客户已确认 / 已发送客户）
-    if (rs === '客户已确认' || rs === '已发送客户' || rs === '已发送' || rs === 'sent') return 6;
-    // 第6步: 待确认（已出具 / 待客户确认）
-    if (rs === '待客户确认' || rs === '已出报告' || rs === '已出具' || rs === 'completed' || rs === 'done') return 5;
-    // 第5步: 报告编制中 (deprecated step index, now step 4)
+    // 第7步: 已出报告（最终状态，签字盖章版已交付）
+    if (rs === '已出报告' || rs === '已出具' || rs === '已发送客户') return 6;
+    // 第6步: 客户已确认
+    if (rs === '客户已确认') return 5;
+    // 第5步: 待客户确认
+    if (rs === '待客户确认') return 4;
     // 第4步: 报告编制中
-    if (rs === '报告编制中' || rs === '编制中' || rs === '审核中' || rs === '待修改' || rs === '待出具' || rs === 'drafting' || is_ === '报告编制中') return 3;
-    // 第3步: 检测中 (含补测)
-    if (is_ === '检测中' || is_ === '补测中' || is_ === 'testing') return 2;
-    // 第2步: 已派单 (后台对应: 已排期/待进场)
-    if (is_ === '已派单' || is_ === '已排期' || is_ === '待进场' || is_ === 'assigned') return 1;
-    // 第1步: 待审核 (未安排/未开始 或空值)
+    if (rs === '报告编制中' || rs === '编制中' || rs === '审核中' || rs === '待修改' || rs === '待出具') return 3;
+    // 第3步: 检测中
+    if (is_ === '检测中' || is_ === '补测中' || is_ === '检测完成') return 2;
+    // 第2步: 已派单
+    if (is_ === '已派单' || is_ === '已排期' || is_ === '待进场') return 1;
+    // 第1步: 待审核
     return 0;
   }
 
@@ -92,7 +93,7 @@
 
   function init() {
     api('GET', '/api/user').then(function (u) {
-      var name = u.display_name || u.real_name || u.username || '';
+      var name = u.client_name || u.display_name || u.real_name || u.username || '';
       document.getElementById('customer-welcome').textContent = '欢迎回来，' + name;
       document.getElementById('header-username').textContent = name;
     }).catch(function () {});
@@ -246,8 +247,8 @@
       empty.style.display = 'none';
       tbody.innerHTML = list.map(function (r) {
         var status = r.status || '已完成';
-        var statusCls = (status === '客户已确认') ? 'background:#f6ffed;color:#389e0d;'
-          : (status === '已出具' || status === '已完成' || status === '成功' || status === '已发送') ? 'background:#f6ffed;color:#52c41a;'
+        var statusCls = (status === '已出报告' || status === '已出具' || status === '已完成') ? 'background:#f6ffed;color:#389e0d;'
+          : (status === '客户已确认') ? 'background:#f6ffed;color:#52c41a;'
           : 'background:#e6f7ff;color:#1677ff;';
         var previewBtn = '';
         if (r.can_preview_pdf && r.project_id) {
@@ -307,9 +308,9 @@
 
         // === 报告操作按钮（状态驱动高亮/灰色） ===
         var rptStatus = (p.report_status || '').trim();
-        var canPreview = (rptStatus === '已出具' || rptStatus === '待客户确认');
-        var canFeedback = canPreview;
-        var canConfirm = canPreview;
+        var canPreview = (rptStatus === '待客户确认' || rptStatus === '客户已确认' || rptStatus === '已出报告' || rptStatus === '已出具' || rptStatus === '已发送客户');
+        var canFeedback = (rptStatus === '待客户确认');
+        var canConfirm = (rptStatus === '待客户确认');
         var reportBtns = '';
         if (canPreview) {
           reportBtns += '<button class="btn btn-sm btn-preview" onclick="previewReport(' + p.id + ')">🔍 预览</button>';

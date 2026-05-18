@@ -36,7 +36,9 @@ DEFAULT_ROLE_PERMISSIONS = {
         # 客户反馈回复
         'admin.customers.feedback_reply',
         # 上传历史报告
-        'admin.projects.upload_report'
+        'admin.projects.upload_report',
+        # 财务查看
+        'admin.finance.contract_amount', 'admin.finance.paid_amount', 'admin.finance.receivable_amount'
     },
     'viewer': {
         'admin.access', 'admin.stats.view', 'admin.records.view', 'admin.logs.view', 'admin.logs.delete',
@@ -140,14 +142,12 @@ def get_user(user_id):
 
 
 def verify_password(user_id, password):
-    """验证密码"""
+    """验证密码（仅校验密码，不检查 is_active）"""
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute('SELECT password_hash, is_active FROM users WHERE user_id = ?', (user_id,))
+        cursor.execute('SELECT password_hash FROM users WHERE user_id = ?', (user_id,))
         row = cursor.fetchone()
         if not row:
-            return False
-        if ('is_active' in row.keys()) and not row['is_active']:
             return False
         return check_password_hash(row['password_hash'], password)
 

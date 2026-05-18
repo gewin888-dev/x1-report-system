@@ -118,8 +118,8 @@ def customer_mgmt_list():
                 'receivable': receivable,
                 'last_project_date': (r['last_project_date'] or '')[:10],
                 'domains': r['domains'] or '',
-                'contact_name': profile.get('recipient_name', ''),
-                'contact_phone': profile.get('recipient_phone', ''),
+                'contact_name': profile.get('contact_name') or profile.get('recipient_name', ''),
+                'contact_phone': profile.get('contact_phone') or profile.get('recipient_phone', ''),
                 'contact_address': profile.get('recipient_address', ''),
                 'has_account': cn in user_map,
                 'account_info': user_map.get(cn),
@@ -140,8 +140,8 @@ def customer_mgmt_list():
                 'receivable': 0,
                 'last_project_date': '',
                 'domains': '',
-                'contact_name': profile.get('recipient_name', ''),
-                'contact_phone': profile.get('recipient_phone', ''),
+                'contact_name': profile.get('contact_name') or profile.get('recipient_name', ''),
+                'contact_phone': profile.get('contact_phone') or profile.get('recipient_phone', ''),
                 'contact_address': profile.get('recipient_address', ''),
                 'has_account': cn in user_map,
                 'account_info': user_map.get(cn),
@@ -337,7 +337,7 @@ def customer_mgmt_reply_feedback(feedback_id):
         conn.close()
 
 # ──────────────────────────────────────────────
-# 5. 新增客户（后台手动创建 profile）
+# 5. 新增客户（后台手动创建 profile + 可选创建登录账号）
 # ──────────────────────────────────────────────
 @customer_admin_bp.route('/admin/api/customer_management/create', methods=['POST'])
 @login_required
@@ -347,6 +347,9 @@ def customer_mgmt_create():
     client_name = data.get('client_name', '').strip()
     if not client_name:
         return jsonify({'success': False, 'error': '客户名称不能为空'}), 400
+
+    contact_name = data.get('contact_name', '').strip()
+    contact_phone = data.get('contact_phone', '').strip()
 
     conn = _get_x1_conn()
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -358,17 +361,56 @@ def customer_mgmt_create():
             return jsonify({'success': False, 'error': '该客户已存在'}), 400
 
         conn.execute(
-            "INSERT INTO client_profiles (client_name, recipient_name, recipient_phone, recipient_address, updated_at) VALUES (?, ?, ?, ?, ?)",
-            (client_name,
+            "INSERT INTO client_profiles (client_name, contact_name, contact_phone, recipient_name, recipient_phone, recipient_address, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (client_name, contact_name, contact_phone,
              data.get('recipient_name', ''),
              data.get('recipient_phone', ''),
              data.get('recipient_address', ''),
              now)
         )
         conn.commit()
-        return jsonify({'success': True, 'message': f'客户 {client_name} 已创建'})
     finally:
         conn.close()
+
+    # 可选：同时创建登录账号
+    account_msg = ''
+    username = data.get('username', '').strip()
+    password = data.get('password', '').strip()
+    if username and password:
+        import re as _re
+        if len(username) < 3 or not _re.match(r'^[a-zA-Z0-9_]+$', username):
+            return jsonify({'success': True, 'message': f'客户 {client_name} 已创建，但账号创建失败：用户名需为3-20位字母数字下划线'})
+        if len(password) < 6:
+            return jsonify({'success': True, 'message': f'客户 {client_name} 已创建，但账号创建失败：密码至少6位'})
+        from database import get_db
+        from werkzeug.security import generate_password_hash
+        try:
+            with get_db() as uconn:
+                exists = uconn.execute('SELECT user_id FROM users WHERE user_id=?', [username]).fetchone()
+                if exists:
+                    account_msg = '，账号创建失败：用户名已存在'
+                else:
+                    # 检查该客户下是否已有账号
+                    existing_accounts = uconn.execute(
+                        "SELECT user_id, display_name FROM users WHERE client_name=? AND role='customer'",
+                        [client_name]
+                    ).fetchall()
+                    if existing_accounts:
+                        names = ', '.join([r['display_name'] or r['user_id'] for r in existing_accounts])
+                        account_msg = f'，账号 {username} 已创建（注意：该客户已有账号 {names}）'
+                    else:
+                        account_msg = f'，登录账号 {username} 已创建'
+                    uconn.execute(
+                        """INSERT INTO users (user_id, display_name, password_hash, role, department, is_active, client_name, created_at)
+                           VALUES (?, ?, ?, 'customer', ?, 1, ?, datetime('now', 'localtime'))""",
+                        [username, contact_name or client_name, generate_password_hash(password, method='pbkdf2:sha256'),
+                         client_name, client_name]
+                    )
+                    uconn.commit()
+        except Exception as e:
+            account_msg = f'，账号创建失败：{str(e)}'
+
+    return jsonify({'success': True, 'message': f'客户 {client_name} 已创建{account_msg}'})
 
 # ──────────────────────────────────────────────
 # 6. 清除催单标记

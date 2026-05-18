@@ -228,7 +228,9 @@ def _build_export_payload(project: dict) -> dict:
 
 
 def _try_advance_on_export(export_payload):
-    """导出报告成功后，尝试推进已存在项目的状态到 检测完成 + 待客户确认。"""
+    """导出报告成功后，尝试推进已存在项目的状态到 检测完成 + 报告编制中。
+    注意：导出后还需人工审核，审核通过后才上传审核稿推进到“待客户确认”。
+    """
     try:
         project_info = export_payload.get('project', {}) or {}
         project_name = (project_info.get('project_name') or '').strip()
@@ -247,7 +249,7 @@ def _try_advance_on_export(export_payload):
             _auto_advance_project_stage(
                 row['id'],
                 target_inspection='检测完成',
-                target_report='待客户确认'
+                target_report='报告编制中'
             )
     except Exception:
         pass

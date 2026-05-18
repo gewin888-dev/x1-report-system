@@ -280,7 +280,7 @@ def customer_get_history():
     conn = _get_x1_data_conn()
     try:
         confirmed_rows = conn.execute(
-            "SELECT * FROM business_projects WHERE client_name=? AND report_status IN ('客户已确认','已发送客户') ORDER BY updated_at DESC",
+            "SELECT * FROM business_projects WHERE client_name=? AND report_status IN ('客户已确认','已发送客户','已出报告') ORDER BY updated_at DESC",
             (client_name,)
         ).fetchall()
         for row in confirmed_rows:
@@ -299,7 +299,7 @@ def customer_get_history():
                 'contact_name': row['contact_name'] or '',
                 'contact_phone': row['contact_phone'] or '',
                 'client_name': row['client_name'] or '',
-                'status': '客户已确认' if row['report_status'] == '客户已确认' else '已发送',
+                'status': '已出报告' if row['report_status'] == '已出报告' else ('客户已确认' if row['report_status'] == '客户已确认' else '已完成'),
                 'feishu_report_url': '',
                 'feishu_export_url': '',
                 'can_preview_pdf': True,
@@ -381,8 +381,8 @@ def customer_get_projects():
             pid = row['id']
             cooling = urge_cooling.get(pid, set())
             rs = (row['report_status'] or '').strip()
-            # 已确认的项目不在进行中列表显示（转历史记录）
-            if rs in ('客户已确认', '已发送客户'):
+            # 已确认/已出报告的项目不在进行中列表显示（转历史记录）
+            if rs in ('客户已确认', '已发送客户', '已出报告'):
                 continue
             projects.append({
                 'id': pid,
@@ -649,7 +649,7 @@ def customer_get_report_feedback(project_id):
 @customer_required
 @require_permission('customer.feedback')
 def customer_submit_report_feedback(project_id):
-    """客户提交报告修正意见，状态回退到“待修改”"""
+    """客户提交报告修正意见，状态回退到“报告编制中”"""
     client_name = _get_client_name()
     data = request.get_json(silent=True) or {}
     content = (data.get('content') or '').strip()
@@ -674,10 +674,10 @@ def customer_submit_report_feedback(project_id):
             "INSERT INTO report_feedback (project_id, client_name, action, content, created_at) VALUES (?,?,?,?,?)",
             (project_id, client_name, 'feedback', content, now)
         )
-        # 状态回退到“待修改”
+        # 状态回退到“报告编制中”——管理员修改后重新上传审核稿
         conn.execute(
             "UPDATE business_projects SET report_status=?, updated_at=? WHERE id=?",
-            ('待修改', now, project_id)
+            ('报告编制中', now, project_id)
         )
         conn.commit()
 
@@ -743,7 +743,10 @@ def customer_confirm_report(project_id):
 @customer_required
 @require_permission('customer.report.preview')
 def customer_preview_pdf(project_id):
-    """客户预览报告PDF——仅在报告已出具后可用"""
+    """客户预览报告PDF。
+    - 待客户确认/客户已确认 → 预览审核稿
+    - 已出报告 → 预览正式报告
+    """
     from flask import send_file as _send_file
     client_name = _get_client_name()
     conn = _get_x1_data_conn()
@@ -756,92 +759,70 @@ def customer_preview_pdf(project_id):
             return jsonify({'success': False, 'error': '项目不存在'}), 404
 
         rs = (project['report_status'] or '').strip()
-        allowed = ('已出具', '待客户确认', '客户已确认', '已发送客户')
+        allowed = ('待客户确认', '客户已确认', '已出报告', '已出具', '已发送客户')
         if rs not in allowed:
             return jsonify({'success': False, 'error': '报告尚未出具，无法预览'}), 400
+
+        project_name = (project['project_name'] or '').strip()
+        report_file_raw = (project['report_file_path'] if 'report_file_path' in project.keys() else '') or ''
     finally:
         conn.close()
 
-    # 查找对应的 PDF 文件
-    project_name = (project['project_name'] or '').strip()
-    report_file_path = (project['report_file_path'] if 'report_file_path' in project.keys() else '') or ''
-    reports_dir = BASE_DIR / 'reports_x1'
+    # 根据状态获取客户可见的附件
+    file_list = _parse_customer_report_files(report_file_raw, rs)
     preview_dir = BASE_DIR / 'preview_pdf'
-
     pdf_path = None
 
-    # 策略0：手动上传的报告文件
-    if report_file_path and Path(report_file_path).exists():
-        rfp = Path(report_file_path)
-        if rfp.suffix.lower() == '.pdf':
-            pdf_path = rfp
-        else:
-            # docx → 在 preview_pdf 中找已生成的 PDF
-            for candidate in sorted(preview_dir.glob(f'uploaded_{project_id}_*.pdf'), reverse=True) if preview_dir.exists() else []:
-                if candidate.stat().st_size > 0:
-                    pdf_path = candidate
-                    break
-            # 没找到则实时转换
-            if not pdf_path:
+    # 从客户可见附件中找 PDF
+    for item in file_list:
+        fp = Path(item['path'])
+        if fp.suffix.lower() == '.pdf' and fp.exists():
+            pdf_path = fp
+            break
+
+    # 如果没有直接的 PDF，尝试从 preview_pdf 目录找已生成的
+    if not pdf_path and preview_dir.exists():
+        for candidate in sorted(preview_dir.glob(f'uploaded_{project_id}_*.pdf'), reverse=True):
+            if candidate.stat().st_size > 0:
+                pdf_path = candidate
+                break
+
+    # 如果还没有，尝试从 docx 实时转换
+    if not pdf_path:
+        for item in file_list:
+            fp = Path(item['path'])
+            if fp.suffix.lower() == '.docx' and fp.exists():
                 try:
                     from pdf_converter import convert_docx_to_pdf
                     preview_dir.mkdir(exist_ok=True)
-                    ts = rfp.stem.split('_')[-1] if '_' in rfp.stem else 'conv'
-                    pdf_out = str(preview_dir / f"uploaded_{project_id}_{ts}.pdf")
-                    result = convert_docx_to_pdf(str(rfp), pdf_out)
+                    ts = datetime.now().strftime('%Y%m%d%H%M%S')
+                    pdf_out = str(preview_dir / f"preview_{project_id}_{ts}.pdf")
+                    result = convert_docx_to_pdf(str(fp), pdf_out)
                     if result:
                         pdf_path = Path(result)
+                        break
                 except Exception:
                     pass
-
-    # 策略1：从 reports_x1/*.json 找到匹配项目的导出记录
-    if reports_dir.exists():
-        for json_file in sorted(reports_dir.glob('X1EXPORT_*.json'), reverse=True):
-            try:
-                data = json.loads(json_file.read_text(encoding='utf-8'))
-                ep = data.get('export_payload', {})
-                proj = ep.get('project', {})
-                if proj.get('project_name') == project_name and proj.get('client_name') == client_name:
-                    # 找到匹配的导出记录
-                    export_id = data.get('export_id', '')
-                    # 检查 PDF 是否已生成
-                    candidate = preview_dir / f"{export_id}.pdf"
-                    if candidate.exists() and candidate.stat().st_size > 0:
-                        pdf_path = candidate
-                        break
-                    # PDF 未生成，尝试实时转换
-                    pdf_preview = data.get('pdf_preview', '')
-                    if not pdf_preview:
-                        docx_src = data.get('filled_docx_path') or data.get('bound_docx_path', '')
-                        if docx_src and Path(docx_src).exists():
-                            try:
-                                from pdf_converter import convert_docx_to_pdf
-                                preview_dir.mkdir(exist_ok=True)
-                                pdf_out = str(preview_dir / f"{export_id}.pdf")
-                                result = convert_docx_to_pdf(docx_src, pdf_out)
-                                if result:
-                                    pdf_path = Path(result)
-                                    break
-                            except Exception:
-                                pass
-            except Exception:
-                continue
 
     if not pdf_path or not pdf_path.exists():
         return jsonify({'success': False, 'error': 'PDF 预览文件尚未生成，请稍后重试或联系检测中心'}), 404
 
+    label = '正式报告' if rs in ('已出报告', '已出具', '已发送客户') else '检测报告(审核稿)'
     return _send_file(
         str(pdf_path),
         mimetype='application/pdf',
         as_attachment=False,
-        download_name=f"检测报告_{project_name}.pdf"
+        download_name=f"{label}_{project_name}.pdf"
     )
 
 @customer_bp.route('/customer/api/projects/<int:project_id>/download_report', methods=['GET'])
 @customer_required
 @require_permission('customer.report.download')
 def customer_download_report(project_id):
-    """客户下载报告文件（DOCX/PDF原件）"""
+    """客户下载报告文件。
+    - 待客户确认/客户已确认 → 返回审核稿(draft)
+    - 已出报告 → 返回正式报告(final)，审核稿不可见
+    """
     from flask import send_file as _send_file
     client_name = _get_client_name()
     conn = _get_x1_data_conn()
@@ -854,40 +835,107 @@ def customer_download_report(project_id):
             return jsonify({'success': False, 'error': '项目不存在'}), 404
 
         rs = (project['report_status'] or '').strip()
-        allowed = ('已出具', '待客户确认', '客户已确认', '已发送客户')
+        allowed = ('待客户确认', '客户已确认', '已出报告', '已出具', '已发送客户')
         if rs not in allowed:
             return jsonify({'success': False, 'error': '报告尚未出具，无法下载'}), 400
+
+        project_name = (project['project_name'] or '').strip()
+        report_file_raw = (project['report_file_path'] if 'report_file_path' in project.keys() else '') or ''
     finally:
         conn.close()
 
-    project_name = (project['project_name'] or '').strip()
-    report_file_path = (project['report_file_path'] if 'report_file_path' in project.keys() else '') or ''
+    # 解析附件列表
+    file_list = _parse_customer_report_files(report_file_raw, rs)
 
-    # 优先返回手动上传的报告文件
-    if report_file_path and Path(report_file_path).exists():
-        rfp = Path(report_file_path)
-        mime = 'application/pdf' if rfp.suffix.lower() == '.pdf' else 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-        return _send_file(str(rfp), mimetype=mime, as_attachment=True,
-                          download_name=f"检测报告_{project_name}{rfp.suffix}")
+    idx = request.args.get('idx', 0, type=int)
+    if not file_list:
+        return jsonify({'success': False, 'error': '报告文件不存在，请联系检测中心'}), 404
+    if idx < 0 or idx >= len(file_list):
+        idx = 0
 
-    # 其次从 reports_x1 找导出的 docx
-    reports_dir = BASE_DIR / 'reports_x1'
-    if reports_dir.exists():
-        for json_file in sorted(reports_dir.glob('X1EXPORT_*.json'), reverse=True):
-            try:
-                data = json.loads(json_file.read_text(encoding='utf-8'))
-                ep = data.get('export_payload', {})
-                proj = ep.get('project', {})
-                if proj.get('project_name') == project_name and proj.get('client_name') == client_name:
-                    docx_path = data.get('filled_docx_path') or data.get('bound_docx_path', '')
-                    if docx_path and Path(docx_path).exists():
-                        return _send_file(docx_path, as_attachment=True,
-                                          download_name=f"检测报告_{project_name}.docx")
-                    break
-            except Exception:
-                continue
+    target = Path(file_list[idx]['path'])
+    if not target.exists():
+        return jsonify({'success': False, 'error': '文件已被移除，请联系检测中心'}), 404
 
-    return jsonify({'success': False, 'error': '报告文件不存在，请联系检测中心'}), 404
+    file_type_label = '正式报告' if file_list[idx].get('file_type') == 'final' else '检测报告'
+    mime = 'application/pdf' if target.suffix.lower() == '.pdf' else 'application/octet-stream'
+    return _send_file(str(target), mimetype=mime, as_attachment=True,
+                      download_name=f"{file_type_label}_{project_name}{target.suffix}")
+
+
+@customer_bp.route('/customer/api/projects/<int:project_id>/report_files', methods=['GET'])
+@customer_required
+@require_permission('customer.report.download')
+def customer_list_report_files(project_id):
+    """客户查看可下载的报告附件列表（根据状态过滤 draft/final）"""
+    client_name = _get_client_name()
+    conn = _get_x1_data_conn()
+    try:
+        project = conn.execute(
+            "SELECT * FROM business_projects WHERE id=? AND client_name=?",
+            (project_id, client_name)
+        ).fetchone()
+        if not project:
+            return jsonify({'success': False, 'error': '项目不存在'}), 404
+
+        rs = (project['report_status'] or '').strip()
+        allowed = ('待客户确认', '客户已确认', '已出报告', '已出具', '已发送客户')
+        if rs not in allowed:
+            return jsonify({'success': True, 'files': [], 'total': 0})
+
+        report_file_raw = (project['report_file_path'] if 'report_file_path' in project.keys() else '') or ''
+    finally:
+        conn.close()
+
+    file_list = _parse_customer_report_files(report_file_raw, rs)
+    files = []
+    for i, item in enumerate(file_list):
+        pp = Path(item['path'])
+        files.append({
+            'index': i,
+            'name': item.get('name') or pp.name,
+            'ext': pp.suffix.lower(),
+            'size': item.get('size') or (pp.stat().st_size if pp.exists() else 0),
+            'file_type': item.get('file_type', 'draft'),
+            'download_url': f'/customer/api/projects/{project_id}/download_report?idx={i}'
+        })
+    return jsonify({'success': True, 'files': files, 'total': len(files)})
+
+
+def _parse_customer_report_files(raw: str, report_status: str) -> list:
+    """根据项目状态，返回客户可见的附件列表。
+    - 已出报告 → 只返回 final 类型
+    - 待客户确认/客户已确认 → 只返回 draft 类型（未 hidden 的）
+    """
+    if not raw:
+        return []
+    raw = raw.strip()
+    items = []
+    if raw.startswith('['):
+        try:
+            parsed = json.loads(raw)
+            for item in parsed:
+                if isinstance(item, dict):
+                    if item.get('path') and Path(item['path']).exists() and not item.get('hidden'):
+                        items.append(item)
+                elif isinstance(item, str) and item and Path(item).exists():
+                    items.append({'path': item, 'name': Path(item).name, 'file_type': 'draft'})
+        except (json.JSONDecodeError, TypeError):
+            pass
+    elif Path(raw).exists():
+        items.append({'path': raw, 'name': Path(raw).name, 'file_type': 'draft'})
+
+    # 根据状态过滤
+    if report_status in ('已出报告', '已出具', '已发送客户'):
+        # 最终状态：只展示 final
+        final_files = [f for f in items if f.get('file_type') == 'final']
+        if final_files:
+            return final_files
+        # 如果没有 final 标记的（旧数据兼容），返回所有
+        return items
+    else:
+        # 待确认/已确认：只展示 draft
+        return [f for f in items if f.get('file_type') == 'draft']
 
 
 # ============================================================

@@ -1,7 +1,19 @@
+// 财务列权限控制
+var _finPerms = {contract:false, paid:false, receivable:false};
+(function(){
+  fetch('/api/user',{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(u){
+    var p = u.permissions || [];
+    var isAdmin = p.indexOf('*') >= 0;
+    _finPerms.contract = isAdmin || p.indexOf('admin.finance.contract_amount') >= 0;
+    _finPerms.paid = isAdmin || p.indexOf('admin.finance.paid_amount') >= 0;
+    _finPerms.receivable = isAdmin || p.indexOf('admin.finance.receivable_amount') >= 0;
+  }).catch(function(){});
+})();
+
 const PROJECT_STAGE_OPTIONS = ['商机跟进','已报价','待签约','已签约','进场准备','检测中','报告编制中','待交付','已交付','已完成','暂停','终止'];
 const CONTRACT_STATUS_OPTIONS = ['未签','合同审批中','已签未归档','已签已归档','无合同','异常'];
 const INSPECTION_STAGE_OPTIONS = ['未安排','已排期','检测中','检测完成','检测异常'];
-const REPORT_STATUS_OPTIONS = ['未开始','编制中','审核中','待修改','待出具','已出具','待客户确认','客户已确认','已发送客户'];
+const REPORT_STATUS_OPTIONS = ['未开始','报告编制中','待客户确认','客户已确认','已出报告'];
 const INVOICE_STATUS_OPTIONS = ['未开票','部分开票','已开票','无需开票'];
 const PAYMENT_STATUS_OPTIONS = ['未回款','部分回款','已回款','逾期未回款','无需回款'];
 let projectPanelInited = false;
@@ -41,11 +53,11 @@ function renderProjectSummary(summary){ const box=document.getElementById('proje
 function loadProjectSummary(){ fetch('/admin/api/business_projects/summary').then(r=>r.json()).then(d=>{ if(!d.success) throw new Error(d.error||'加载失败'); renderProjectSummary(d.summary||{}); }).catch(console.error); }
 function loadProjects(page=1){ const params=new URLSearchParams(); params.set('page',page); params.set('page_size',20); const m=[['keyword','project-search'],['contract_status','project-contract-status'],['inspection_stage','project-inspection-stage'],['report_status','project-report-status'],['invoice_status','project-invoice-status'],['payment_status','project-payment-status'],['owner','project-owner']]; m.forEach(([k,id])=>{ const v=document.getElementById(id)?.value||''; if(v) params.set(k,v); }); fetch('/admin/api/business_projects?'+params.toString()).then(r=>r.json()).then(d=>{ if(!d.success) throw new Error(d.error||'加载失败'); renderProjectTable(d); }).catch(err=>{ console.error(err); const box=document.getElementById('project-list'); if(box) box.innerHTML='<div class="empty">加载失败</div>'; }); }
 function _classifyProject(x){ const ca=parseFloat(x.contract_amount)||0; const pa=parseFloat(x.paid_amount)||0; const ra=ca-pa; const ins=x.inspection_stage||''; const rpt=x.report_status||''; const inv=x.invoice_status||''; const done_ins=(ins==='检测完成'); const done_rpt=(rpt==='已出具'||rpt==='已发送客户'||rpt==='客户已确认'); const done_inv=(inv==='已开票'||inv==='无需开票'); const done_work=done_ins && done_rpt && done_inv; if(done_work && ra<=0) return 'done'; if(done_work && ra>0) return 'receivable'; return 'active'; }
-function renderProjectTable(data){ const items=data.items||[]; const box=document.getElementById('project-list'); if(!box) return; if(!items.length){ box.innerHTML='<div class="empty">暂无项目</div>'; renderProjectPagination(0,1,20); return; } const sm=data.summary||{}; const fmtAmt=function(v){v=parseFloat(v)||0;return v?v.toLocaleString('zh-CN',{minimumFractionDigits:0,maximumFractionDigits:2}):'-';}; const groups={'active':[],'receivable':[],'done':[]}; items.forEach(x=>groups[_classifyProject(x)].push(x)); const groupMeta=[['active','🟢 进行中','#e6f7ff',false],['receivable','🟡 待收款','#fff7e6',false],['done','✅ 已完结','#f6ffed',true]]; const renderRow=function(x){const ca=parseFloat(x.contract_amount)||0;const pa=parseFloat(x.paid_amount)||0;const ra=ca-pa;return `<tr><td>${escapeHtml(x.project_name)}${x.has_urge?'<span title="\u5ba2\u6237\u50ac\u5355" style="color:#f5222d;margin-left:4px;">\ud83d\udd14</span>':''}</td><td>${escapeHtml(x.client_name)}</td><td>${renderProjectTag('contract_status',x.contract_status)}</td><td style="text-align:right;font-family:monospace;">${ca?fmtAmt(ca):'-'}</td><td>${renderProjectTag('inspection_stage',x.inspection_stage)}</td><td>${renderProjectTag('report_status',x.report_status)}</td><td>${renderProjectTag('invoice_status',x.invoice_status)}</td><td style="text-align:right;font-family:monospace;color:#389e0d;">${pa?fmtAmt(pa):'-'}</td><td style="text-align:right;font-family:monospace;color:${ra>0?'#cf1322':'#389e0d'};">${ca?fmtAmt(ra):'-'}</td><td>${escapeHtml(x.owner||'-')}</td><td>${escapeHtml((x.updated_at||'').replace('T',' ').slice(0,16)||'-')}</td><td style="text-align:center;"><button class="btn btn-sm" onclick="event.stopPropagation();deleteProject(${x.id})" style="color:#94a3b8;border-color:#e2e8f0;font-size:11px;padding:2px 8px;white-space:nowrap;" onmouseenter="this.style.color='#dc2626';this.style.borderColor='#fca5a5'" onmouseleave="this.style.color='#94a3b8';this.style.borderColor='#e2e8f0'">删除</button></td></tr>`;}; let tbody=''; groupMeta.forEach(([key,label,bg,collapsed])=>{ const arr=groups[key]; if(!arr.length) return; const gid='proj-group-'+key; const arrow=collapsed?'▶':'▼'; tbody+=`<tr class="proj-group-header" style="cursor:pointer;background:${bg};" onclick="toggleProjectGroup('${gid}',this)"><td colspan="12" style="font-weight:600;font-size:13px;padding:8px 12px;border:none;"><span class="proj-group-arrow">${arrow}</span> ${label}（${arr.length}）</td></tr>`; const display=collapsed?'none':''; arr.forEach(x=>{ tbody+=renderRow(x).replace('<tr','<tr class="'+gid+'" style="display:'+display+';cursor:pointer;transition:background .12s;" onclick="showProjectModal('+x.id+',\'view\')" onmouseenter="this.style.background=\'#f0f7ff\'" onmouseleave="this.style.background=\'\'"'); }); }); box.innerHTML=`<table><colgroup><col style='width:14%'><col style='width:10%'><col style='width:8%'><col style='width:8%'><col style='width:8%'><col style='width:8%'><col style='width:8%'><col style='width:8%'><col style='width:8%'><col style='width:6%'><col style='width:8%'><col style='width:6%'></colgroup><thead><tr><th>项目名称</th><th>客户/委托单位</th><th>合同情况</th><th>合同金额</th><th>检测阶段</th><th>报告状态</th><th>开票情况</th><th>已收款</th><th>应收款</th><th>负责人</th><th>更新时间</th><th style='text-align:center;'>操作</th></tr></thead><tbody>${tbody}</tbody><tfoot><tr style="background:#f5f5f5;font-weight:600;"><td colspan="3" style="text-align:right;">合计</td><td style="text-align:right;font-family:monospace;">${fmtAmt(sm.contract_amount)}</td><td colspan="3"></td><td style="text-align:right;font-family:monospace;color:#389e0d;">${fmtAmt(sm.paid_amount)}</td><td style="text-align:right;font-family:monospace;color:${(sm.receivable_amount||0)>0?'#cf1322':'#389e0d'};">${fmtAmt(sm.receivable_amount)}</td><td colspan="3"></td></tr></tfoot></table>`; renderProjectPagination(data.total||0, data.page||1, data.page_size||20); }
+function renderProjectTable(data){ const items=data.items||[]; const box=document.getElementById('project-list'); if(!box) return; if(!items.length){ box.innerHTML='<div class="empty">暂无项目</div>'; renderProjectPagination(0,1,20); return; } const sm=data.summary||{}; const fmtAmt=function(v){v=parseFloat(v)||0;return v?v.toLocaleString('zh-CN',{minimumFractionDigits:0,maximumFractionDigits:2}):'-';}; const groups={'active':[],'receivable':[],'done':[]}; items.forEach(x=>groups[_classifyProject(x)].push(x)); const groupMeta=[['active','🟢 进行中','#e6f7ff',false],['receivable','🟡 待收款','#fff7e6',false],['done','✅ 已完结','#f6ffed',true]]; const renderRow=function(x){const ca=parseFloat(x.contract_amount)||0;const pa=parseFloat(x.paid_amount)||0;const ra=ca-pa;return `<tr><td>${escapeHtml(x.project_name)}${x.has_urge?'<span title="\u5ba2\u6237\u50ac\u5355" style="color:#f5222d;margin-left:4px;">\ud83d\udd14</span>':''}</td><td style="font-size:11px;color:#666;">${escapeHtml(x.project_no||'-')}</td><td>${escapeHtml(x.client_name)}</td><td>${renderProjectTag('contract_status',x.contract_status)}</td><td style="text-align:right;font-family:monospace;">${_finPerms.contract?(ca?fmtAmt(ca):'-'):'***'}</td><td>${renderProjectTag('inspection_stage',x.inspection_stage)}</td><td>${renderProjectTag('report_status',x.report_status)}</td><td>${renderProjectTag('invoice_status',x.invoice_status)}</td><td style="text-align:right;font-family:monospace;color:#389e0d;">${_finPerms.paid?(pa?fmtAmt(pa):'-'):'***'}</td><td style="text-align:right;font-family:monospace;color:${ra>0?'#cf1322':'#389e0d'};">${_finPerms.receivable?(ca?fmtAmt(ra):'-'):'***'}</td><td>${escapeHtml(x.owner||'-')}</td><td>${escapeHtml((x.updated_at||'').replace('T',' ').slice(0,16)||'-')}</td><td style="text-align:center;"><button class="btn btn-sm" onclick="event.stopPropagation();deleteProject(${x.id})" style="color:#94a3b8;border-color:#e2e8f0;font-size:11px;padding:2px 8px;white-space:nowrap;" onmouseenter="this.style.color='#dc2626';this.style.borderColor='#fca5a5'" onmouseleave="this.style.color='#94a3b8';this.style.borderColor='#e2e8f0'">删除</button></td></tr>`;}; let tbody=''; groupMeta.forEach(([key,label,bg,collapsed])=>{ const arr=groups[key]; if(!arr.length) return; const gid='proj-group-'+key; const arrow=collapsed?'▶':'▼'; tbody+=`<tr class="proj-group-header" style="cursor:pointer;background:${bg};" onclick="toggleProjectGroup('${gid}',this)"><td colspan="13" style="font-weight:600;font-size:13px;padding:8px 12px;border:none;"><span class="proj-group-arrow">${arrow}</span> ${label}(${arr.length})</td></tr>`; const display=collapsed?'none':''; arr.forEach(x=>{ tbody+=renderRow(x).replace('<tr','<tr class="'+gid+'" style="display:'+display+';cursor:pointer;transition:background .12s;" onclick="showProjectModal('+x.id+',\'view\')" onmouseenter="this.style.background=\'#f0f7ff\'" onmouseleave="this.style.background=\'\'"'); }); }); box.innerHTML=`<table><colgroup><col style='width:16%'><col style='width:7%'><col style='width:10%'><col style='width:6%'><col style='width:7%'><col style='width:7%'><col style='width:8%'><col style='width:6%'><col style='width:7%'><col style='width:7%'><col style='width:5%'><col style='width:9%'><col style='width:5%'></colgroup><thead><tr><th>项目名称</th><th>项目编号</th><th>客户/委托单位</th><th>合同情况</th><th style='text-align:right;'>合同金额</th><th>检测阶段</th><th>报告状态</th><th>开票情况</th><th style='text-align:right;'>已收款</th><th style='text-align:right;'>应收款</th><th>负责人</th><th>更新时间</th><th style='text-align:center;'>操作</th></tr></thead><tbody>${tbody}</tbody><tfoot><tr style="background:#f5f5f5;font-weight:600;"><td colspan="4" style="text-align:right;">合计</td><td style="text-align:right;font-family:monospace;">${_finPerms.contract?fmtAmt(sm.contract_amount):'***'}</td><td colspan="3"></td><td style="text-align:right;font-family:monospace;color:#389e0d;">${_finPerms.paid?fmtAmt(sm.paid_amount):'***'}</td><td style="text-align:right;font-family:monospace;color:${(sm.receivable_amount||0)>0?'#cf1322':'#389e0d'};">${_finPerms.receivable?fmtAmt(sm.receivable_amount):'***'}</td><td colspan="3"></td></tr></tfoot></table>`; renderProjectPagination(data.total||0, data.page||1, data.page_size||20); }
 function toggleProjectGroup(gid,headerEl){ const rows=document.querySelectorAll('tr.'+gid); if(!rows.length) return; const show=rows[0].style.display==='none'; rows.forEach(r=>r.style.display=show?'':'none'); const arrow=headerEl.querySelector('.proj-group-arrow'); if(arrow) arrow.textContent=show?'▼':'▶'; }
 function renderProjectPagination(total,page,pageSize){ const box=document.getElementById('project-pagination'); if(!box) return; const totalPages=Math.max(1,Math.ceil(total/pageSize)); box.innerHTML=`<div class="pagination"><span class="page-info">共 ${total} 条 / 第 ${page} / ${totalPages} 页</span><button ${page<=1?'disabled':''} onclick="loadProjects(${page-1})">上一页</button><button ${page>=totalPages?'disabled':''} onclick="loadProjects(${page+1})">下一页</button></div>`; }
 function resetProjectForm(){ ['project-id','project-name','project-client-name','project-address','project-contact-name','project-contact-phone','project-detection-domain','project-detection-type','project-expected-date','project-desc','project-contract-status-form','project-contract-amount','project-paid-amount','project-inspection-stage-form','project-report-status-form','project-invoice-status-form','project-payment-status-form','project-owner-form','project-remarks'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; }); }
-function fillProjectForm(x){ document.getElementById('project-id').value=x.id||''; document.getElementById('project-name').value=x.project_name||''; document.getElementById('project-client-name').value=x.client_name||''; document.getElementById('project-address').value=x.project_address||''; document.getElementById('project-contact-name').value=x.contact_name||''; document.getElementById('project-contact-phone').value=x.contact_phone||''; document.getElementById('project-detection-domain').value=x.detection_domain||''; document.getElementById('project-detection-type').value=x.detection_type||''; document.getElementById('project-expected-date').value=x.expected_detection_date||''; document.getElementById('project-desc').value=x.project_desc||''; document.getElementById('project-contract-status-form').value=x.contract_status||'未签'; document.getElementById('project-contract-amount').value=x.contract_amount||''; var paidEl=document.getElementById('project-paid-amount'); if(paidEl) paidEl.value=x.paid_amount||''; document.getElementById('project-inspection-stage-form').value=x.inspection_stage||'未安排'; document.getElementById('project-report-status-form').value=x.report_status||'未开始'; document.getElementById('project-invoice-status-form').value=x.invoice_status||'未开票'; var psf=document.getElementById('project-payment-status-form'); if(psf) psf.value=x.payment_status||'未回款'; document.getElementById('project-owner-form').value=x.owner||''; document.getElementById('project-remarks').value=x.remarks||''; var rfs=document.getElementById('report-file-status'); if(rfs){ if(x.report_file_path){ rfs.style.display=''; rfs.style.color='#389e0d'; rfs.innerHTML='\u2705 \u5df2\u4e0a\u4f20\u62a5\u544a <a href="/admin/api/business_projects/'+x.id+'/download_report" target="_blank" style="color:#1677ff;font-size:12px;">\u4e0b\u8f7d</a>'; } else { rfs.style.display='none'; rfs.textContent=''; } } }
+function fillProjectForm(x){ document.getElementById('project-id').value=x.id||''; document.getElementById('project-name').value=x.project_name||''; document.getElementById('project-client-name').value=x.client_name||''; document.getElementById('project-address').value=x.project_address||''; document.getElementById('project-contact-name').value=x.contact_name||''; document.getElementById('project-contact-phone').value=x.contact_phone||''; document.getElementById('project-detection-domain').value=x.detection_domain||''; document.getElementById('project-detection-type').value=x.detection_type||''; document.getElementById('project-expected-date').value=x.expected_detection_date||''; document.getElementById('project-desc').value=x.project_desc||''; document.getElementById('project-contract-status-form').value=x.contract_status||'未签'; document.getElementById('project-contract-amount').value=x.contract_amount||''; var paidEl=document.getElementById('project-paid-amount'); if(paidEl) paidEl.value=x.paid_amount||''; document.getElementById('project-inspection-stage-form').value=x.inspection_stage||'未安排'; document.getElementById('project-report-status-form').value=x.report_status||'未开始'; document.getElementById('project-invoice-status-form').value=x.invoice_status||'未开票'; var psf=document.getElementById('project-payment-status-form'); if(psf) psf.value=x.payment_status||'未回款'; document.getElementById('project-owner-form').value=x.owner||''; document.getElementById('project-remarks').value=x.remarks||''; var rfs=document.getElementById('report-file-status'); if(rfs){ rfs.style.display='none'; rfs.textContent=''; } var uth=document.getElementById('upload-type-hint'); if(uth){ var rs=(x.report_status||'').trim(); if(rs==='客户已确认'){ uth.textContent='📌 当前状态“客户已确认”，上传的文件将作为【正式报告（盖章版）】'; uth.style.color='#389e0d'; } else if(rs==='已出报告'){ uth.textContent='✅ 已出报告，流程已结束。如需补传文件将作为正式报告附件'; uth.style.color='#389e0d'; } else if(rs==='待客户确认'){ uth.textContent='📌 当前状态“待客户确认”，客户确认后再上传盖章版'; uth.style.color='#1677ff'; } else if(rs==='报告编制中' || rs==='编制中'){ uth.textContent='📌 上传的文件将作为【审核稿】发送给客户确认'; uth.style.color='#faad14'; } else { uth.textContent=''; } } }
 function setProjectFieldReadonlyStyle(id, readonly){
   const el = document.getElementById(id);
   if(!el) return;
@@ -81,9 +93,9 @@ function setProjectFormMode(mode){
   if(topEditBtn){ topEditBtn.style.display = readonly ? '' : 'none'; topEditBtn.onclick = switchProjectModalToEdit; }
   if(topCloseBtn){ topCloseBtn.style.display = readonly ? '' : 'none'; }
 
-  if(subtitle) subtitle.textContent = readonly ? '查看项目完整档案；后续检测员派单、客户进度查询与历史报告关联均以此为基础。' : '维护项目基础信息与推进状态，后续检测员派单、客户进度查询与历史报告关联均以此为基础。';
+  if(subtitle) subtitle.textContent = readonly ? '查看项目完整档案;后续检测员派单、客户进度查询与历史报告关联均以此为基础。' : '维护项目基础信息与推进状态,后续检测员派单、客户进度查询与历史报告关联均以此为基础。';
 
-  // 派单按钮逻辑：已完结/客户已确认 → 禁用（灰色）；新项目未保存 → 禁用；其他 → 启用
+  // 派单按钮逻辑:已完结/客户已确认 → 禁用(灰色);新项目未保存 → 禁用;其他 → 启用
   var dispatchBtn = document.getElementById('project-dispatch-btn');
   if(dispatchBtn){
     var stage = (document.getElementById('project-inspection-stage-form')||{}).value || '';
@@ -97,7 +109,7 @@ function setProjectFormMode(mode){
       dispatchBtn.disabled = true;
       dispatchBtn.style.opacity = '0.4';
       dispatchBtn.style.cursor = 'not-allowed';
-      dispatchBtn.title = isNew ? '请先保存项目' : '项目已完结，无需派单';
+      dispatchBtn.title = isNew ? '请先保存项目' : '项目已完结,无需派单';
     } else {
       dispatchBtn.disabled = false;
       dispatchBtn.style.opacity = '1';
@@ -107,7 +119,7 @@ function setProjectFormMode(mode){
   }
 }
 
-function showProjectModal(id=null, mode='edit'){ const modal=document.getElementById('project-modal'); const title=document.getElementById('project-modal-title'); if(!modal) return; resetProjectForm(); if(id){ title.textContent = mode === 'view' ? '项目信息卡' : '编辑项目'; fetch('/admin/api/business_projects/'+id).then(r=>r.json()).then(d=>{ if(!d.success) throw new Error(d.error||'加载项目失败'); fillProjectForm(d.item||{}); setProjectFormMode(mode); modal.classList.add('show'); loadProjectTasks(id); loadProjectReports(id); }).catch(err=>{ console.error(err); alert(err.message||'加载项目失败'); }); } else { title.textContent='新增项目'; setProjectFormMode('edit'); renderTaskListEmpty(); modal.classList.add('show'); } }
+function showProjectModal(id=null, mode='edit'){ const modal=document.getElementById('project-modal'); const title=document.getElementById('project-modal-title'); if(!modal) return; resetProjectForm(); if(id){ title.textContent = mode === 'view' ? '项目信息卡' : '编辑项目'; fetch('/admin/api/business_projects/'+id).then(r=>r.json()).then(d=>{ if(!d.success) throw new Error(d.error||'加载项目失败'); fillProjectForm(d.item||{}); setProjectFormMode(mode); modal.classList.add('show'); loadProjectTasks(id); loadProjectReports(id); loadReportFileList(id); }).catch(err=>{ console.error(err); alert(err.message||'加载项目失败'); }); } else { title.textContent='新增项目'; setProjectFormMode('edit'); renderTaskListEmpty(); modal.classList.add('show'); } }
 function closeProjectModal(){ document.getElementById('project-modal')?.classList.remove('show'); }
 function switchProjectModalToEdit(){
   const id = document.getElementById('project-id')?.value || '';
@@ -116,10 +128,10 @@ function switchProjectModalToEdit(){
 }
 function collectProjectFormData(){ return { project_name:document.getElementById('project-name')?.value||'', client_name:document.getElementById('project-client-name')?.value||'', project_address:document.getElementById('project-address')?.value||'', contact_name:document.getElementById('project-contact-name')?.value||'', contact_phone:document.getElementById('project-contact-phone')?.value||'', detection_domain:document.getElementById('project-detection-domain')?.value||'', detection_type:document.getElementById('project-detection-type')?.value||'', expected_detection_date:document.getElementById('project-expected-date')?.value||'', project_desc:document.getElementById('project-desc')?.value||'', contract_status:document.getElementById('project-contract-status-form')?.value||'', contract_amount:document.getElementById('project-contract-amount')?.value||0, paid_amount:document.getElementById('project-paid-amount')?.value||0, inspection_stage:document.getElementById('project-inspection-stage-form')?.value||'', report_status:document.getElementById('project-report-status-form')?.value||'', invoice_status:document.getElementById('project-invoice-status-form')?.value||'', payment_status:document.getElementById('project-payment-status-form')?.value||'', owner:document.getElementById('project-owner-form')?.value||'', remarks:document.getElementById('project-remarks')?.value||'' }; }
 function saveProject(){ const id=document.getElementById('project-id')?.value||''; const payload=collectProjectFormData(); if(!payload.project_name.trim()){ alert('项目名称不能为空'); return; } const isEdit=!!id; fetch(isEdit?('/admin/api/business_projects/'+id):'/admin/api/business_projects',{ method:isEdit?'PUT':'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) }).then(r=>r.json().then(d=>({ok:r.ok,data:d}))).then(({ok,data})=>{ if(!ok||!data.success) throw new Error(data.error||'保存失败'); closeProjectModal(); loadProjectSummary(); loadProjects(1); }).catch(err=>{ console.error(err); alert(err.message||'保存失败'); }); }
-function deleteProject(id){ if(!confirm('确认删除该项目吗？')) return; fetch('/admin/api/business_projects/'+id,{method:'DELETE'}).then(r=>r.json().then(d=>({ok:r.ok,data:d}))).then(({ok,data})=>{ if(!ok||!data.success) throw new Error(data.error||'删除失败'); loadProjectSummary(); loadProjects(1); }).catch(err=>{ console.error(err); alert(err.message||'删除失败'); }); }
+function deleteProject(id){ if(!confirm('确认删除该项目吗?')) return; fetch('/admin/api/business_projects/'+id,{method:'DELETE'}).then(r=>r.json().then(d=>({ok:r.ok,data:d}))).then(({ok,data})=>{ if(!ok||!data.success) throw new Error(data.error||'删除失败'); loadProjectSummary(); loadProjects(1); }).catch(err=>{ console.error(err); alert(err.message||'删除失败'); }); }
 
 /* ============================================================
- * 派单链 V1 — 前端任务管理
+ * 派单链 V1 - 前端任务管理
  * ============================================================ */
 
 const TASK_STATUS_PALETTE = {
@@ -161,7 +173,7 @@ function renderProjectTaskList(items, projectId){
   const box = document.getElementById('project-task-list');
   if(!box) return;
   if(!items.length){
-    box.innerHTML = '<div style="color:#999;padding:8px 0;">暂无任务，点击“发起派单”创建第一个检测任务</div>';
+    box.innerHTML = '<div style="color:#999;padding:8px 0;">暂无任务,点击"发起派单"创建第一个检测任务</div>';
     return;
   }
   let html = '';
@@ -175,8 +187,8 @@ function renderProjectTaskList(items, projectId){
     html += `<div style="display:grid;grid-template-columns:80px 1fr 80px 1fr;gap:4px 8px;font-size:12px;color:#374151;">`;
     html += `<div style="color:#6b7280;">任务类型</div><div>${escapeHtml(t.task_type_label)}</div>`;
     html += `<div style="color:#6b7280;">检测员</div><div>${escapeHtml(t.assigned_to_name || t.assigned_to || '未指派')}</div>`;
-    html += `<div style="color:#6b7280;">指派时间</div><div>${escapeHtml((t.assigned_at||'').replace('T',' ').slice(0,16) || '—')}</div>`;
-    html += `<div style="color:#6b7280;">预计日期</div><div>${escapeHtml(t.expected_execute_date || '—')}</div>`;
+    html += `<div style="color:#6b7280;">指派时间</div><div>${escapeHtml((t.assigned_at||'').replace('T',' ').slice(0,16) || '-')}</div>`;
+    html += `<div style="color:#6b7280;">预计日期</div><div>${escapeHtml(t.expected_execute_date || '-')}</div>`;
     if(t.started_at){ html += `<div style="color:#6b7280;">开始时间</div><div>${escapeHtml(t.started_at.replace('T',' ').slice(0,16))}</div>`; }
     if(t.completed_at){ html += `<div style="color:#6b7280;">完成时间</div><div>${escapeHtml(t.completed_at.replace('T',' ').slice(0,16))}</div>`; }
     if(t.remarks){ html += `<div style="color:#6b7280;">备注</div><div style="grid-column:span 3;">${escapeHtml(t.remarks)}</div>`; }
@@ -187,7 +199,7 @@ function renderProjectTaskList(items, projectId){
     html += `</div>`;
   });
   box.innerHTML = html;
-  // 派单按钮：有活跃任务时禁用
+  // 派单按钮:有活跃任务时禁用
   var dispBtn = document.getElementById('project-dispatch-btn');
   if(dispBtn){
     var hasActive = items.some(function(t){ return ['pending_assign','assigned','accepted','in_progress'].indexOf(t.task_status) >= 0; });
@@ -213,14 +225,14 @@ function showDispatchDialog(){
   // 加载检测员列表
   const sel = document.getElementById('dispatch-inspector');
   if(sel){
-    sel.innerHTML = '<option value="">— 暂不指派，创建待派单任务 —</option>';
+    sel.innerHTML = '<option value="">- 暂不指派,创建待派单任务 -</option>';
     fetch('/admin/api/inspectors').then(r=>r.json()).then(d=>{
       if(d.success && d.items){
         d.items.forEach(u=>{
           const roleMap = {admin:'管理员',supervisor:'主管',inspector:'检测员',viewer:'访客'};
           const roleLabel = roleMap[u.role] || u.role;
           const dept = u.department ? ' · ' + u.department : '';
-          sel.innerHTML += `<option value="${u.user_id}">${u.display_name}（${roleLabel}${dept}）</option>`;
+          sel.innerHTML += `<option value="${u.user_id}">${u.display_name}(${roleLabel}${dept})</option>`;
         });
       }
     }).catch(()=>{});
@@ -272,8 +284,8 @@ function submitDispatch(){
 }
 
 function cancelProjectTask(taskId, projectId){
-  if(!confirm('确认取消该任务？')) return;
-  const reason = prompt('取消原因（可留空）') || '';
+  if(!confirm('确认取消该任务?')) return;
+  const reason = prompt('取消原因(可留空)') || '';
   fetch('/admin/api/project_tasks/' + taskId + '/cancel', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
@@ -295,7 +307,7 @@ function loadProjectReports(projectId){
   var box = document.getElementById('project-report-list');
   var countEl = document.getElementById('project-report-count');
   if(!box) return;
-  box.innerHTML = '<div style="color:#999;">加载中…</div>';
+  box.innerHTML = '<div style="color:#999;">加载中...</div>';
   fetch('/admin/api/business_projects/' + projectId + '/reports')
     .then(function(r){ return r.json(); })
     .then(function(d){
@@ -334,22 +346,75 @@ function uploadReport() {
   var fileInput = document.getElementById('report-file-input');
   if (!fileInput || !fileInput.files.length) { alert('请选择报告文件'); return; }
   var formData = new FormData();
-  formData.append('report_file', fileInput.files[0]);
+  for (var i = 0; i < fileInput.files.length; i++) {
+    formData.append('report_file', fileInput.files[i]);
+  }
   var statusEl = document.getElementById('report-file-status');
-  if (statusEl) { statusEl.style.display = ''; statusEl.textContent = '上传中...'; statusEl.style.color = '#1677ff'; }
+  if (statusEl) { statusEl.style.display = ''; statusEl.textContent = '上传中(' + fileInput.files.length + '个文件)...'; statusEl.style.color = '#1677ff'; }
   fetch('/admin/api/business_projects/' + projectId + '/upload_report', {
     method: 'POST', body: formData, credentials: 'same-origin'
   }).then(function(r) { return r.json(); }).then(function(d) {
     if (d.success) {
       if (statusEl) { statusEl.textContent = '✅ ' + d.message; statusEl.style.color = '#389e0d'; }
       fileInput.value = '';
-      // 刷新项目数据
-      showProjectModal(parseInt(projectId), 'edit');
+      loadReportFileList(projectId);
       loadProjects();
     } else {
       if (statusEl) { statusEl.textContent = '❌ ' + (d.error || '上传失败'); statusEl.style.color = '#cf1322'; }
     }
   }).catch(function() {
     if (statusEl) { statusEl.textContent = '❌ 网络错误'; statusEl.style.color = '#cf1322'; }
+  });
+}
+
+function loadReportFileList(projectId) {
+  var container = document.getElementById('report-file-list');
+  if (!container) return;
+  fetch('/admin/api/business_projects/' + projectId + '/report_files', { credentials: 'same-origin' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.success || !d.files || !d.files.length) {
+        container.innerHTML = '';
+        return;
+      }
+      var html = '<div style="font-size:11px;color:#6b7280;margin-bottom:4px;">已上传 ' + d.total + ' 个附件:</div>';
+      d.files.forEach(function(f) {
+        var sizeKB = (f.size / 1024).toFixed(1);
+        var icon = _fileIcon(f.ext);
+        var typeTag = f.file_type === 'final'
+          ? '<span style="font-size:9px;background:#389e0d;color:#fff;padding:1px 4px;border-radius:3px;">正式</span>'
+          : '<span style="font-size:9px;background:#faad14;color:#fff;padding:1px 4px;border-radius:3px;">审核稿</span>';
+        html += '<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid #f0f0f0;">';
+        html += '<span style="font-size:12px;">' + icon + '</span>';
+        html += typeTag + ' ';
+        html += '<span style="font-size:11px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + f.name + '">' + f.name + '</span>';
+        html += '<span style="font-size:10px;color:#999;">' + sizeKB + 'KB</span>';
+        html += '<a href="' + f.download_url + '" style="font-size:11px;color:#1677ff;text-decoration:none;" download>下载</a>';
+        html += '<span style="font-size:11px;color:#cf1322;cursor:pointer;" onclick="deleteReportFile(' + projectId + ',' + f.index + ')">删除</span>';
+        html += '</div>';
+      });
+      container.innerHTML = html;
+    });
+}
+
+function _fileIcon(ext) {
+  var map = {'.pdf':'📄','.docx':'📝','.doc':'📝','.xlsx':'📊','.xls':'📊','.zip':'📦','.rar':'📦','.7z':'📦','.tar':'📦','.gz':'📦'};
+  return map[ext] || '📎';
+}
+
+function deleteReportFile(projectId, idx) {
+  if (!confirm('确定删除这个附件?')) return;
+  fetch('/admin/api/business_projects/' + projectId + '/delete_report_file', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    credentials: 'same-origin',
+    body: JSON.stringify({index: idx})
+  }).then(function(r) { return r.json(); }).then(function(d) {
+    if (d.success) {
+      loadReportFileList(projectId);
+      loadProjects();
+    } else {
+      alert(d.error || '删除失败');
+    }
   });
 }

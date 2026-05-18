@@ -275,9 +275,11 @@ def api_x_submit_export():
             cn = _safe_filename_part(project_info.get('client_name', ''), '未知委托单位')
             pn = _safe_filename_part(project_info.get('project_name', ''), '未命名项目')
             rn = _safe_filename_part(project_info.get('report_number', ''), export_id)
-            formal_export_name = f"原始记录_{cn}_{pn}.xlsx"
+            # 文件名加时间戳后缀，避免同项目多次导出覆盖
+            ts = datetime.now().strftime('%Y%m%d%H%M%S')
+            formal_export_name = f"原始记录_{cn}_{pn}_{ts}.xlsx"
             report_source = Path(filled_docx_path) if filled_docx_path else (bound_docx_target if bound_docx_target.exists() else docx_target)
-            formal_report_name = f"{rn}_{cn}{report_source.suffix or '.docx'}"
+            formal_report_name = f"{rn}_{cn}_{ts}{report_source.suffix or '.docx'}"
             formal_export = _copy_to_formal_dir(xlsx_target, FORMAL_RECORDS_BASE, year, formal_export_name)
             formal_report = _copy_to_formal_dir(report_source, FORMAL_REPORTS_BASE, year, formal_report_name)
 

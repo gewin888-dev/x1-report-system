@@ -765,13 +765,16 @@ def _compute_record_asset_state(record: dict) -> dict:
 @app.route('/api/user')
 def api_user_compat():
     if current_user.is_authenticated:
-        return jsonify({
+        data = {
             'username': current_user.id,
             'display_name': current_user.display_name,
             'role': current_user.role,
             'department': current_user.department,
             'permissions': sorted(list(current_user.permissions or []))
-        })
+        }
+        if hasattr(current_user, 'client_name') and current_user.client_name:
+            data['client_name'] = current_user.client_name
+        return jsonify(data)
     return jsonify({
         'username': 'guest',
         'display_name': '访客'
@@ -832,6 +835,11 @@ def login_page():
         
         if verify_password(username, password):
             user = get_user(username)
+            if not user.is_active:
+                if request.is_json:
+                    return jsonify({'success': False, 'error': '账号已停用，请联系管理员'}), 403
+                flash('账号已停用，请联系管理员')
+                return redirect('/login')
             login_user(user, remember=remember)
             log_action(username, 'login', '', '登录成功')
             _clear_login_attempts(client_ip)
@@ -917,12 +925,26 @@ def api_register():
 
     from database import get_db
     from werkzeug.security import generate_password_hash
+    confirm_add = data.get('confirm_add', False)  # 前端确认新增用户到已有客户
     try:
         with get_db() as conn:
             # 检查用户名是否已存在
             existing = conn.execute('SELECT user_id FROM users WHERE user_id = ?', [username]).fetchone()
             if existing:
                 return jsonify({'success': False, 'message': '该用户名已被注册'})
+
+            # 检查该公司是否已有账号
+            existing_accounts = conn.execute(
+                "SELECT user_id, display_name FROM users WHERE client_name = ? AND role = 'customer'",
+                [company]
+            ).fetchall()
+            if existing_accounts and not confirm_add:
+                names = ', '.join([r['display_name'] or r['user_id'] for r in existing_accounts])
+                return jsonify({
+                    'success': False,
+                    'needs_confirm': True,
+                    'message': f'该公司已有注册账号（{names}），是否要增加用户账号？'
+                })
 
             # 创建账号：is_active=0（待审核）
             conn.execute(

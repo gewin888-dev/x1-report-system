@@ -56,8 +56,8 @@ function renderCustomerList(items) {
   }
 
   // 表头
-  var html = '<table style="width:100%;border-collapse:separate;border-spacing:0 6px;"><colgroup><col style="width:36%"><col style="width:8%"><col style="width:12%"><col style="width:12%"><col style="width:12%"><col style="width:14%"><col style="width:6%"></colgroup>'
-    + '<thead><tr style="font-size:12px;color:#94a3b8;font-weight:500;"><td style="padding:0 20px;">客户</td><td style="text-align:center;">项目数</td><td style="text-align:right;padding-right:12px;">合同总额</td><td style="text-align:right;padding-right:12px;">已收款</td><td style="text-align:right;padding-right:12px;">应收款</td><td style="text-align:center;">状态</td><td></td></tr></thead><tbody>';
+  var html = '<table style="width:100%;border-collapse:separate;border-spacing:0 2px;"><colgroup><col style="width:32%"><col style="width:7%"><col style="width:11%"><col style="width:11%"><col style="width:11%"><col style="width:8%"><col style="width:10%"><col style="width:5%"></colgroup>'
+    + '<thead><tr style="font-size:12px;color:#94a3b8;font-weight:500;"><td style="padding:0 12px;">客户</td><td style="text-align:center;">项目数</td><td style="text-align:right;padding-right:8px;">合同总额</td><td style="text-align:right;padding-right:8px;">已收款</td><td style="text-align:right;padding-right:8px;">应收款</td><td style="text-align:center;">消息</td><td style="text-align:center;">账号</td><td></td></tr></thead><tbody>';
 
   items.forEach(function(c) {
     var receivable = parseFloat(c.receivable) || 0;
@@ -75,42 +75,29 @@ function renderCustomerList(items) {
     }
 
     // 状态指示
-    var badges = '';
-
-    if ((c.feedback_count || 0) > 0) {
-      badges += '<span style="display:inline-flex;align-items:center;gap:2px;background:#fffbeb;color:#d97706;border:1px solid #fde68a;border-radius:999px;padding:2px 8px;font-size:11px;line-height:18px;font-weight:600;">💬' + c.feedback_count + '</span>';
-    }
-    if (c.has_account) {
-      badges += '<span style="display:inline-flex;align-items:center;gap:2px;background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;border-radius:999px;padding:2px 8px;font-size:11px;line-height:18px;font-weight:600;">✅ 已开通</span>';
-    }
-
-    html += '<tr onclick="showCustomerDetail(\'' + _safeHtml(c.client_name).replace(/'/g, "\\'") + '\')"'
+        html += '<tr onclick="showCustomerDetail(\'' + _safeHtml(c.client_name).replace(/'/g, "\\'") + '\')"'
       + ' style="background:#fff;cursor:pointer;transition:all .15s;"'
       + ' onmouseenter="this.style.background=\'#f8fafc\'"'
       + ' onmouseleave="this.style.background=\'#fff\'">'
 
-      // 客户信息列
-      + '<td style="padding:14px 20px;">'  + '<div style="min-width:0;">'
-      + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">'
-      + '<span style="font-size:14px;font-weight:700;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + _safeHtml(c.client_name) + '</span>'
-      + (c.contact_name ? '<span style="color:#64748b;font-size:12px;white-space:nowrap;">' + _safeHtml(c.contact_name) + '</span>' : '')
-      + (c.contact_phone ? '<span style="color:#94a3b8;font-size:11px;font-family:monospace;white-space:nowrap;">' + _safeHtml(c.contact_phone) + '</span>' : '')
-      + '</div>'
-      + '<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">' + tags
-      + (c.last_project_date ? '<span style="color:#cbd5e1;font-size:11px;margin-left:4px;">最近 ' + _safeHtml(c.last_project_date) + '</span>' : '')
-      + '</div></div>'
-
-      // 项目数
-      + '</div></td>'
-      + '<td style="text-align:center;font-size:14px;font-weight:600;color:#334155;vertical-align:middle;">' + (c.project_count || 0) + '</td>'
+      // 客户信息列（单行紧凑）
+      + '<td style="padding:8px 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'
+      + '<span style="font-size:13px;font-weight:600;color:#0f172a;">' + _safeHtml(c.client_name) + '</span>'
+      + (c.contact_name ? '<span style="color:#64748b;font-size:11px;margin-left:8px;">' + _safeHtml(c.contact_name) + '</span>' : '')
+      + (c.contact_phone ? '<span style="color:#94a3b8;font-size:11px;font-family:monospace;margin-left:4px;">' + _safeHtml(c.contact_phone) + '</span>' : '')
+      + ' ' + tags
+      + '</td>'
+      + '<td style="text-align:center;font-size:13px;font-weight:600;color:#334155;padding:8px 4px;">' + (c.project_count || 0) + '</td>'
       // 合同总额
-      + '<td style="text-align:right;font-size:13px;color:#334155;padding-right:12px;vertical-align:middle;">' + _money(c.total_contract) + '</td>'
+      + '<td style="text-align:right;font-size:12px;color:#334155;padding:8px 8px;">' + _money(c.total_contract) + '</td>'
       // 已收款
-      + '<td style="text-align:right;font-size:13px;color:#16a34a;padding-right:12px;vertical-align:middle;">' + _money(c.total_paid) + '</td>'
+      + '<td style="text-align:right;font-size:12px;color:#16a34a;padding:8px 8px;">' + _money(c.total_paid) + '</td>'
       // 应收款
-      + '<td style="text-align:right;font-size:13px;font-weight:' + recvWeight + ';color:' + recvColor + ';padding-right:12px;vertical-align:middle;">' + _money(c.receivable) + '</td>'
-      // 状态
-      + '<td style="text-align:center;vertical-align:middle;padding:14px 4px;"><div style="display:inline-flex;align-items:center;justify-content:center;gap:4px;flex-wrap:nowrap;">' + (badges || '<span style="color:#cbd5e1;font-size:12px;">—</span>') + '</div></td>'
+      + '<td style="text-align:right;font-size:12px;font-weight:' + recvWeight + ';color:' + recvColor + ';padding:8px 8px;">' + _money(c.receivable) + '</td>'
+      // 消息
+      + '<td style="text-align:center;padding:8px 4px;">' + ((c.feedback_count||0)>0 ? '<span style="background:#fffbeb;color:#d97706;border:1px solid #fde68a;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:600;">💬'+c.feedback_count+'</span>' : '<span style="color:#cbd5e1;">—</span>') + '</td>'
+      // 账号
+      + '<td style="text-align:center;padding:8px 4px;">' + (c.has_account ? '<span style="background:#f0fdf4;color:#16a34a;border:1px solid #bbf7d0;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:600;">✅ 已开通</span>' : '<span style="color:#cbd5e1;">—</span>') + '</td>'
       + '<td style="text-align:center;vertical-align:middle;"><button onclick="event.stopPropagation();deleteCustomer(\x27' + _safeHtml(c.client_name).replace(/'/g, "\\'") + '\x27)" style="padding:3px 8px;font-size:11px;color:#94a3b8;border:1px solid #e2e8f0;border-radius:6px;background:#fff;cursor:pointer;transition:all .15s;" onmouseenter="this.style.color=\x27#dc2626\x27;this.style.borderColor=\x27#fca5a5\x27" onmouseleave="this.style.color=\x27#94a3b8\x27;this.style.borderColor=\x27#e2e8f0\x27">删除</button></div>'
 
       + '</td></tr>';
@@ -489,12 +476,21 @@ function openCustomerCreateModal() {
   var modal = document.createElement('div');
   modal.id = 'customer-create-modal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,0.4);display:flex;align-items:center;justify-content:center;z-index:10000;backdrop-filter:blur(2px);';
-  modal.innerHTML = '<div style="background:#fff;border-radius:16px;padding:28px 32px;width:440px;max-width:92vw;box-shadow:0 20px 60px rgba(0,0,0,0.15);">'
+  modal.innerHTML = '<div style="background:#fff;border-radius:16px;padding:28px 32px;width:480px;max-width:92vw;box-shadow:0 20px 60px rgba(0,0,0,0.15);max-height:90vh;overflow-y:auto;">'
     + '<div style="font-size:17px;font-weight:700;color:#0f172a;margin-bottom:20px;">➕ 新增客户</div>'
-    + _createField('new-customer-name', '客户名称', '公司/单位名称', true)
-    + _createField('new-customer-contact', '联系人', '收件人姓名', false)
-    + _createField('new-customer-phone', '电话', '联系电话', false)
-    + _createField('new-customer-address', '地址', '收件地址', false)
+    + '<div style="font-size:12px;color:#64748b;margin-bottom:16px;padding:8px 12px;background:#f8fafc;border-radius:8px;">创建客户主数据，可选同时创建登录账号</div>'
+    + _createField('new-customer-name', '客户名称（公司）', '公司/单位全称', true)
+    + '<div style="display:flex;gap:12px;">'
+    + '<div style="flex:1;">' + _createField('new-customer-contact', '联系人', '姓名', false) + '</div>'
+    + '<div style="flex:1;">' + _createField('new-customer-phone', '联系电话', '手机号', false) + '</div>'
+    + '</div>'
+    + '<div style="border-top:1px dashed #e2e8f0;margin:16px 0;padding-top:16px;">'
+    + '<div style="font-size:13px;font-weight:600;color:#334155;margin-bottom:12px;">🔐 登录账号（选填）</div>'
+    + '<div style="font-size:11px;color:#94a3b8;margin-bottom:10px;">填写后客户可直接登录客户端查看项目进度</div>'
+    + '<div style="display:flex;gap:12px;">'
+    + '<div style="flex:1;">' + _createField('new-customer-username', '用户名', '字母数字下划线，3-20位', false) + '</div>'
+    + '<div style="flex:1;">' + _createField('new-customer-password', '初始密码', '至少6位', false) + '</div>'
+    + '</div></div>'
     + '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;">'
     + '<button class="btn btn-sm" onclick="closeCustomerCreateModal()" style="padding:8px 20px;">取消</button>'
     + '<button class="btn btn-sm" onclick="submitCustomerCreate()" style="padding:8px 20px;background:#2563eb;color:#fff;border:none;">创建</button>'
@@ -520,18 +516,23 @@ function submitCustomerCreate() {
   var name = (document.getElementById('new-customer-name')?.value || '').trim();
   var contact = (document.getElementById('new-customer-contact')?.value || '').trim();
   var phone = (document.getElementById('new-customer-phone')?.value || '').trim();
-  var address = (document.getElementById('new-customer-address')?.value || '').trim();
+  var username = (document.getElementById('new-customer-username')?.value || '').trim();
+  var password = (document.getElementById('new-customer-password')?.value || '').trim();
   if (!name) { if (typeof showToast === 'function') showToast('客户名称不能为空', 'error'); return; }
+
+  var payload = { client_name: name, contact_name: contact, contact_phone: phone };
+  if (username) payload.username = username;
+  if (password) payload.password = password;
 
   fetch('/admin/api/customer_management/create', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ client_name: name, recipient_name: contact, recipient_phone: phone, recipient_address: address })
+    body: JSON.stringify(payload)
   })
     .then(function(r) { return r.json(); })
     .then(function(d) {
       if (!d.success) throw new Error(d.error || '创建失败');
-      if (typeof showToast === 'function') showToast('客户创建成功', 'success');
+      if (typeof showToast === 'function') showToast(d.message || '客户创建成功', 'success');
       closeCustomerCreateModal();
       loadCustomerList();
     })

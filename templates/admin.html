@@ -347,12 +347,14 @@ input[type="text"]:focus,input[type="password"]:focus,input[type="number"]:focus
           <div><label style="font-size:12px;color:#6b7280;display:block;margin-bottom:4px;">报告状态</label><select id="project-report-status-form" style="width:100%;"></select></div>
         </div>
         <div style="margin-top:12px;padding:10px;background:#fff;border:1px dashed #d9d9d9;border-radius:8px;">
-          <div style="font-size:12px;color:#6b7280;margin-bottom:6px;">📎 上传检测报告 <span style="color:#bbb;font-size:11px;">(.docx / .pdf / .doc)</span></div>
+          <div style="font-size:12px;color:#6b7280;margin-bottom:6px;">📎 上传检测报告 <span style="color:#bbb;font-size:11px;">(.docx/.pdf/.doc/.xlsx/.zip/.rar/.7z，可多选)</span></div>
+          <div id="upload-type-hint" style="font-size:11px;color:#faad14;margin-bottom:4px;"></div>
           <div style="display:flex;align-items:center;gap:8px;">
-            <input type="file" id="report-file-input" accept=".docx,.pdf,.doc" style="font-size:11px;flex:1;">
+            <input type="file" id="report-file-input" accept=".docx,.pdf,.doc,.xlsx,.xls,.zip,.rar,.7z,.tar,.gz" multiple style="font-size:11px;flex:1;">
             <button class="btn btn-primary btn-sm" onclick="uploadReport()" style="white-space:nowrap;font-size:12px;">上传</button>
           </div>
           <div id="report-file-status" style="font-size:11px;color:#389e0d;margin-top:4px;display:none;"></div>
+          <div id="report-file-list" style="margin-top:6px;"></div>
         </div>
       </div>
     </div>
@@ -853,7 +855,7 @@ input[type="text"]:focus,input[type="password"]:focus,input[type="number"]:focus
     <div class="user-detail-sticky-head">
       <div>
         <div id="modalTitle" class="user-detail-title">新增用户</div>
-        <div class="user-detail-subtitle">参照模板管理详情页，拆成“身份信息 + 权限角色 + 安全信息”三段，减少挤在一个小弹窗里。</div>
+        <div id="modalSubtitle" class="user-detail-subtitle">参照模板管理详情页，拆成“身份信息 + 权限角色 + 安全信息”三段，减少挤在一个小弹窗里。</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
         <button class="btn" onclick="closeUserModal()">取消</button>
@@ -1227,7 +1229,7 @@ function switchUserTab(tab){
   }
   // 更新新增按钮文案
   var addBtn = document.getElementById('btn-add-user');
-  if(addBtn) addBtn.textContent = tab==='internal' ? '+ 新增员工' : '+ 新增客户';
+  if(addBtn) addBtn.textContent = tab==='internal' ? '+ 新增员工账号' : '+ 新增客户账号';
   // 重置选中
   currentSelectedUser = null;
   renderUsers();
@@ -1444,23 +1446,76 @@ function renderUsers(){
 
 function showUserModal(user){
   editingUser=user||null;
-  document.getElementById('modalTitle').textContent=user?'编辑用户':'新增用户';
-  document.getElementById('fm-username').value=user?user.username:'';
-  document.getElementById('fm-username').disabled=!!user;
-  document.getElementById('fm-display').value=user?user.display_name:'';
-  document.getElementById('fm-role').value=user?user.role:'inspector';
-  document.getElementById('fm-department').value=user?user.department:'';
-  var cnEl=document.getElementById('fm-client-name'); if(cnEl) cnEl.value=user?user.client_name||'':'';
-  var cng=document.getElementById('fm-client-name-group'); if(cng){ var isCustomer=user?user.role==='customer':false; cng.style.display=isCustomer?'':'none'; if(isCustomer) _loadClientNameList(); }
+  var isCustomerTab = currentUserTab==='customer';
+  var isEditing = !!user;
+  var title = isEditing ? '编辑用户' : (isCustomerTab ? '新增客户账号' : '新增员工账号');
+  document.getElementById('modalTitle').textContent=title;
+  var subtitleEl = document.getElementById('modalSubtitle');
+  if(subtitleEl){
+    if(isEditing) subtitleEl.textContent='修改用户信息、角色或密码';
+    else if(isCustomerTab) subtitleEl.textContent='为已有客户创建登录账号，客户可用此账号登录客户端查看项目进度';
+    else subtitleEl.textContent='创建内部员工账号，用于登录管理后台';
+  }
+
+  // 基础字段填充
+  document.getElementById('fm-username').value=isEditing?user.username:'';
+  document.getElementById('fm-username').disabled=isEditing;
+  document.getElementById('fm-display').value=isEditing?user.display_name:'';
+  document.getElementById('fm-department').value=isEditing?user.department:'';
   document.getElementById('fm-password').value='';
-  document.getElementById('fm-pw-hint').textContent=user?'留空则不修改密码':'建议设置一个便于首次登录后立即修改的临时密码';
+  document.getElementById('fm-pw-hint').textContent=isEditing?'留空则不修改密码':'建议设置一个便于首次登录后立即修改的临时密码';
+
+  // 角色下拉：根据 tab 限制选项
+  var roleSelect = document.getElementById('fm-role');
+  if(roleSelect){
+    if(isEditing){
+      roleSelect.innerHTML='<option value="inspector">检测员</option><option value="supervisor">主管</option><option value="viewer">访客</option><option value="customer">客户</option><option value="admin">管理员</option>';
+      roleSelect.value=user.role;
+      roleSelect.disabled=false;
+    } else if(isCustomerTab){
+      roleSelect.innerHTML='<option value="customer">客户</option>';
+      roleSelect.value='customer';
+      roleSelect.disabled=true;
+    } else {
+      roleSelect.innerHTML='<option value="inspector">检测员</option><option value="supervisor">主管</option><option value="viewer">访客</option><option value="admin">管理员</option>';
+      roleSelect.value='inspector';
+      roleSelect.disabled=false;
+    }
+  }
+
+  // 部门字段：客户账号时隐藏
+  var deptEl = document.getElementById('fm-department');
+  var deptGroup = deptEl ? deptEl.closest('.form-group') : null;
+  if(deptGroup){
+    deptGroup.style.display = (!isEditing && isCustomerTab) ? 'none' : '';
+  }
+
+  // 客户名称绑定：客户账号时显示，员工时隐藏
+  var cnEl=document.getElementById('fm-client-name');
+  var cng=document.getElementById('fm-client-name-group');
+  if(cnEl) cnEl.value=isEditing?(user.client_name||''):'';
+  if(cng){
+    if(isEditing){
+      cng.style.display=(user.role==='customer')?'':'none';
+      if(user.role==='customer') _loadClientNameList();
+    } else if(isCustomerTab){
+      cng.style.display='';
+      _loadClientNameList();
+    } else {
+      cng.style.display='none';
+    }
+  }
+
+  // 姓名 label 语义调整
+  var displayEl = document.getElementById('fm-display');
+  var displayLabel = displayEl ? displayEl.closest('.form-group') : null;
+  if(displayLabel){
+    var lbl = displayLabel.querySelector('label');
+    if(lbl) lbl.textContent = (!isEditing && isCustomerTab) ? '显示名称' : '姓名';
+  }
+
   syncUserModalPreview();
   document.getElementById('userModal').classList.add('show');
-  // 根据当前 tab 预设角色
-  if(!user){
-    var rs=document.getElementById('userRoleSelect');
-    if(rs && currentUserTab==='customer'){ rs.value='customer'; syncUserModalPreview(); }
-  }
 }
 function closeUserModal(){document.getElementById('userModal').classList.remove('show');editingUser=null;}
 
@@ -1477,9 +1532,27 @@ function saveUser(){
   var rl=document.getElementById('fm-role').value;
   var dept=document.getElementById('fm-department').value.trim();
   var pw=document.getElementById('fm-password').value;
+  var clientName=(document.getElementById('fm-client-name')||{}).value||'';
   if(!un){showToast('请输入用户名','info');return;}
   if(!editingUser&&!pw){showToast('请输入密码','info');return;}
-  var body={display_name:dn,role:rl,department:dept,client_name:(document.getElementById('fm-client-name')||{}).value||''};
+
+  // 客户账号必须绑定已有客户
+  if(rl==='customer' && !editingUser){
+    if(!clientName){
+      showToast('请选择绑定的客户名称','info');return;
+    }
+    // 检查是否在 datalist 中
+    var dl=document.getElementById('client-name-datalist');
+    if(dl){
+      var opts=[].slice.call(dl.options);
+      var valid=opts.some(function(o){return o.value===clientName;});
+      if(!valid){
+        showToast('客户名称必须从已有客户中选择，请先在客户管理中新建客户','error');return;
+      }
+    }
+  }
+
+  var body={display_name:dn,role:rl,department:dept,client_name:clientName};
   if(pw)body.password=pw;
   var url,method;
   if(editingUser){url='/admin/api/users/'+editingUser.username;method='PUT';}
@@ -1614,6 +1687,9 @@ function getRolePermissionMeta(){
     'admin.records.batch_export':'批量导出记录',
     'admin.customers.feedback_reply':'回复客户反馈',
     'admin.projects.upload_report':'上传历史报告',
+    'admin.finance.contract_amount':'查看合同金额',
+    'admin.finance.paid_amount':'查看已收款',
+    'admin.finance.receivable_amount':'查看应收款',
     'admin.monitor.view':'查看系统监控'
   };
 }
@@ -1624,6 +1700,7 @@ function getRolePermissionGroups(){
     // ═══ 经营概览 ═══
     {title:'📊 数据统计', keys:['admin.stats.view','admin.monitor.view']},
     {title:'📁 项目管理', keys:['admin.projects.view','admin.projects.create','admin.projects.update','admin.projects.delete','admin.projects.upload_report','admin.tasks.view','admin.tasks.create','admin.tasks.update','admin.tasks.delete']},
+    {title:'💰 财务查看', keys:['admin.finance.contract_amount','admin.finance.paid_amount','admin.finance.receivable_amount']},
     {title:'🏢 客户管理', keys:['admin.customers.view','admin.customers.create','admin.customers.update','admin.customers.delete','admin.customers.feedback_reply']},
     // ═══ 检测业务 ═══
     {title:'📋 报告管理', keys:['admin.records.view','admin.records.delete','admin.records.batch_delete','admin.records.batch_export','admin.records.open_local','admin.records.open_feishu','admin.records.export','admin.records.void_export','admin.feishu.retry','admin.trash.cleanup','admin.files.download']},
@@ -4289,9 +4366,9 @@ ensureCurrentUserProfile().then(function(){
 <script src="/static/docs_ui.js?v=20260512a"></script>
 <script src="/static/admin_stats.js?v=20260509c"></script>
 
-<script src="/static/admin_projects.js?v=20260516v4"></script>
+<script src="/static/admin_projects.js?v=20260518v4"></script>
 <style>details[open]>.fold-arrow,details[open] summary .fold-arrow{transform:rotate(90deg)}</style>
-<script src="/static/admin_customers.js?v=20260517v1"></script>
+<script src="/static/admin_customers.js?v=20260518v2"></script>
 <style>
 @media (max-width: 768px) {
   #stats-advanced-mount > div { grid-template-columns: 1fr !important; }

@@ -662,6 +662,9 @@ function getRolePermissionMeta(){
     'admin.records.batch_export':'批量导出记录',
     'admin.customers.feedback_reply':'回复客户反馈',
     'admin.projects.upload_report':'上传历史报告',
+    'admin.finance.contract_amount':'查看合同金额',
+    'admin.finance.paid_amount':'查看已收款',
+    'admin.finance.receivable_amount':'查看应收款',
     'admin.monitor.view':'查看系统监控'
   };
 }
@@ -672,6 +675,7 @@ function getRolePermissionGroups(){
     // ═══ 经营概览 ═══
     {title:'📊 数据统计', keys:['admin.stats.view','admin.monitor.view']},
     {title:'📁 项目管理', keys:['admin.projects.view','admin.projects.create','admin.projects.update','admin.projects.delete','admin.projects.upload_report','admin.tasks.view','admin.tasks.create','admin.tasks.update','admin.tasks.delete']},
+    {title:'💰 财务查看', keys:['admin.finance.contract_amount','admin.finance.paid_amount','admin.finance.receivable_amount']},
     {title:'🏢 客户管理', keys:['admin.customers.view','admin.customers.create','admin.customers.update','admin.customers.delete','admin.customers.feedback_reply']},
     // ═══ 检测业务 ═══
     {title:'📋 报告管理', keys:['admin.records.view','admin.records.delete','admin.records.batch_delete','admin.records.batch_export','admin.records.open_local','admin.records.open_feishu','admin.records.export','admin.records.void_export','admin.feishu.retry','admin.trash.cleanup','admin.files.download']},

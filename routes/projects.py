@@ -4,6 +4,7 @@ X1 项目管理路由 Blueprint
 
 import json
 import os
+import re
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -370,101 +371,284 @@ def admin_api_business_project_delete(project_id):
 @login_required
 @require_permission('admin.projects.upload_report')
 def admin_api_upload_report(project_id):
-    """上传报告文件（补录场景），支持 .docx / .pdf"""
+    """上传报告附件（支持多文件 + 压缩包）。
+    根据当前 report_status 自动判断附件类型：
+    - 报告编制中 → 上传审核稿(draft)，状态推进到"待客户确认"
+    - 客户已确认 → 上传最终盖章版(final)，状态推进到"已出报告"
+    - 其他状态 → 按 file_type 参数或默认 draft
+    """
+    ALLOWED_EXTS = {'.docx', '.pdf', '.doc', '.zip', '.rar', '.7z', '.tar', '.gz', '.xlsx', '.xls'}
     conn = get_x1_data_conn()
     try:
         project = conn.execute('SELECT * FROM business_projects WHERE id=?', [project_id]).fetchone()
         if not project:
             return jsonify({'success': False, 'error': '项目不存在'}), 404
 
-        f = request.files.get('report_file')
-        if not f or not f.filename:
+        files = request.files.getlist('report_file')
+        if not files or not any(f.filename for f in files):
             return jsonify({'success': False, 'error': '请选择报告文件'}), 400
 
-        ext = Path(f.filename).suffix.lower()
-        if ext not in ('.docx', '.pdf', '.doc'):
-            return jsonify({'success': False, 'error': '仅支持 .docx / .pdf / .doc 格式'}), 400
+        # 根据当前状态判断附件类型和目标状态
+        current_rs = (project['report_status'] or '').strip()
+        # 允许前端显式指定 file_type（可选）
+        explicit_type = ''
+        if request.content_type and 'multipart' in request.content_type:
+            explicit_type = (request.form.get('file_type') or '').strip()
+
+        if explicit_type in ('draft', 'final'):
+            file_type = explicit_type
+        elif current_rs in ('客户已确认',):
+            file_type = 'final'
+        else:
+            file_type = 'draft'
+
+        # 目标状态推进
+        if file_type == 'draft':
+            target_status = '待客户确认'
+        else:
+            target_status = '已出报告'
 
         upload_dir = BASE_DIR / 'uploaded_reports'
         upload_dir.mkdir(exist_ok=True)
-
-        # 文件名：项目ID_时间戳.ext
         ts = datetime.now().strftime('%Y%m%d%H%M%S')
-        safe_name = f"project_{project_id}_{ts}{ext}"
-        save_path = upload_dir / safe_name
-        f.save(str(save_path))
 
-        # 如果上传的是 docx，同时生成 PDF 预览
-        pdf_path = ''
-        if ext == '.docx':
-            try:
-                from pdf_converter import convert_docx_to_pdf
+        # 读取已有附件列表
+        existing_raw = (project['report_file_path'] if 'report_file_path' in project.keys() else '') or ''
+        existing_files = _parse_report_file_list(existing_raw)
+
+        saved_files = []
+        pdf_paths = []
+        errors = []
+
+        for idx, f in enumerate(files):
+            if not f or not f.filename:
+                continue
+            ext = Path(f.filename).suffix.lower()
+            if ext not in ALLOWED_EXTS:
+                errors.append(f"{f.filename}: 不支持的格式({ext})")
+                continue
+
+            orig_stem = re.sub(r'[^\w\u4e00-\u9fff\-.]', '_', Path(f.filename).stem)[:50]
+            safe_name = f"project_{project_id}_{ts}_{idx}_{orig_stem}{ext}"
+            save_path = upload_dir / safe_name
+            f.save(str(save_path))
+            saved_files.append({
+                'path': str(save_path),
+                'name': f.filename,
+                'size': save_path.stat().st_size,
+                'file_type': file_type,
+                'uploaded_at': datetime.now().isoformat(timespec='seconds')
+            })
+
+            # PDF 预览生成
+            if ext == '.docx':
+                try:
+                    from pdf_converter import convert_docx_to_pdf
+                    preview_dir = BASE_DIR / 'preview_pdf'
+                    preview_dir.mkdir(exist_ok=True)
+                    pdf_out = str(preview_dir / f"uploaded_{project_id}_{ts}_{idx}.pdf")
+                    result = convert_docx_to_pdf(str(save_path), pdf_out)
+                    if result:
+                        pdf_paths.append(result)
+                except Exception:
+                    pass
+            elif ext == '.pdf':
                 preview_dir = BASE_DIR / 'preview_pdf'
                 preview_dir.mkdir(exist_ok=True)
-                pdf_out = str(preview_dir / f"uploaded_{project_id}_{ts}.pdf")
-                result = convert_docx_to_pdf(str(save_path), pdf_out)
-                if result:
-                    pdf_path = result
-            except Exception:
-                pass  # PDF 生成失败不影响主流程
-        elif ext == '.pdf':
-            # PDF 直接复制到预览目录
-            preview_dir = BASE_DIR / 'preview_pdf'
-            preview_dir.mkdir(exist_ok=True)
-            pdf_dest = preview_dir / f"uploaded_{project_id}_{ts}.pdf"
-            shutil.copy2(str(save_path), str(pdf_dest))
-            pdf_path = str(pdf_dest)
+                pdf_dest = preview_dir / f"uploaded_{project_id}_{ts}_{idx}.pdf"
+                shutil.copy2(str(save_path), str(pdf_dest))
+                pdf_paths.append(str(pdf_dest))
+
+        if not saved_files:
+            error_msg = '; '.join(errors) if errors else '没有有效文件'
+            return jsonify({'success': False, 'error': error_msg}), 400
+
+        # 如果上传最终版，清除旧的审核稿对客户的可见性（保留文件但标记隐藏）
+        if file_type == 'final':
+            for item in existing_files:
+                if item.get('file_type') == 'draft':
+                    item['hidden'] = True
+
+        # 合并附件列表
+        all_files = existing_files + saved_files
+        file_list_json = json.dumps(all_files, ensure_ascii=False)
 
         # 更新项目记录
         now = datetime.now().isoformat(timespec='seconds')
-        updates = {'report_file_path': str(save_path), 'updated_at': now}
-        # 如果 report_status 还是初始状态，自动推进到"已出具"
-        current_rs = (project['report_status'] or '').strip()
-        if current_rs in ('', '未开始', '编制中', '审核中', '待出具'):
-            updates['report_status'] = '已出具'
-            updates['inspection_stage'] = '检测完成'
+        updates = {'report_file_path': file_list_json, 'updated_at': now}
+
+        # 状态推进（只前进不后退，除非是从编制中到待确认）
+        if file_type == 'draft' and current_rs in ('', '未开始', '编制中', '报告编制中', '审核中', '待修改', '待出具'):
+            updates['report_status'] = '待客户确认'
+            if not (project['inspection_stage'] or '').strip() or (project['inspection_stage'] or '').strip() in ('未安排', '已排期', '检测中'):
+                updates['inspection_stage'] = '检测完成'
+        elif file_type == 'final' and current_rs in ('客户已确认',):
+            updates['report_status'] = '已出报告'
 
         set_clause = ', '.join(f"{k}=?" for k in updates.keys())
         conn.execute(f'UPDATE business_projects SET {set_clause} WHERE id=?',
                      list(updates.values()) + [project_id])
         conn.commit()
 
-        # 通知客户报告已出具
+        # 通知客户
         try:
-            notify_project_report_uploaded(project['project_name'], project['client_name'])
+            if file_type == 'draft':
+                notify_project_report_uploaded(project['project_name'], project['client_name'])
         except Exception:
             pass
 
+        count = len(saved_files)
+        type_label = '审核稿' if file_type == 'draft' else '正式报告'
+        msg = f'{count}个{type_label}上传成功'
+        if pdf_paths:
+            msg += f'，{len(pdf_paths)}个PDF预览已生成'
+        if errors:
+            msg += f'（{len(errors)}个文件被跳过）'
+        msg += f'，状态已更新为"{target_status}"'
+
         return jsonify({
             'success': True,
-            'file_path': str(save_path),
-            'pdf_path': pdf_path,
-            'message': '报告上传成功' + ('，PDF 预览已生成' if pdf_path else '')
+            'files': [{'name': f['name'], 'size': f['size'], 'file_type': f['file_type']} for f in saved_files],
+            'file_type': file_type,
+            'target_status': target_status,
+            'pdf_paths': pdf_paths,
+            'errors': errors,
+            'total_attachments': len([f for f in all_files if not f.get('hidden')]),
+            'message': msg
         })
     finally:
         conn.close()
+
+
+def _parse_report_file_list(raw: str) -> list:
+    """解析 report_file_path 字段：
+    - 新格式：JSON 数组，每项是 {path, name, file_type, ...} 对象
+    - 旧格式：JSON 数组的纯路径字符串列表
+    - 最旧格式：单个路径字符串
+    返回统一的对象列表。
+    """
+    if not raw:
+        return []
+    raw = raw.strip()
+    if raw.startswith('['):
+        try:
+            items = json.loads(raw)
+            result = []
+            for item in items:
+                if isinstance(item, dict):
+                    if item.get('path') and Path(item['path']).exists():
+                        result.append(item)
+                elif isinstance(item, str) and item and Path(item).exists():
+                    # 旧格式纯路径，转为对象
+                    result.append({
+                        'path': item,
+                        'name': Path(item).name,
+                        'file_type': 'draft',
+                        'size': Path(item).stat().st_size
+                    })
+            return result
+        except (json.JSONDecodeError, TypeError):
+            return []
+    # 最旧格式：单个路径
+    if Path(raw).exists():
+        return [{'path': raw, 'name': Path(raw).name, 'file_type': 'draft', 'size': Path(raw).stat().st_size}]
+    return []
+
+
+def _parse_report_file_paths(raw: str) -> list:
+    """向后兼容：返回纯路径列表（供 download 等接口使用）"""
+    items = _parse_report_file_list(raw)
+    return [item['path'] for item in items if not item.get('hidden')]
 
 
 # ============================================================
 # 下载项目报告
 # ============================================================
 
-@projects_bp.route('/admin/api/business_projects/<int:project_id>/download_report', methods=['GET'])
+@projects_bp.route('/admin/api/business_projects/<int:project_id>/report_files', methods=['GET'])
 @login_required
 @require_permission('admin.projects.view')
-def admin_api_download_report(project_id):
-    """下载项目报告文件（DOCX/PDF）"""
+def admin_api_list_report_files(project_id):
+    """列出项目所有报告附件（含 file_type 标记）"""
     conn = get_x1_data_conn()
     try:
         project = conn.execute('SELECT * FROM business_projects WHERE id=?', [project_id]).fetchone()
         if not project:
             return jsonify({'success': False, 'error': '项目不存在'}), 404
-        rfp = (project['report_file_path'] if 'report_file_path' in project.keys() else '') or ''
-        if not rfp or not Path(rfp).exists():
+        raw = (project['report_file_path'] if 'report_file_path' in project.keys() else '') or ''
+        items = _parse_report_file_list(raw)
+        files = []
+        for i, item in enumerate(items):
+            if item.get('hidden'):
+                continue
+            pp = Path(item['path'])
+            files.append({
+                'index': i,
+                'name': item.get('name') or pp.name,
+                'ext': pp.suffix.lower(),
+                'size': item.get('size') or (pp.stat().st_size if pp.exists() else 0),
+                'file_type': item.get('file_type', 'draft'),
+                'uploaded_at': item.get('uploaded_at', ''),
+                'download_url': f'/admin/api/business_projects/{project_id}/download_report?idx={i}'
+            })
+        return jsonify({'success': True, 'files': files, 'total': len(files)})
+    finally:
+        conn.close()
+
+
+@projects_bp.route('/admin/api/business_projects/<int:project_id>/download_report', methods=['GET'])
+@login_required
+@require_permission('admin.projects.view')
+def admin_api_download_report(project_id):
+    """下载项目报告文件，支持 ?idx=N 指定附件索引（默认第一个）"""
+    conn = get_x1_data_conn()
+    try:
+        project = conn.execute('SELECT * FROM business_projects WHERE id=?', [project_id]).fetchone()
+        if not project:
+            return jsonify({'success': False, 'error': '项目不存在'}), 404
+        raw = (project['report_file_path'] if 'report_file_path' in project.keys() else '') or ''
+        paths = _parse_report_file_paths(raw)
+        if not paths:
             return jsonify({'success': False, 'error': '报告文件不存在'}), 404
-        pname = project['project_name'] or '检测报告'
-        ext = Path(rfp).suffix
-        return send_file(rfp, as_attachment=True, download_name=f"{pname}{ext}")
+        idx = request.args.get('idx', 0, type=int)
+        if idx < 0 or idx >= len(paths):
+            return jsonify({'success': False, 'error': f'附件索引无效(0~{len(paths)-1})'}), 400
+        file_path = Path(paths[idx])
+        if not file_path.exists():
+            return jsonify({'success': False, 'error': '文件已被移除'}), 404
+        return send_file(str(file_path), as_attachment=True, download_name=file_path.name)
+    finally:
+        conn.close()
+
+
+@projects_bp.route('/admin/api/business_projects/<int:project_id>/delete_report_file', methods=['POST'])
+@login_required
+@require_permission('admin.projects.update')
+def admin_api_delete_report_file(project_id):
+    """删除项目的某个报告附件"""
+    conn = get_x1_data_conn()
+    try:
+        project = conn.execute('SELECT * FROM business_projects WHERE id=?', [project_id]).fetchone()
+        if not project:
+            return jsonify({'success': False, 'error': '项目不存在'}), 404
+        data = request.get_json(silent=True) or {}
+        idx = data.get('index', -1)
+        raw = (project['report_file_path'] if 'report_file_path' in project.keys() else '') or ''
+        paths = _parse_report_file_paths(raw)
+        if idx < 0 or idx >= len(paths):
+            return jsonify({'success': False, 'error': '附件索引无效'}), 400
+        # 删除文件
+        removed_path = Path(paths[idx])
+        if removed_path.exists():
+            removed_path.unlink()
+        paths.pop(idx)
+        # 更新数据库
+        now = datetime.now().isoformat(timespec='seconds')
+        new_json = json.dumps(paths, ensure_ascii=False) if paths else ''
+        conn.execute('UPDATE business_projects SET report_file_path=?, updated_at=? WHERE id=?',
+                     [new_json, now, project_id])
+        conn.commit()
+        return jsonify({'success': True, 'remaining': len(paths), 'message': '附件已删除'})
     finally:
         conn.close()
 

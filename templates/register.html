@@ -171,8 +171,8 @@
     </div>
 
     <script>
-    function submitRegister(e) {
-        e.preventDefault();
+    function submitRegister(e, confirmAdd) {
+        e && e.preventDefault();
         var pw1 = document.getElementById('reg_password').value;
         var pw2 = document.getElementById('reg_password2').value;
         if (pw1 !== pw2) {
@@ -191,6 +191,7 @@
             password: pw1,
             address: document.getElementById('reg_address').value.trim()
         };
+        if (confirmAdd) payload.confirm_add = true;
 
         fetch('/api/register', {
             method: 'POST',
@@ -202,6 +203,14 @@
             if (d.success) {
                 showMsg('🎉 注册成功！请等待管理员审核，审核通过后即可登录。', 'success');
                 document.getElementById('registerForm').style.display = 'none';
+            } else if (d.needs_confirm) {
+                // 该公司已有账号，询问是否新增
+                if (confirm(d.message)) {
+                    submitRegister(null, true);
+                } else {
+                    btn.disabled = false;
+                    btn.textContent = '提交注册';
+                }
             } else {
                 showMsg(d.message || '注册失败，请重试', 'error');
                 btn.disabled = false;

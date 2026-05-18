@@ -169,7 +169,7 @@ def admin_api_registrations():
 @login_required
 @require_permission('admin.users.manage')
 def admin_api_approve_registration(reg_id):
-    """审核通过客户注册"""
+    """审核通过客户注册，同时自动创建/更新 client_profiles"""
     with get_db() as conn:
         _ensure_registration_table(conn)
         reg = conn.execute('SELECT * FROM customer_registrations WHERE id=?', [reg_id]).fetchone()
@@ -186,6 +186,39 @@ def admin_api_approve_registration(reg_id):
             [current_user.id, reg_id]
         )
         conn.commit()
+
+    # 自动创建/更新 client_profiles（业务数据库）
+    company = (reg['company'] or '').strip()
+    contact_name = (reg['contact_name'] or '').strip()
+    phone = (reg['phone'] or '').strip()
+    address = (reg['address'] or '').strip() if 'address' in reg.keys() else ''
+    if company:
+        try:
+            from helpers.db_utils import get_x1_data_conn
+            biz_conn = get_x1_data_conn()
+            try:
+                existing = biz_conn.execute(
+                    'SELECT id FROM client_profiles WHERE client_name=?', (company,)
+                ).fetchone()
+                now = __import__('datetime').datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                if existing:
+                    # 更新联系人信息（不覆盖已有的开票/收件信息）
+                    biz_conn.execute(
+                        'UPDATE client_profiles SET contact_name=?, contact_phone=?, updated_at=? WHERE client_name=?',
+                        (contact_name, phone, now, company)
+                    )
+                else:
+                    # 新建 profile
+                    biz_conn.execute(
+                        'INSERT INTO client_profiles (client_name, contact_name, contact_phone, recipient_name, recipient_phone, recipient_address, updated_at) VALUES (?,?,?,?,?,?,?)',
+                        (company, contact_name, phone, contact_name, phone, address, now)
+                    )
+                biz_conn.commit()
+            finally:
+                biz_conn.close()
+        except Exception:
+            pass  # profile 创建失败不影响审批结果
+
     log_action(current_user.id, 'approve_registration', reg['username'], f"审核通过客户注册：{reg['company']} / {reg['contact_name']}")
     notify_registration_approved(reg['username'])
     return jsonify({'success': True, 'message': '已通过审核，客户可登录使用'})
