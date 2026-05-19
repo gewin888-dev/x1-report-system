@@ -28,9 +28,45 @@ function handleAdminEntry(event){
     return false;
 }
 
+function getCurrentWeekNumber(){
+    const now = new Date();
+    const start = new Date(now.getFullYear(), 0, 1);
+    const diff = Math.floor((now - start) / 86400000);
+    return String(Math.ceil((diff + start.getDay() + 1) / 7));
+}
+
+function sanitizeReportWeekInput(){
+    const weekEl = document.getElementById('reportWeekInput');
+    if(!weekEl) return '';
+    let raw = String(weekEl.value || '').replace(/\D/g, '');
+    if(!raw){
+        weekEl.value = '';
+        return '';
+    }
+    let num = parseInt(raw, 10);
+    if(Number.isNaN(num)){
+        weekEl.value = '';
+        return '';
+    }
+    if(num < 1) num = 1;
+    if(num > 53) num = 53;
+    weekEl.value = String(num);
+    return weekEl.value;
+}
+
+function initReportNumberDisplays(){
+    const yearEl = document.getElementById('reportYearDisplay');
+    const weekEl = document.getElementById('reportWeekInput');
+    if(yearEl) yearEl.textContent = new Date().getFullYear();
+    if(weekEl && !String(weekEl.value || '').trim()){
+        weekEl.value = getCurrentWeekNumber();
+    }
+    sanitizeReportWeekInput();
+}
+
 function updateReportNumber(){
     const year=document.getElementById('reportYearDisplay').textContent||new Date().getFullYear();
-    const week=document.getElementById('reportWeekDisplay').textContent||'';
+    const week=sanitizeReportWeekInput()||'';
     const suffix=(document.getElementById('reportNumberSuffix').value||'').trim();
     document.getElementById('reportNumber').value='PDJC-BG'+year+'-'+week+suffix;
 }
@@ -84,8 +120,7 @@ function resetForm(){
     });
     // 重置报告编号自定义部分
     document.getElementById('reportNumberSuffix').value='';
-    document.getElementById('reportYearDisplay').textContent=new Date().getFullYear();
-    (function(){const now=new Date(),start=new Date(now.getFullYear(),0,1),diff=Math.floor((now-start)/86400000),week=Math.ceil((diff+start.getDay()+1)/7);document.getElementById('reportWeekDisplay').textContent=week;})();
+    initReportNumberDisplays();
     updateReportNumber();
     // 重置检测状态为静态
     document.querySelectorAll('input[name="detectionState"]').forEach(r=>{r.checked=r.value==='静态';});
@@ -1168,6 +1203,22 @@ function previewFile(filename){
     });
 }
 
+function previewReportAsset(recordId){
+    var r = window._recordMap && window._recordMap[recordId];
+    if(!r){ showToast('记录不存在或未加载', 'error'); return; }
+    var fn = r.report_info && r.report_info.filename;
+    if(fn){ previewFile(fn); return; }
+    showToast('暂无可预览的检测报告', 'info');
+}
+
+function previewExportAsset(recordId){
+    var r = window._recordMap && window._recordMap[recordId];
+    if(!r){ showToast('记录不存在或未加载', 'error'); return; }
+    var fn = r.export_info && r.export_info.filename;
+    if(fn){ previewFile(fn); return; }
+    showToast('暂无可预览的原始记录', 'info');
+}
+
 function buildStatusText(status){
     const text = String(status || '未生成');
     const done = text.includes('已生成') || text.includes('已完成');
@@ -1236,15 +1287,31 @@ function buildRecordItem(r){
     const isOwnRecord = !r.inspector || r.inspector === currentUser;
     const isDraft = isDraftRecord(r);
     if(hasReport || hasExport){
-        if(r.report_info?.feishu_url){
-            actionButtons+=`<button onclick="event.stopPropagation();openFeishuFile('${r.report_info.feishu_url}')" class="record-action-btn report-btn">📄 查看检测报告</button>`;
-        }else if(r.report_info?.filename){
-            actionButtons+=`<button onclick="event.stopPropagation();openFileWithWPS('${r.report_info.filename}')" class="record-action-btn report-btn">📄 查看检测报告</button>`;
+        window._recordMap = window._recordMap || {};
+        window._recordMap[r.record_id] = r;
+        let chips = '';
+        if(r.report_info){
+            const rLocal = !!r.report_info.filename;
+            const rFeishu = !!r.report_info.feishu_url;
+            const rStatus = rFeishu ? '飞书已上传' : (rLocal ? '仅本地存留' : '暂无文件');
+            const rBg = rFeishu ? '#ecfdf3' : (rLocal ? '#fff7ed' : '#f5f5f5');
+            const rColor = rFeishu ? '#15803d' : (rLocal ? '#c2410c' : '#666');
+            chips += `<span style="display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;background:${rBg};color:${rColor};font-size:12px;font-weight:600;margin:0 8px 6px 0;">📄 ${rStatus}</span>`;
         }
-        if(r.export_info?.feishu_url){
-            actionButtons+=`<button onclick="event.stopPropagation();openFeishuFile('${r.export_info.feishu_url}')" class="record-action-btn export-btn">📋 查看原始记录</button>`;
-        }else if(r.export_info?.filename){
-            actionButtons+=`<button onclick="event.stopPropagation();openFileWithWPS('${r.export_info.filename}')" class="record-action-btn export-btn">📋 查看原始记录</button>`;
+        if(r.export_info){
+            const eLocal = !!r.export_info.filename;
+            const eFeishu = !!r.export_info.feishu_url;
+            const eStatus = eFeishu ? '飞书已上传' : (eLocal ? '仅本地存留' : '暂无文件');
+            const eBg = eFeishu ? '#eff6ff' : (eLocal ? '#fff7ed' : '#f5f5f5');
+            const eColor = eFeishu ? '#1d4ed8' : (eLocal ? '#c2410c' : '#666');
+            chips += `<span style="display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;background:${eBg};color:${eColor};font-size:12px;font-weight:600;margin:0 8px 6px 0;">📋 ${eStatus}</span>`;
+        }
+        if(chips) actionButtons += `<div style="margin-bottom:6px;display:flex;flex-wrap:wrap;align-items:center;">${chips}</div>`;
+        if(r.report_info?.feishu_url || r.report_info?.filename){
+            actionButtons+=`<button onclick="event.stopPropagation();previewReportAsset('${r.record_id}')" class="record-action-btn report-btn">📄 核验报告</button>`;
+        }
+        if(r.export_info?.feishu_url || r.export_info?.filename){
+            actionButtons+=`<button onclick="event.stopPropagation();previewExportAsset('${r.record_id}')" class="record-action-btn export-btn">📋 核验原始记录</button>`;
         }
         if(hasReport || hasExport){
             actionButtons+= r.voided

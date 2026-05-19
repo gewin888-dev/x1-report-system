@@ -475,7 +475,7 @@ input[type="text"]:focus,input[type="password"]:focus,input[type="number"]:focus
   <summary class="role-permission-fold-head">
     <div>
       <div class="role-permission-fold-title">🔐 角色权限配置</div>
-      <div class="role-permission-fold-desc">改成左侧角色列表、右侧共用工作台，减少来回跳转和纵向堆叠。</div>
+      <div class="role-permission-fold-desc">这里维护的是“角色”的统一权限，不是单个员工的个人权限。修改后会影响该角色下的所有用户。</div>
     </div>
     <span class="role-permission-fold-indicator">展开 / 收起</span>
   </summary>
@@ -484,7 +484,7 @@ input[type="text"]:focus,input[type="password"]:focus,input[type="number"]:focus
       <div class="role-permission-list-panel" id="permission-role-list"></div>
       <div class="role-permission-workbench">
         <div class="role-permission-toolbar">
-          <div class="role-permission-toolbar-tip">此处配置的是角色级权限覆盖项。默认权限仍保留；勾选表示启用，取消勾选表示禁用。</div>
+          <div class="role-permission-toolbar-tip">此处配置的是角色级权限覆盖项，不是员工个人权限。默认权限仍保留；勾选表示启用，取消勾选表示禁用。保存后会影响当前角色下的全部用户。</div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <select id="permission-role-select" onchange="renderRolePermissions()" style="display:none;">
               <option value="admin">管理员</option>
@@ -874,7 +874,7 @@ input[type="text"]:focus,input[type="password"]:focus,input[type="number"]:focus
           <div class="user-detail-side-kicker">填写提示</div>
           <div class="user-detail-tip">用户名建议保持英文或拼音，避免后续账号流转出错。</div>
           <div class="user-detail-tip">编辑已有用户时，密码留空表示不改密码。</div>
-          <div class="user-detail-tip">角色决定默认权限，细粒度权限在下方角色权限配置里维护。</div>
+          <div class="user-detail-tip">角色决定默认权限。这里展示的是当前用户因其角色而获得的权限；若调整下方角色权限配置，会同步影响该角色下所有用户。</div>
         </div>
       </div>
       <div class="user-detail-main">
@@ -1785,7 +1785,7 @@ function renderRolePermissions(){
   var saveBtn=document.querySelector('#role-permission-card .btn.btn-primary');
   renderRolePermissionRoleList(role);
   if(!listBox||!summary) return;
-  if(!role){ listBox.innerHTML='<div class="empty">请先从左侧选择角色</div>'; summary.innerHTML='<span style="color:#64748b">当前显示全部角色导航，请点击左侧角色后查看并编辑该角色权限。系统设置、记录范围、导出能力等新权限已纳入可配置项。</span>'; if(saveBtn) saveBtn.disabled = true; return; }
+  if(!role){ listBox.innerHTML='<div class="empty">请先从左侧选择角色</div>'; summary.innerHTML='<span style="color:#64748b">当前显示全部角色导航，请点击左侧角色后查看并编辑该角色权限。注意：这里修改的是角色统一权限，不是某个员工的个人权限；保存后会影响该角色下全部用户。</span>'; if(saveBtn) saveBtn.disabled = true; return; }
   if(!item){ listBox.innerHTML='<div class="empty">暂无权限数据</div>'; summary.innerHTML=''; return; }
   var meta=getRolePermissionMeta();
   var combined={};
@@ -1796,7 +1796,7 @@ function renderRolePermissions(){
   var readonly = role === 'admin';
   summary.innerHTML = readonly
     ? '<strong style="color:#1e3a8a;display:block;margin-bottom:6px;">管理员角色</strong><span>admin 为内建超管：固定拥有全部最高权限，不可修改。请在左侧切换到其他角色后再勾选权限。</span>'
-    : '<strong style="color:#1e3a8a;display:block;margin-bottom:6px;">当前角色：'+getRoleDisplay(role)+'</strong><span>默认权限 '+(item.default_permissions||[]).length+' 项；当前展示 '+keys.length+' 项；带覆盖配置 '+Object.keys(item.custom_permissions||{}).length+' 项。</span>';
+    : '<strong style="color:#1e3a8a;display:block;margin-bottom:6px;">当前角色：'+getRoleDisplay(role)+'</strong><span>默认权限 '+(item.default_permissions||[]).length+' 项；当前展示 '+keys.length+' 项；带覆盖配置 '+Object.keys(item.custom_permissions||{}).length+' 项。保存后将同步影响该角色下全部用户。</span>';
   if(saveBtn) saveBtn.disabled = readonly;
   var groups = getRolePermissionGroups();
   if(role==='customer'){

@@ -202,6 +202,7 @@ def admin_api_records():
 
                 export_groups[export_id] = {
                     'id': export_id,
+                    'record_id': export_id,
                     'type': 'export',
                     'project_name': proj.get('project_name', ''),
                     'report_number': proj.get('report_number', ''),

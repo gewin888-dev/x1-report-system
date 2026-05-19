@@ -15,9 +15,8 @@ document.addEventListener('DOMContentLoaded', function(){
     window._suppressReturnToEditPrompt = false;
     ensureEditingRecordId();
     document.getElementById('detectionDate').value=new Date().toISOString().split('T')[0];
-    // 报告编号:自动填充年份和周份
-    document.getElementById('reportYearDisplay').textContent=new Date().getFullYear();
-    (function(){const now=new Date(),start=new Date(now.getFullYear(),0,1),diff=Math.floor((now-start)/86400000),week=Math.ceil((diff+start.getDay()+1)/7);document.getElementById('reportWeekDisplay').textContent=week;})();
+    // 报告编号:年份自动更新，周默认固定为当前值但后续不自动滚动
+    initReportNumberDisplays();
     updateReportNumber();
     fetch('/api/user').then(r=>r.json()).then(d=>{currentUser=d.username; currentUserProfile=d||null; document.getElementById('currentUser').textContent=d.display_name||d.username;}).catch(()=>{currentUser='离线'; currentUserProfile=null;});
     renderDomainGrid();
@@ -163,6 +162,7 @@ window.renderAirchangeSpeedOnly = renderAirchangeSpeedOnly;
 window.renderBacteriaControl = renderBacteriaControl;
 window.renderBacteriaZone = renderBacteriaZone;
 window.renderBacteriaZoneControl = renderBacteriaZoneControl;
+window.sanitizeReportWeekInput = sanitizeReportWeekInput;
 window.renderDomainGrid = renderDomainGrid;
 window.renderDraftRecords = renderDraftRecords;
 window.renderFloating = renderFloating;

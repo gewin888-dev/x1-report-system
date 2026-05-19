@@ -11,9 +11,8 @@ document.addEventListener('DOMContentLoaded', function(){
     window._suppressReturnToEditPrompt = false;
     ensureEditingRecordId();
     document.getElementById('detectionDate').value=new Date().toISOString().split('T')[0];
-    // 报告编号:自动填充年份和周份
-    document.getElementById('reportYearDisplay').textContent=new Date().getFullYear();
-    (function(){const now=new Date(),start=new Date(now.getFullYear(),0,1),diff=Math.floor((now-start)/86400000),week=Math.ceil((diff+start.getDay()+1)/7);document.getElementById('reportWeekDisplay').textContent=week;})();
+    // 报告编号:年份自动更新，周默认固定为当前值但后续不自动滚动
+    initReportNumberDisplays();
     updateReportNumber();
     fetch('/api/user').then(r=>r.json()).then(d=>{currentUser=d.username; currentUserProfile=d||null; document.getElementById('currentUser').textContent=d.display_name||d.username;}).catch(()=>{currentUser='离线'; currentUserProfile=null;});
     renderDomainGrid();
@@ -60,10 +59,46 @@ function renderDomainGrid(){
     grid.innerHTML = `<div class="domain-grid-row domain-grid-row-2">${top.map(d=>`<div class="domain-btn" onclick="selectDomain('${d.id}',this)">${d.icon} ${d.name}</div>`).join('')}</div><div class="domain-grid-row domain-grid-row-3">${rest.map(d=>`<div class="domain-btn" onclick="selectDomain('${d.id}',this)">${d.icon} ${d.name}</div>`).join('')}</div>`;
 }
 
+function getCurrentWeekNumber(){
+    const now = new Date();
+    const start = new Date(now.getFullYear(), 0, 1);
+    const diff = Math.floor((now - start) / 86400000);
+    return String(Math.ceil((diff + start.getDay() + 1) / 7));
+}
+
+function sanitizeReportWeekInput(){
+    const weekEl = document.getElementById('reportWeekInput');
+    if(!weekEl) return '';
+    let raw = String(weekEl.value || '').replace(/\D/g, '');
+    if(!raw){
+        weekEl.value = '';
+        return '';
+    }
+    let num = parseInt(raw, 10);
+    if(Number.isNaN(num)){
+        weekEl.value = '';
+        return '';
+    }
+    if(num < 1) num = 1;
+    if(num > 53) num = 53;
+    weekEl.value = String(num);
+    return weekEl.value;
+}
+
+function initReportNumberDisplays(){
+    const yearEl = document.getElementById('reportYearDisplay');
+    const weekEl = document.getElementById('reportWeekInput');
+    if(yearEl) yearEl.textContent = new Date().getFullYear();
+    if(weekEl && !String(weekEl.value || '').trim()){
+        weekEl.value = getCurrentWeekNumber();
+    }
+    sanitizeReportWeekInput();
+}
+
 // 报告编号:PDJC-BG年份-周份+用户自定义
 function updateReportNumber(){
     const year=document.getElementById('reportYearDisplay').textContent||new Date().getFullYear();
-    const week=document.getElementById('reportWeekDisplay').textContent||'';
+    const week=sanitizeReportWeekInput()||'';
     const suffix=(document.getElementById('reportNumberSuffix').value||'').trim();
     document.getElementById('reportNumber').value='PDJC-BG'+year+'-'+week+suffix;
 }
@@ -90,6 +125,7 @@ function hasMeaningfulEditingContent(){
 }
 
 function showReturnToEditDialog(){
+    if(window._loadingRecordForEdit) return;
     const overlay=document.createElement('div');
     overlay.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
     overlay.innerHTML=`<div style="background:white;border-radius:12px;padding:24px;max-width:360px;width:88%;text-align:center;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
@@ -117,8 +153,7 @@ function resetForm(){
     });
     // 重置报告编号自定义部分
     document.getElementById('reportNumberSuffix').value='';
-    document.getElementById('reportYearDisplay').textContent=new Date().getFullYear();
-    (function(){const now=new Date(),start=new Date(now.getFullYear(),0,1),diff=Math.floor((now-start)/86400000),week=Math.ceil((diff+start.getDay()+1)/7);document.getElementById('reportWeekDisplay').textContent=week;})();
+    initReportNumberDisplays();
     updateReportNumber();
     // 重置检测状态为静态
     document.querySelectorAll('input[name="detectionState"]').forEach(r=>{r.checked=r.value==='静态';});
@@ -6094,8 +6129,8 @@ function submitAndExport(){
             await clearActiveLocalDrafts(window._editingRecordId);
             showToast(msg.replace(/\n/g,' | '),'success');
             window._editCompleted=true;window._lastEditedRecordId=window._editingRecordId;
-            if(r.export?.download_url){window.open(r.export.download_url,'_blank');}
-            setTimeout(()=>showTab('history'),300);
+            showSubmitVerifyPanel(r);
+            setTimeout(()=>showTab('history'),800);
         }else{
             showToast('导出失败: '+(r.error||'未知错误'),'error');
         }
@@ -6124,7 +6159,7 @@ function exportRecordExcel(){
         if(r.success){
             showToast('✅ 原始记录已保存并导出','success');
             window._editCompleted=true;window._lastEditedRecordId=window._editingRecordId;
-            if(r.download_url){window.open(r.download_url,'_blank');}
+            showSubmitVerifyPanel(r);
             loadHistory();
         }else{showToast('导出失败: '+r.error,'error');}
     }).catch(e=>{submitting=false;showToast('网络错误: '+e.message,'error');});
@@ -6198,6 +6233,87 @@ function buildRoomHierarchySummary(room){
 
     if(roomName) parts.push(roomName);
     return parts.filter(Boolean).join(' / ');
+}
+
+function showSubmitVerifyPanel(payload){
+    var overlay=document.createElement('div');
+    overlay.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.38);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;z-index:10002;padding:24px';
+    var report = payload && payload.report || {};
+    var exportInfo = payload && payload.export || {};
+    var reportFile = report.filename || '';
+    var exportFile = exportInfo.filename || '';
+    var reportFeishu = !!(report.feishu && report.feishu.success);
+    var exportFeishu = !!(exportInfo.feishu && exportInfo.feishu.success);
+    var reportPreview = !!(report.feishu_url || reportFile);
+    var exportPreview = !!(exportInfo.feishu_url || exportFile);
+    function cardHtml(title, icon, ok, previewOk, fileName, kind){
+        var tone = ok ? '#16a34a' : '#ea580c';
+        var bg = ok ? '#f0fdf4' : '#fff7ed';
+        var status = ok ? '已落入飞书' : (fileName ? '仅本地生成，未确认飞书' : '未生成');
+        var previewText = previewOk ? '可核验内容完整性' : '暂无可核验文件';
+        return '<div style="border:1px solid #e5e7eb;border-radius:14px;padding:16px;background:#fff;box-shadow:0 4px 14px rgba(15,23,42,.05)">'
+            + '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:10px">'
+            + '<div><div style="font-size:16px;font-weight:700;color:#111827">'+icon+' '+title+'</div><div style="margin-top:6px;display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;background:'+bg+';color:'+tone+';font-size:12px;font-weight:700">'+status+'</div></div>'
+            + '<div style="font-size:12px;color:#6b7280">'+previewText+'</div>'
+            + '</div>'
+            + '<div style="font-size:13px;color:#374151;line-height:1.7">'
+            + '<div><span style="color:#6b7280">飞书核验：</span>'+(ok?'✅ 已确认上传成功':'⚠️ 需继续确认')+'</div>'
+            + '<div><span style="color:#6b7280">文件内容：</span>'+(fileName?fileName:'未生成本地文件名')+'</div>'
+            + '</div>'
+            + '<div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">'
+            + (previewOk?'<button data-kind="'+kind+'" class="sv-preview-btn" style="padding:9px 14px;border:none;border-radius:10px;background:#2563eb;color:#fff;font-weight:600;cursor:pointer">核验预览</button>':'')
+            + '</div>'
+            + '</div>';
+    }
+    overlay.innerHTML = '<div style="background:#f8fafc;border-radius:18px;width:min(820px,96vw);max-height:90vh;overflow:auto;padding:22px 22px 18px;box-shadow:0 18px 60px rgba(15,23,42,.22)">'
+        + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px">'
+        + '<div><div style="font-size:20px;font-weight:800;color:#0f172a">提交结果核验</div><div style="margin-top:6px;font-size:13px;color:#475569">重点确认两件事：<b>是否成功落入飞书</b>、<b>内容是否完整可核验</b>。</div></div>'
+        + '<button id="sv-close" style="border:1px solid #d1d5db;background:#fff;border-radius:10px;padding:8px 14px;cursor:pointer;color:#374151">关闭</button>'
+        + '</div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">'
+        + cardHtml('检测报告','📄',reportFeishu,reportPreview,reportFile,'report')
+        + cardHtml('原始记录','📋',exportFeishu,exportPreview,exportFile,'export')
+        + '</div>'
+        + '<div style="margin-top:16px;padding:12px 14px;border-radius:12px;background:#eff6ff;color:#1e3a8a;font-size:13px;line-height:1.7">'
+        + '说明：员工端以飞书落库核验为主；若飞书未确认但本地仍有文件，可先做内容自检，再回头补查上传链路。'
+        + '</div>'
+        + '</div>';
+    document.body.appendChild(overlay);
+    function close(){ overlay.remove(); }
+    overlay.querySelector('#sv-close').onclick = close;
+    overlay.addEventListener('click', function(e){ if(e.target===overlay) close(); });
+    overlay.querySelectorAll('.sv-preview-btn').forEach(function(btn){
+        btn.onclick = function(){
+            var kind = btn.getAttribute('data-kind');
+            if(kind === 'report'){
+                if(report.feishu_url){ window.open(report.feishu_url, '_blank'); return; }
+                if(reportFile){ previewFile(reportFile); return; }
+                showToast('暂无可核验的检测报告', 'info');
+                return;
+            }
+            if(exportInfo.feishu_url){ window.open(exportInfo.feishu_url, '_blank'); return; }
+            if(exportFile){ previewFile(exportFile); return; }
+            showToast('暂无可核验的原始记录', 'info');
+        };
+    });
+}
+
+function previewReportAsset(recordId){
+    var r = window._recordMap && window._recordMap[recordId];
+    if(!r){ showToast('记录不存在或未加载', 'error'); return; }
+    var info = r.report_info || {};
+    if(info.feishu_url){ window.open(info.feishu_url, '_blank'); return; }
+    if(info.filename){ previewFile(info.filename); return; }
+    showToast('暂无可核验的检测报告', 'info');
+}
+
+function previewExportAsset(recordId){
+    var r = window._recordMap && window._recordMap[recordId];
+    if(!r){ showToast('记录不存在或未加载', 'error'); return; }
+    var info = r.export_info || {};
+    if(info.feishu_url){ window.open(info.feishu_url, '_blank'); return; }
+    if(info.filename){ previewFile(info.filename); return; }
+    showToast('暂无可核验的原始记录', 'info');
 }
 
 function buildStatusText(status){
@@ -6304,15 +6420,31 @@ function buildRecordItem(r){
     const isOwnRecord = !r.inspector || r.inspector === currentUser;
     const isDraft = isDraftRecord(r);
     if(hasReport || hasExport){
-        if(r.report_info?.feishu_url){
-            actionButtons+=`<button onclick="event.stopPropagation();openFeishuFile('${r.report_info.feishu_url}')" class="record-action-btn report-btn">📄 查看检测报告</button>`;
-        }else if(r.report_info?.filename){
-            actionButtons+=`<button onclick="event.stopPropagation();openFileWithWPS('${r.report_info.filename}')" class="record-action-btn report-btn">📄 查看检测报告</button>`;
+        window._recordMap = window._recordMap || {};
+        window._recordMap[r.record_id] = r;
+        let chips = '';
+        if(r.report_info){
+            const rLocal = !!r.report_info.filename;
+            const rFeishu = !!r.report_info.feishu_url;
+            const rStatus = rFeishu ? '飞书已上传' : (rLocal ? '仅本地存留' : '暂无文件');
+            const rBg = rFeishu ? '#ecfdf3' : (rLocal ? '#fff7ed' : '#f5f5f5');
+            const rColor = rFeishu ? '#15803d' : (rLocal ? '#c2410c' : '#666');
+            chips += `<span style="display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;background:${rBg};color:${rColor};font-size:12px;font-weight:600;margin:0 8px 6px 0;">📄 ${rStatus}</span>`;
         }
-        if(r.export_info?.feishu_url){
-            actionButtons+=`<button onclick="event.stopPropagation();openFeishuFile('${r.export_info.feishu_url}')" class="record-action-btn export-btn">📋 查看原始记录</button>`;
-        }else if(r.export_info?.filename){
-            actionButtons+=`<button onclick="event.stopPropagation();openFileWithWPS('${r.export_info.filename}')" class="record-action-btn export-btn">📋 查看原始记录</button>`;
+        if(r.export_info){
+            const eLocal = !!r.export_info.filename;
+            const eFeishu = !!r.export_info.feishu_url;
+            const eStatus = eFeishu ? '飞书已上传' : (eLocal ? '仅本地存留' : '暂无文件');
+            const eBg = eFeishu ? '#eff6ff' : (eLocal ? '#fff7ed' : '#f5f5f5');
+            const eColor = eFeishu ? '#1d4ed8' : (eLocal ? '#c2410c' : '#666');
+            chips += `<span style="display:inline-flex;align-items:center;padding:3px 10px;border-radius:999px;background:${eBg};color:${eColor};font-size:12px;font-weight:600;margin:0 8px 6px 0;">📋 ${eStatus}</span>`;
+        }
+        if(chips) actionButtons += `<div style="margin-bottom:6px;display:flex;flex-wrap:wrap;align-items:center;">${chips}</div>`;
+        if(r.report_info?.feishu_url || r.report_info?.filename){
+            actionButtons+=`<button onclick="event.stopPropagation();previewReportAsset('${r.record_id}')" class="record-action-btn report-btn">📄 核验报告</button>`;
+        }
+        if(r.export_info?.feishu_url || r.export_info?.filename){
+            actionButtons+=`<button onclick="event.stopPropagation();previewExportAsset('${r.record_id}')" class="record-action-btn export-btn">📋 核验原始记录</button>`;
         }
         if(hasReport || hasExport){
             actionButtons+= r.voided
@@ -6638,6 +6770,7 @@ async function doTransferDraft(draftId, targetUser, btn){
 // - 目标是"返回录入页编辑当前记录",不是重新打开页面,不是进入新建空表
 // - 这段逻辑一旦调整,必须完整验证:打开记录、回填数据、继续暂存、继续生成报告
 async function loadRecordForEdit(id){
+    window._loadingRecordForEdit = true;
     pullRefreshDisabled = true;
     window._suppressReturnToEditPrompt = true;
     // 第一层止血：恢复期间暂停 auto-save，避免保存中间态
@@ -6661,7 +6794,10 @@ async function loadRecordForEdit(id){
         }
         d = normalizeEditableRecordData(d, id);
         window._localEditingTaskId = d._localId || '';
+        const prevSuppress = window._suppressReturnToEditPrompt;
+        window._suppressReturnToEditPrompt = true;
         showTab('new');
+        window._suppressReturnToEditPrompt = prevSuppress;
 
         // 已生成记录:进入编辑时不直接改原记录,而是记录来源ID,后续暂存生成新草稿
         if(isGeneratedRecordData(d)){
@@ -6685,8 +6821,9 @@ async function loadRecordForEdit(id){
             const m = rn.match(/^PDJC-BG(\d{4})-(\d{1,2})(.*)$/);
             if(m){
                 document.getElementById('reportYearDisplay').textContent=m[1];
-                document.getElementById('reportWeekDisplay').textContent=m[2];
+                document.getElementById('reportWeekInput').value=m[2];
                 document.getElementById('reportNumberSuffix').value=m[3]||'';
+                sanitizeReportWeekInput();
             } else {
                 document.getElementById('reportYearDisplay').textContent=new Date().getFullYear();
                 document.getElementById('reportNumberSuffix').value=rn;
@@ -6917,13 +7054,17 @@ async function loadRecordForEdit(id){
         }
 
         // 5. 切到新建记录tab
+        const prevSuppress2 = window._suppressReturnToEditPrompt;
+        window._suppressReturnToEditPrompt = true;
         showTab('new');
+        window._suppressReturnToEditPrompt = prevSuppress2;
         const roomCount = d.rooms?.length || 0;
         const safeDelay = Math.max(1500, roomCount * 500 + 800);
         setTimeout(()=>{
             window.scrollTo(0,0);
             // 恢复完成，解除恢复中状态，重新允许 auto-save
             window._isRestoringDraft = false;
+            window._loadingRecordForEdit = false;
             _autoSaveDirty = false;
         }, safeDelay);
         updateProjectInfoSummary();
@@ -6931,7 +7072,12 @@ async function loadRecordForEdit(id){
 
         // 当前阶段以真实导出、页面回归和收楼文档作为验收依据。
 
-    }catch(e){showToast('加载失败: '+e.message, 'error');}
+    }catch(e){
+        window._isRestoringDraft = false;
+        window._loadingRecordForEdit = false;
+        pullRefreshDisabled = false;
+        showToast('加载失败: '+e.message, 'error');
+    }
 }
 
 function fillRoomParams(rid, card, params){

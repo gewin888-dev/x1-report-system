@@ -39,8 +39,9 @@ REPORTS_DIR = BASE_DIR / PATHS.get('reports', 'reports_x1')
 
 
 def _x_export_path(export_id: str) -> Path:
-    """导出记录路径"""
-    return REPORTS_DIR / f"{export_id}.json"
+    """导出记录路径，兼容传入是否已带 .json 后缀。"""
+    export_id = str(export_id)
+    return REPORTS_DIR / export_id if export_id.endswith('.json') else REPORTS_DIR / f"{export_id}.json"
 
 
 # ============================================================
@@ -242,9 +243,20 @@ def api_get_record_compat(record_id):
         normalized_project['record_id'] = data.get('draft_id', record_id)
         return jsonify({'success': True, 'record': normalized_project})
 
-    # 如果不是草稿，可能是导出记录ID
-    export_target = _x_export_path(record_id)
-    if export_target.exists():
+    # 如果不是草稿，可能是导出记录ID（兼容旧 record_id 与新 X1EXPORT 文件名）
+    export_candidates = [record_id]
+    if not str(record_id).startswith('X1EXPORT_'):
+        export_candidates.extend([
+            f'X1EXPORT_{record_id}',
+            f'X1EXPORT_{record_id}.json',
+        ])
+    if not str(record_id).endswith('.json'):
+        export_candidates.append(f'{record_id}.json')
+
+    for candidate in export_candidates:
+        export_target = _x_export_path(candidate)
+        if not export_target.exists():
+            continue
         data = json.loads(export_target.read_text(encoding='utf-8'))
         ep = data.get('export_payload', {})
         proj = ep.get('project', {})
@@ -252,13 +264,10 @@ def api_get_record_compat(record_id):
             return jsonify({'success': False, 'error': '无权访问该记录'}), 403
         # X1 导出格式：优先从 project.rooms 取多房间，否则回退单房间
         if proj.get('rooms') and isinstance(proj['rooms'], list) and len(proj['rooms']) > 0:
-            pass  # 已有完整的 rooms
+            pass
         else:
             room = ep.get('room', {})
-            if room:
-                proj['rooms'] = [room]
-            else:
-                proj['rooms'] = []
+            proj['rooms'] = [room] if room else []
         proj['record_id'] = record_id
         normalized_project = normalize_project_payload(proj, source='export-record-load')
         normalized_project['record_id'] = record_id
