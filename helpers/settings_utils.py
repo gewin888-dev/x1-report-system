@@ -184,19 +184,33 @@ def _guess_backup_version(name: str) -> str:
     return m.group(1) if m else ''
 
 
+def _guess_backup_type(name: str) -> str:
+    raw = (name or '').lower()
+    if '_code_' in raw or '/code/' in raw or 'code_backup' in raw:
+        return 'code'
+    if '_data_' in raw or '/data_' in raw or '/data/' in raw or 'data_backup' in raw:
+        return 'data'
+    if '_full_' in raw or 'full_backup' in raw:
+        return 'full'
+    return 'full'
+
+
 def _list_backup_files():
     backup_dir = _get_settings_backup_dir()
     backup_dir.mkdir(parents=True, exist_ok=True)
     items = []
-    for fp in sorted(backup_dir.glob('*.tar.gz'), key=lambda p: p.stat().st_mtime, reverse=True):
+    for fp in sorted(backup_dir.rglob('*.tar.gz'), key=lambda p: p.stat().st_mtime, reverse=True):
+        rel_parent = fp.parent.relative_to(backup_dir) if fp.parent != backup_dir else Path('.')
+        backup_type = _guess_backup_type(str(rel_parent / fp.name))
         items.append({
             'name': fp.name,
             'path': str(fp),
+            'relative_dir': '.' if str(rel_parent) == '.' else str(rel_parent),
             'size': fp.stat().st_size,
             'mtime': datetime.fromtimestamp(fp.stat().st_mtime).strftime('%Y-%m-%d %H:%M:%S'),
             'version_guess': _guess_backup_version(fp.name),
             'restorable': True,
-            'type': 'full_backup'
+            'type': backup_type
         })
     return items
 

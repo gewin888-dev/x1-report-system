@@ -176,6 +176,11 @@ def admin_api_records():
                     continue
                 saved_at = data.get('saved_at', '') or proj.get('saved_at', '')
                 feishu = data.get('feishu', {}) or {}
+                pdf_preview = str(data.get('pdf_preview', '') or '').strip()
+                if not pdf_preview:
+                    pdf_candidate = BASE_DIR / 'preview_pdf' / f'{export_id}.pdf'
+                    if pdf_candidate.exists() and pdf_candidate.is_file():
+                        pdf_preview = str(pdf_candidate)
 
                 report_info = {}
                 export_info = {}
@@ -202,7 +207,6 @@ def admin_api_records():
 
                 export_groups[export_id] = {
                     'id': export_id,
-                    'record_id': export_id,
                     'type': 'export',
                     'project_name': proj.get('project_name', ''),
                     'report_number': proj.get('report_number', ''),
@@ -228,6 +232,7 @@ def admin_api_records():
                     'report_info': report_info,
                     'export_info': export_info,
                     'files': [],
+                    'pdf_preview': pdf_preview,
                     'feishu_report_url': feishu.get('report', {}).get('feishu_url', '') or feishu.get('report', {}).get('feishu_open_url', '') if feishu.get('report') else '',
                     'feishu_export_url': feishu.get('export', {}).get('feishu_url', '') or feishu.get('export', {}).get('feishu_open_url', '') if feishu.get('export') else '',
                     'feishu_report_open_url': feishu.get('report', {}).get('feishu_open_url', '') if feishu.get('report') else '',
@@ -435,6 +440,11 @@ def admin_api_records_summary():
                     continue
                 saved_at = data.get('saved_at', '') or proj.get('saved_at', '')
                 feishu = data.get('feishu', {}) or {}
+                pdf_preview = str(data.get('pdf_preview', '') or '').strip()
+                if not pdf_preview:
+                    pdf_candidate = BASE_DIR / 'preview_pdf' / f'{export_id}.pdf'
+                    if pdf_candidate.exists() and pdf_candidate.is_file():
+                        pdf_preview = str(pdf_candidate)
                 report_info = {}
                 export_info = {}
                 if feishu.get('report'):
@@ -471,6 +481,7 @@ def admin_api_records_summary():
                     'report_info': report_info,
                     'export_info': export_info,
                     'files': [],
+                    'pdf_preview': pdf_preview,
                     'voided': bool(data.get('voided')),
                     'voided_at': data.get('voided_at', ''),
                     'voided_by': data.get('voided_by', ''),

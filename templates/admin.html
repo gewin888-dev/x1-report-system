@@ -627,16 +627,13 @@ input[type="text"]:focus,input[type="password"]:focus,input[type="number"]:focus
         <input id="settings-search" class="settings-search" type="text" placeholder="搜索当前分组里的配置项 / 注释 / 后果" oninput="renderCurrentSettingsGroup()">
       </div>
       <div id="settings-group-status" style="font-size:12px;color:#999;margin-bottom:12px;"></div>
-      <div id="settings-restore-center" class="settings-field" style="display:none;margin-bottom:14px;grid-column:1 / -1;">
+      <div id="settings-restore-center" class="settings-field" style="display:block;margin-bottom:14px;grid-column:1 / -1;">
         <div class="settings-label">备份与恢复中心</div>
-        <div class="settings-desc">Phase 1：只做整体还原；默认保留业务数据（records_x1 / reports_x1 / uploads_x1 / logs / logs_x1）。执行前会自动创建恢复前快照。</div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-top:10px;">
-          <div style="min-width:320px;flex:1;max-width:760px;">
-            <label class="settings-label" style="margin-bottom:6px;display:block;">选择要还原的备份</label>
-            <select id="settings-restore-select" onchange="onRestoreBackupSelected(this.value)" style="width:100%;height:40px;border:1px solid #d9d9d9;border-radius:10px;padding:0 12px;">
-              <option value="">请选择备份...</option>
-            </select>
-          </div>
+        <div class="settings-desc">支持代码备份 / 数据备份 / 全量备份，并提供三个独立恢复对话框：代码恢复 / 数据恢复 / 全量恢复。执行恢复前会自动创建恢复前快照。</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px;">
+          <button class="btn settings-btn-main" type="button" onclick="openTypedRestorePicker('code')">恢复代码层</button>
+          <button class="btn settings-btn-soft" type="button" onclick="openTypedRestorePicker('data')">恢复数据层</button>
+          <button class="btn settings-btn-ghost" type="button" onclick="openTypedRestorePicker('full')">整体还原</button>
           <button class="btn settings-btn-soft" type="button" onclick="refreshRestoreBackups()">刷新备份列表</button>
         </div>
         <div id="settings-restore-status" class="settings-meta" style="margin-top:8px;"></div>
@@ -683,6 +680,11 @@ input[type="text"]:focus,input[type="password"]:focus,input[type="number"]:focus
         <button class="docs-nav-btn" data-doc-btn="OPS_DAEMON" onclick="loadWorkspaceDoc('OPS_DAEMON')">⚙️ 启动-停止-验活说明</button>
         <button class="docs-nav-btn" data-doc-btn="OPS_DEPLOY" onclick="loadWorkspaceDoc('OPS_DEPLOY')">📦 部署与迁移说明</button>
         <button class="docs-nav-btn" data-doc-btn="OPS_FEISHU_SOP" onclick="loadWorkspaceDoc('OPS_FEISHU_SOP')">☁️ 飞书上传失败治理 SOP</button>
+        <button class="docs-nav-btn" data-doc-btn="OPS_BACKUP_POLICY" onclick="loadWorkspaceDoc('OPS_BACKUP_POLICY')">🗂️ 备份恢复规范</button>
+        <button class="docs-nav-btn" data-doc-btn="OPS_RESTORE_PLAYBOOK" onclick="loadWorkspaceDoc('OPS_RESTORE_PLAYBOOK')">♻️ 恢复操作说明</button>
+        <button class="docs-nav-btn" data-doc-btn="OPS_ADMIN_RUNBOOK" onclick="loadWorkspaceDoc('OPS_ADMIN_RUNBOOK')">📘 后台备份恢复手册</button>
+        <button class="docs-nav-btn" data-doc-btn="X1_SYSTEM_UNDERSTANDING" onclick="loadWorkspaceDoc('X1_SYSTEM_UNDERSTANDING')">🧠 X1 系统认知报告</button>
+        <button class="docs-nav-btn" data-doc-btn="X1_FULL_AUDIT_PLAN" onclick="loadWorkspaceDoc('X1_FULL_AUDIT_PLAN')">🗺️ X1 全链路巡检与修复总计划</button>
       </div>
     </div>
   </div>
@@ -926,8 +928,8 @@ input[type="text"]:focus,input[type="password"]:focus,input[type="number"]:focus
   <div class="settings-modal" style="width:min(760px,92vw)">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px;">
       <div>
-        <div style="font-size:18px;font-weight:800;color:#1f2937;">整体还原确认</div>
-        <div class="settings-desc">仅允许从已识别备份中整体还原代码与配置；默认保留业务数据目录。</div>
+        <div data-restore-modal-title style="font-size:18px;font-weight:800;color:#1f2937;">整体还原确认</div>
+        <div data-restore-modal-desc class="settings-desc">仅允许从已识别备份中整体还原代码与配置；默认保留业务数据目录。</div>
       </div>
       <button class="btn" type="button" onclick="closeRestoreConfirmModal()">关闭</button>
     </div>
@@ -938,21 +940,46 @@ input[type="text"]:focus,input[type="password"]:focus,input[type="number"]:focus
     </div>
     <div class="modal-footer">
       <button class="btn" type="button" onclick="closeRestoreConfirmModal()">取消</button>
-      <button class="btn settings-btn-main" type="button" onclick="submitFullRestore()">确认整体还原</button>
+      <button class="btn settings-btn-main" data-restore-confirm-btn type="button" onclick="submitFullRestore()">确认整体还原</button>
+    </div>
+  </div>
+</div>
+
+<div id="typed-restore-picker-modal" class="settings-modal-mask">
+  <div class="settings-modal" style="width:min(760px,92vw)">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px;">
+      <div>
+        <div id="typed-restore-picker-title" style="font-size:18px;font-weight:800;color:#1f2937;">选择恢复备份</div>
+        <div id="typed-restore-picker-desc" class="settings-desc">只显示当前恢复类型可用的备份。</div>
+      </div>
+      <button class="btn" type="button" onclick="closeTypedRestorePicker()">关闭</button>
+    </div>
+    <div style="margin-top:8px;">
+      <label class="settings-label" style="margin-bottom:6px;display:block;">选择备份</label>
+      <select id="typed-restore-picker-select" style="width:100%;height:42px;border:1px solid #d9d9d9;border-radius:10px;padding:0 12px;">
+        <option value="">请选择备份...</option>
+      </select>
+    </div>
+    <div id="typed-restore-picker-empty" class="settings-desc" style="display:none;margin-top:10px;color:#cf1322;">当前没有可用备份</div>
+    <div id="typed-restore-picker-preview" class="settings-plain" style="display:none;margin-top:12px;"></div>
+    <div class="modal-footer">
+      <button class="btn" type="button" onclick="closeTypedRestorePicker()">取消</button>
+      <button class="btn settings-btn-main" id="typed-restore-picker-confirm" type="button" onclick="confirmTypedRestorePicker()">下一步</button>
     </div>
   </div>
 </div>
 
 <div id="backup-choice-modal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.38);z-index:9999;align-items:center;justify-content:center;">
-  <div style="width:420px;max-width:92vw;background:#fff;border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.18);padding:20px 20px 16px;">
+  <div style="width:460px;max-width:92vw;background:#fff;border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.18);padding:20px 20px 16px;">
     <div style="font-size:18px;font-weight:700;color:#1f2937;margin-bottom:8px;">立即备份</div>
-    <div style="font-size:13px;color:#6b7280;line-height:1.7;margin-bottom:16px;">请选择本次备份方式：</div>
-    <div style="display:flex;flex-direction:column;gap:10px;">
-      <button class="btn settings-btn-main" style="justify-content:center" onclick="submitBackupChoice('direct')">直接备份</button>
-      <button class="btn settings-btn-soft" style="justify-content:center" onclick="submitBackupChoice('update')">更新备份</button>
-      <button class="btn" style="justify-content:center" onclick="closeBackupChoiceModal()">取消备份</button>
+    <div style="font-size:13px;color:#6b7280;line-height:1.7;margin-bottom:16px;">请选择本次备份类型：</div>
+    <div style="display:grid;grid-template-columns:1fr;gap:10px;">
+      <button class="btn settings-btn-main" style="justify-content:center;height:42px;" onclick="submitBackupChoice('code')">代码备份</button>
+      <button class="btn settings-btn-soft" style="justify-content:center;height:42px;" onclick="submitBackupChoice('data')">数据备份</button>
+      <button class="btn settings-btn-ghost" style="justify-content:center;height:42px;" onclick="submitBackupChoice('full')">全量备份</button>
+      <button class="btn" style="justify-content:center" onclick="closeBackupChoiceModal()">取消</button>
     </div>
-    <div style="margin-top:12px;font-size:12px;color:#9ca3af;line-height:1.6;">直接备份：沿用当前版本号与默认备份名称。<br>更新备份：先更新版本号与备份名称，再执行备份。</div>
+    <div style="margin-top:12px;font-size:12px;color:#9ca3af;line-height:1.6;">代码备份：仅备份程序代码。<br>数据备份：仅备份数据库、记录、报告、上传资源与配置。<br>全量备份：整包备份当前系统。</div>
   </div>
 </div>
 <script>
@@ -964,6 +991,7 @@ var DOMAIN_MAP={hospital:'医院',pharma:'制药',biosafety:'生物安全',food:
 var settingsGroups={},currentSettingsGroup='basic',currentPathBrowseKey='',currentBrowsePath='';
 var restoreBackupItems=[];
 var pendingRestoreItem=null;
+var pendingTypedRestoreType='';
 var SETTINGS_GROUP_META={basic:{title:'基础信息',desc:'查看当前实例身份、版本和运行入口，适合迁移后快速核对环境。'},paths:{title:'路径设置',desc:'集中管理模板、日志、缓存、临时目录等关键运行路径。'},archive:{title:'正式归档设置',desc:'管理正式检测报告和原始记录的业务归档目录与后续归档规则。'},export:{title:'模板与导出',desc:'控制双链导出、模板命中与模板上传等主链行为。'},feishu:{title:'飞书与外部集成',desc:'管理外部上传链路与飞书行为开关。'},security:{title:'权限与安全',desc:'控制删除、下载、预览、安全策略等高风险行为。'},ops:{title:'运行与维护',desc:'管理日志、回收站、备份等日常运维参数。'}};
 
 var _monitorTimer=null;
@@ -1995,22 +2023,7 @@ function loadRecords(page){
 function openRecordAsset(kind, target, failMessage){
   if(kind === 'local'){
     if(!target){ showToast(failMessage || '文件保存失败', 'error'); return; }
-    fetch('/admin/api/open_file/'+encodeURIComponent(target), {method:'POST', credentials:'same-origin'})
-      .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, status:r.status, data:d}; }); })
-      .then(function(res){
-        var d = res.data || {};
-        if(d.success){
-          showToast((d.message || '已调用本机软件打开文件'), 'success');
-          return;
-        }
-        if(res.status === 409){
-          showToast((d.error || '当前主机不支持本机打开，改为浏览器下载'), 'info');
-          window.location.href = '/download/' + encodeURIComponent(target);
-          return;
-        }
-        showToast(d.error || failMessage || '打开失败', 'error');
-      })
-      .catch(function(){ showToast(failMessage || '打开失败', 'error'); });
+    previewFile(target);
     return;
   }
   if(kind === 'feishu'){
@@ -2112,8 +2125,8 @@ function renderRecords(filtered){
     h += '</div>';
     h += '<div class="record-actions">';
     if(r.type === 'export'){
-      h += buildRecordAssetButton('本地报告', localReportOk, 'local', reportFile ? reportFile.name : '', '本地检测报告保存失败', 'local', 'admin.records.open_local');
-      h += buildRecordAssetButton('本地记录', localRecordOk, 'local', rawExcel ? rawExcel.name : '', '本地原始记录保存失败', 'local', 'admin.records.open_local');
+      h += buildRecordAssetButton('查看检测报告', localReportOk, 'local', reportFile ? reportFile.name : '', '本地检测报告保存失败', 'local', 'admin.records.open_local');
+      h += buildRecordAssetButton('查看原始记录', localRecordOk, 'local', rawExcel ? rawExcel.name : '', '本地原始记录保存失败', 'local', 'admin.records.open_local');
       h += buildRecordAssetButton('飞书报告', feishuReportOk, 'feishu', r.feishu_report_url || '', '飞书检测报告保存失败', 'feishu', 'admin.records.open_feishu');
       h += buildRecordAssetButton('飞书记录', feishuRecordOk, 'feishu', r.feishu_export_url || '', '飞书原始记录保存失败', 'feishu', 'admin.records.open_feishu');
       if(!isVoided){
@@ -4009,7 +4022,7 @@ function renderCurrentSettingsGroup(){
     ? '基础信息为系统实时状态展示区，只读，不提供任何编辑入口'
     : '当前分组共 '+items.length+' 项'+(sensitiveCount?'，其中敏感配置 '+sensitiveCount+' 项，修改前请先和客户二次确认':'')+(keyword?'｜已按关键词过滤':'');
   var restoreMount=document.getElementById('settings-restore-center');
-  if(restoreMount) restoreMount.style.display = currentSettingsGroup === 'ops' ? 'block' : 'none';
+  if(restoreMount) restoreMount.style.display = 'block';
   var html='';
   items.forEach(function(item, idx){
     var itemId = currentSettingsGroup + '__' + idx;
@@ -4137,21 +4150,13 @@ function closeBackupChoiceModal(){
 function submitBackupChoice(mode){
   if(mode==='direct'){
     closeBackupChoiceModal();
-    executeSettingsBackup({});
     return;
   }
-  if(mode==='update'){
-    var currentVersion = ((window.currentSettingsData||{})['basic.version']||{}).value || (document.getElementById('sys-version') ? document.getElementById('sys-version').textContent : '{{ version }}') || '{{ version }}';
-    var nextVersion = prompt('请输入新的版本号：', currentVersion);
-    if(nextVersion === null) return;
-    nextVersion = (nextVersion||'').trim();
-    if(!nextVersion){ showToast('版本号不能为空','error'); return; }
-    var backupName = prompt('请输入备份名称：', 'X1_'+nextVersion+'_manual_backup');
-    if(backupName === null) return;
-    backupName = (backupName||'').trim();
-    if(!backupName){ showToast('备份名称不能为空','error'); return; }
+  var backupType = mode;
+  if(['code','data','full'].indexOf(backupType) < 0){ showToast('备份类型不合法','error'); return; }
+  if(mode==='code' || mode==='data' || mode==='full'){
     closeBackupChoiceModal();
-    executeSettingsBackup({updateVersion:true, version:nextVersion, backupName:backupName});
+    executeSettingsBackup({type: backupType});
     return;
   }
   closeBackupChoiceModal();
@@ -4160,7 +4165,9 @@ function submitBackupChoice(mode){
 function executeSettingsBackup(payload){
   fetch('/admin/api/settings/backup_now',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload||{})}).then(function(r){return r.json()}).then(function(d){
     if(d.success){
-      showToast('备份完成：'+d.backup_file,'success');
+      var backupTypeMap={code:'代码备份',data:'数据备份',full:'全量备份'};
+      var label=backupTypeMap[d.type]||'备份';
+      showToast(label+'完成：'+d.backup_file,'success');
       if(d.version_updated){ showToast('系统版本已更新为 '+d.version,'success'); loadSettingsPanel(); }
       refreshRestoreBackups();
     } else showToast(d.error||'备份失败','error');
@@ -4172,52 +4179,87 @@ function loadRestoreCenter(){
   if(target) switchSettingsGroup('ops', target);
   refreshRestoreBackups();
 }
+function openTypedRestorePicker(restoreType){
+  pendingTypedRestoreType = restoreType || 'full';
+  var modal=document.getElementById('typed-restore-picker-modal');
+  var title=document.getElementById('typed-restore-picker-title');
+  var desc=document.getElementById('typed-restore-picker-desc');
+  var select=document.getElementById('typed-restore-picker-select');
+  var empty=document.getElementById('typed-restore-picker-empty');
+  var preview=document.getElementById('typed-restore-picker-preview');
+  var btn=document.getElementById('typed-restore-picker-confirm');
+  var metaMap={
+    code:{title:'选择代码恢复备份',desc:'这里只显示代码备份，确认后进入代码层恢复确认对话框。'},
+    data:{title:'选择数据恢复备份',desc:'这里只显示数据备份，确认后进入数据层恢复确认对话框。'},
+    full:{title:'选择全量恢复备份',desc:'这里只显示全量备份，确认后进入整体还原确认对话框。'}
+  };
+  var meta=metaMap[pendingTypedRestoreType] || metaMap.full;
+  var items=(restoreBackupItems||[]).filter(function(x){ return (x.type||'full')===pendingTypedRestoreType; });
+  if(title) title.textContent=meta.title;
+  if(desc) desc.textContent=meta.desc;
+  if(select){
+    var typeLabelMap={code:'代码',data:'数据',full:'全量'};
+    select.innerHTML='<option value="">请选择备份...</option>' + items.map(function(x){
+      var typeLabel=typeLabelMap[x.type]||x.type||'全量';
+      return '<option value="'+escapeHtml(x.name||'')+'">['+escapeHtml(typeLabel)+'] '+escapeHtml((x.version_guess||'-')+' ｜ '+(x.mtime||'-')+' ｜ '+(x.name||''))+'</option>';
+    }).join('');
+    select.value='';
+    select.onchange=function(){ renderTypedRestorePickerPreview(this.value); };
+  }
+  if(empty) empty.style.display = items.length ? 'none' : 'block';
+  if(preview){ preview.style.display='none'; preview.innerHTML=''; }
+  if(btn) btn.disabled = !items.length;
+  if(modal) modal.style.display='flex';
+}
+
+function renderTypedRestorePickerPreview(name){
+  var preview=document.getElementById('typed-restore-picker-preview');
+  var btn=document.getElementById('typed-restore-picker-confirm');
+  var item=(restoreBackupItems||[]).find(function(x){ return x.name===name; });
+  if(!preview) return;
+  if(!item){ preview.style.display='none'; preview.innerHTML=''; if(btn) btn.disabled=true; return; }
+  var typeLabelMap={code:'代码备份',data:'数据备份',full:'全量备份'};
+  preview.style.display='block';
+  preview.innerHTML='已选备份：<strong>'+escapeHtml(item.name||'-')+'</strong><br>类型：'+escapeHtml(typeLabelMap[item.type]||item.type||'-')+'<br>版本：'+escapeHtml(item.version_guess||'-')+'<br>时间：'+escapeHtml(item.mtime||'-')+'<br>大小：'+(((item.size||0)/1024/1024).toFixed(1))+' MB';
+  if(btn) btn.disabled=false;
+}
+
+function confirmTypedRestorePicker(){
+  var select=document.getElementById('typed-restore-picker-select');
+  var name=select ? select.value : '';
+  if(!name){ showToast('请先选择备份','error'); return; }
+  closeTypedRestorePicker();
+  openRestoreConfirmModal(name, pendingTypedRestoreType || 'full');
+}
+
+function closeTypedRestorePicker(){
+  var modal=document.getElementById('typed-restore-picker-modal');
+  if(modal) modal.style.display='none';
+}
+
 function refreshRestoreBackups(){
   var mount=document.getElementById('settings-restore-list');
   var status=document.getElementById('settings-restore-status');
   var result=document.getElementById('settings-restore-result');
-  var select=document.getElementById('settings-restore-select');
   if(status) status.textContent='正在加载备份列表...';
   fetch('/admin/api/settings/backups').then(function(r){return r.json()}).then(function(d){
     if(!d.success){ if(status) status.textContent=d.error||'加载失败'; return; }
     restoreBackupItems=d.items||[];
     if(status) status.textContent='备份目录：'+(d.backup_dir||'-')+' ｜ 共 '+restoreBackupItems.length+' 个备份';
-    if(select){
-      select.innerHTML='<option value="">请选择备份...</option>' + restoreBackupItems.map(function(x){
-        return '<option value="'+escapeHtml(x.name||'')+'">'+escapeHtml((x.version_guess||'-')+' ｜ '+(x.mtime||'-')+' ｜ '+(x.name||''))+'</option>';
-      }).join('');
-    }
     if(!mount) return;
-    mount.innerHTML='<div class="settings-desc">请先在上方下拉框中选择一个备份，再查看详情或执行整体还原。</div>';
+    var counts={code:0,data:0,full:0};
+    restoreBackupItems.forEach(function(x){ var t=(x.type||'full'); if(counts[t] !== undefined) counts[t] += 1; });
+    mount.innerHTML=''
+      +'<div class="settings-plain" style="border:1px solid #eef2f7;border-radius:12px;padding:14px 16px;background:#fbfdff;">'
+      +'<div style="font-size:15px;font-weight:700;color:#1f2937;margin-bottom:8px;">当前备份统计</div>'
+      +'<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;">'
+      +'<div><div class="settings-meta">代码备份</div><div style="font-weight:700;">'+counts.code+' 个</div></div>'
+      +'<div><div class="settings-meta">数据备份</div><div style="font-weight:700;">'+counts.data+' 个</div></div>'
+      +'<div><div class="settings-meta">全量备份</div><div style="font-weight:700;">'+counts.full+' 个</div></div>'
+      +'</div>'
+      +'<div class="settings-desc" style="margin-top:10px;">请点击上方“恢复代码层 / 恢复数据层 / 整体还原”按钮，分别打开对应类型的下拉选择对话框。</div>'
+      +'</div>';
   }).catch(function(){ if(status) status.textContent='备份列表加载失败'; });
-}
-function onRestoreBackupSelected(name){
-  var mount=document.getElementById('settings-restore-list');
-  if(!mount) return;
-  if(!name){
-    mount.innerHTML='<div class="settings-desc">请先在上方下拉框中选择一个备份，再查看详情或执行整体还原。</div>';
-    return;
-  }
-  var item=(restoreBackupItems||[]).find(function(x){return x.name===name;});
-  if(!item){
-    mount.innerHTML='<div class="empty">未找到所选备份</div>';
-    return;
-  }
-  var sizeMb=((item.size||0)/1024/1024).toFixed(1)+' MB';
-  mount.innerHTML=''
-    +'<div class="settings-plain" style="border:1px solid #eef2f7;border-radius:12px;padding:14px 16px;background:#fbfdff;">'
-    +'<div style="font-size:15px;font-weight:700;color:#1f2937;margin-bottom:8px;">当前选中备份</div>'
-    +'<div style="font-family:monospace;font-size:12px;color:#334155;word-break:break-all;">'+escapeHtml(item.name||'')+'</div>'
-    +'<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px;">'
-    +'<div><div class="settings-meta">版本</div><div style="font-weight:600;">'+escapeHtml(item.version_guess||'-')+'</div></div>'
-    +'<div><div class="settings-meta">时间</div><div style="font-weight:600;">'+escapeHtml(item.mtime||'-')+'</div></div>'
-    +'<div><div class="settings-meta">大小</div><div style="font-weight:600;">'+sizeMb+'</div></div>'
-    +'</div>'
-    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">'
-    +'<button class="btn settings-btn-ghost" type="button" onclick="viewRestoreBackupDetail(\''+String(item.name||'').replace(/'/g,"&#39;")+'\')">查看详情</button>'
-    +'<button class="btn settings-btn-main" type="button" onclick="openRestoreConfirmModal(\''+String(item.name||'').replace(/'/g,"&#39;")+'\')">整体还原</button>'
-    +'</div>'
-    +'</div>';
 }
 function viewRestoreBackupDetail(name){
   fetch('/admin/api/settings/backups/'+encodeURIComponent(name)).then(function(r){return r.json()}).then(function(d){
@@ -4226,10 +4268,19 @@ function viewRestoreBackupDetail(name){
     alert('备份详情\n\n文件：'+(d.name||'-')+'\n时间：'+(d.mtime||'-')+'\n版本：'+(d.version_guess||'-')+'\n大小：'+(((d.size||0)/1024/1024).toFixed(1))+' MB\n\n根目录：'+((s.root_names||[]).join(', ')||'-')+'\napp_x1.py：'+(checks['app_x1.py']?'存在':'缺失')+'\nstatic/record.js：'+(checks['static/record.js']?'存在':'缺失')+'\ntemplates/record_index.html：'+(checks['templates/record_index.html']?'存在':'缺失')+'\nx1_config.json：'+(checks['x1_config.json']?'存在':'缺失'));
   }).catch(function(){showToast('读取备份详情失败','error')});
 }
-function openRestoreConfirmModal(name){
+function openRestoreConfirmModal(name, restoreType){
   pendingRestoreItem=(restoreBackupItems||[]).find(function(x){return x.name===name;}) || {name:name};
+  pendingRestoreItem.restore_type = restoreType || pendingRestoreItem.type || 'full';
   var body=document.getElementById('restore-confirm-body');
-  if(body){ body.innerHTML='目标备份：<strong>'+escapeHtml(pendingRestoreItem.name||'-')+'</strong><br>版本推测：'+escapeHtml(pendingRestoreItem.version_guess||'-')+'<br>时间：'+escapeHtml(pendingRestoreItem.mtime||'-')+'<br><br>执行前将自动创建恢复前快照；将整体恢复代码与配置；默认保留 <code>records_x1 / reports_x1 / uploads_x1 / logs / logs_x1</code>；恢复后需要手动重启服务完成真正切换。'; }
+  var titleEl=document.querySelector('#restore-confirm-modal [data-restore-modal-title]');
+  var descEl=document.querySelector('#restore-confirm-modal [data-restore-modal-desc]');
+  var confirmBtn=document.querySelector('#restore-confirm-modal [data-restore-confirm-btn]');
+  var typeLabelMap={code:'代码层恢复',data:'数据层恢复',full:'整体还原'};
+  var actionLabel=typeLabelMap[pendingRestoreItem.restore_type]||'整体还原';
+  if(titleEl) titleEl.textContent=actionLabel+'确认';
+  if(descEl) descEl.textContent=pendingRestoreItem.restore_type==='code' ? '仅恢复代码层，不覆盖数据库、上传资源与配置。' : (pendingRestoreItem.restore_type==='data' ? '仅恢复数据层，不覆盖代码层。' : '恢复代码、配置与系统内容；保留关键业务数据与恢复前快照。');
+  if(confirmBtn) confirmBtn.textContent='确认'+actionLabel;
+  if(body){ body.innerHTML='目标备份：<strong>'+escapeHtml(pendingRestoreItem.name||'-')+'</strong><br>恢复类型：'+escapeHtml(actionLabel)+'<br>版本推测：'+escapeHtml(pendingRestoreItem.version_guess||'-')+'<br>时间：'+escapeHtml(pendingRestoreItem.mtime||'-')+'<br><br>'+(pendingRestoreItem.restore_type==='code' ? '将仅恢复代码层，并自动尝试重启服务；不会覆盖数据库、上传资源与配置。' : (pendingRestoreItem.restore_type==='data' ? '将仅恢复数据层（数据库/记录/报告/上传资源/配置）；不会覆盖代码层。' : '执行前将自动创建恢复前快照；将整体恢复代码与配置；当前会保留 <code>records_x1 / reports_x1 / uploads / uploads_x1 / uploaded_reports / logs / logs_x1</code>，并保留 <code>x1_data.db / data/x1_data.db / users.json / x1_config.json</code>；恢复后需要手动重启服务完成真正切换。')); }
   var input=document.getElementById('restore-confirm-input');
   if(input) input.value='';
   var modal=document.getElementById('restore-confirm-modal');
@@ -4246,12 +4297,16 @@ function renderRestoreResultCard(d, ok){
   var healthOk=!!(d.health&&d.health.success);
   var tone=ok?'#f6ffed':'#fff2f0';
   var border=ok?'#b7eb8f':'#ffccc7';
-  var title=ok?'最近一次整体还原结果：成功':'最近一次整体还原结果：失败';
+  var restoreType=(d.restore_type||d.type||((pendingRestoreItem||{}).restore_type)||'full');
+  var titleMap={code:['最近一次代码层恢复结果：成功','最近一次代码层恢复结果：失败'],data:['最近一次数据层恢复结果：成功','最近一次数据层恢复结果：失败'],full:['最近一次整体还原结果：成功','最近一次整体还原结果：失败']};
+  var actionMap={code:'代码层恢复',data:'数据层恢复',full:'整体还原'};
+  var title=(titleMap[restoreType]||titleMap.full)[ok?0:1];
   mount.style.display='block';
   mount.innerHTML=''
     +'<div style="border:1px solid '+border+';background:'+tone+';border-radius:12px;padding:14px 16px;">'
     +'<div style="font-size:15px;font-weight:800;color:#1f2937;margin-bottom:10px;">'+title+'</div>'
     +'<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px;">'
+    +'<div><div class="settings-meta">恢复类型</div><div style="font-weight:600;">'+escapeHtml(actionMap[restoreType]||'整体还原')+'</div></div>'
     +'<div><div class="settings-meta">目标备份</div><div style="font-family:monospace;font-size:12px;word-break:break-all;">'+escapeHtml(d.backup_name||'-')+'</div></div>'
     +'<div><div class="settings-meta">版本</div><div style="font-weight:600;">'+escapeHtml(d.version||'-')+'</div></div>'
     +'<div><div class="settings-meta">快照路径</div><div style="font-family:monospace;font-size:12px;word-break:break-all;">'+escapeHtml(d.snapshot_path||'-')+'</div></div>'
@@ -4269,19 +4324,21 @@ function submitFullRestore(){
   if(!pendingRestoreItem || !pendingRestoreItem.name){ showToast('未选择备份','error'); return; }
   var confirmText=(document.getElementById('restore-confirm-input')||{}).value||'';
   if(confirmText.trim() !== 'RESTORE'){ showToast('确认词不正确','error'); return; }
-  fetch('/admin/api/settings/restore/full',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({backup_name:pendingRestoreItem.name,confirm:'RESTORE'})}).then(function(r){return r.json()}).then(function(d){
+  var restoreType = pendingRestoreItem.restore_type || pendingRestoreItem.type || 'full';
+  var endpoint = restoreType==='code' ? '/admin/api/settings/restore/code' : (restoreType==='data' ? '/admin/api/settings/restore/data' : '/admin/api/settings/restore/full');
+  fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({backup_name:pendingRestoreItem.name,confirm:'RESTORE'})}).then(function(r){return r.json()}).then(function(d){
     if(d.success){
       closeRestoreConfirmModal();
       renderRestoreResultCard(d, true);
-      showToast('整体还原完成','success');
+      showToast((restoreType==='code' ? '代码层恢复完成' : (restoreType==='data' ? '数据层恢复完成' : '整体还原完成')),'success');
       refreshRestoreBackups();
       onRestoreBackupSelected(d.backup_name||pendingRestoreItem.name);
     } else {
       renderRestoreResultCard(d, false);
-      alert('整体还原失败\n\n原因：'+(d.error||'未知错误'));
-      showToast(d.error||'整体还原失败','error');
+      alert((restoreType==='code' ? '代码层恢复失败' : (restoreType==='data' ? '数据层恢复失败' : '整体还原失败'))+'\n\n原因：'+(d.error||'未知错误'));
+      showToast(d.error||'恢复失败','error');
     }
-  }).catch(function(){showToast('整体还原失败','error')});
+  }).catch(function(){showToast('恢复失败','error')});
 }
 function ensureSettingsPath(key){
   fetch('/admin/api/settings/ensure_path',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:key})}).then(function(r){return r.json()}).then(function(d){

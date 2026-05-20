@@ -24,7 +24,7 @@ from monitor import log_action, get_system_health
 from helpers.settings_utils import (
     _settings_defs, _setting_defs_map, _cast_setting_value,
     _load_system_settings, _setting_enabled, _save_feishu_config_from_settings,
-    _get_settings_backup_dir, _is_allowed_backup_file, _guess_backup_version,
+    _get_settings_backup_dir, _is_allowed_backup_file, _guess_backup_version, _guess_backup_type,
     _list_backup_files, _extract_backup_summary, _safe_rmtree,
     _get_listener_pid, _get_process_cwd, _health_json, _get_latest_backup
 )
@@ -298,17 +298,42 @@ def admin_api_settings_backup_now():
             return jsonify({'success': False, 'error': f'更新版本号失败: {e}'}), 500
 
     ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+    backup_type = str(data.get('type', 'full') or 'full').strip().lower()
+    if backup_type not in {'code', 'data', 'full'}:
+        return jsonify({'success': False, 'error': '不支持的备份类型'}), 400
+    backup_subdir = backup_dir / backup_type
+    backup_subdir.mkdir(parents=True, exist_ok=True)
     backup_name = str(data.get('backupName', '') or '').strip() if data.get('updateVersion') else ''
     if backup_name:
         safe_name = ''.join(ch if ch.isalnum() or ch in ('-','_') else '_' for ch in backup_name)
     else:
-        safe_name = f'X1_{version}_manual_backup'
-    backup_file = backup_dir / f'{safe_name}_{ts}.tar.gz'
+        safe_name = f'X1_{version}_{backup_type}_manual_backup'
+    backup_file = backup_subdir / f'{safe_name}_{ts}.tar.gz'
     import tarfile as _tarfile
     with _tarfile.open(backup_file, 'w:gz') as tar:
-        tar.add(str(BASE_DIR), arcname=BASE_DIR.name)
-    log_action(current_user.id, '执行立即备份', 'system_settings', str(backup_file))
-    return jsonify({'success': True, 'backup_file': str(backup_file), 'size': backup_file.stat().st_size, 'version_updated': version_updated, 'version': version})
+        if backup_type == 'code':
+            code_items = [
+                'app_x1.py', 'customer_routes.py', 'customer_admin_routes.py', 'feishu_utils.py', 'judgement_engine.py',
+                'payload_normalizer.py', 'report_context_builder.py', 'package.json', 'requirements.txt',
+                'routes', 'static', 'templates', 'adapters', 'helpers'
+            ]
+            for item in code_items:
+                src = BASE_DIR / item
+                if src.exists():
+                    tar.add(str(src), arcname=str(Path(BASE_DIR.name) / item))
+        elif backup_type == 'data':
+            data_items = [
+                'x1_data.db', 'users.json', 'x1_config.json', 'records_x1', 'reports_x1', 'uploads', 'uploaded_reports'
+            ]
+            optional_items = ['data/x1_data.db']
+            for item in data_items + optional_items:
+                src = BASE_DIR / item
+                if src.exists():
+                    tar.add(str(src), arcname=str(Path(BASE_DIR.name) / item))
+        else:
+            tar.add(str(BASE_DIR), arcname=BASE_DIR.name)
+    log_action(current_user.id, '执行立即备份', 'system_settings', json.dumps({'backup_file': str(backup_file), 'type': backup_type}, ensure_ascii=False))
+    return jsonify({'success': True, 'backup_file': str(backup_file), 'size': backup_file.stat().st_size, 'version_updated': version_updated, 'version': version, 'type': backup_type})
 
 
 @settings_bp.route('/admin/api/settings/backups')
@@ -322,11 +347,17 @@ def admin_api_settings_backups():
 @login_required
 @require_permission('admin.settings.view')
 def admin_api_settings_backup_detail(name):
-    backup_path = (_get_settings_backup_dir() / Path(name).name)
+    backup_name = Path(name).name
+    backup_dir = _get_settings_backup_dir()
+    backup_path = backup_dir / backup_name
     if not _is_allowed_backup_file(backup_path):
+        backup_path = next((p for p in backup_dir.rglob(backup_name) if _is_allowed_backup_file(p)), None)
+    if not backup_path:
         return jsonify({'success': False, 'error': '备份文件不存在或不在允许目录中'}), 404
     summary = _extract_backup_summary(backup_path)
-    return jsonify({'success': True, 'name': backup_path.name, 'size': backup_path.stat().st_size, 'mtime': datetime.fromtimestamp(backup_path.stat().st_mtime).strftime('%Y-%m-%d %H:%M:%S'), 'version_guess': _guess_backup_version(backup_path.name), 'summary': summary})
+    relative_dir = backup_path.parent.relative_to(backup_dir) if backup_path.parent != backup_dir else Path('.')
+    backup_type = _guess_backup_type(str(relative_dir / backup_path.name))
+    return jsonify({'success': True, 'name': backup_path.name, 'type': backup_type, 'relative_dir': '.' if str(relative_dir)=='.' else str(relative_dir), 'size': backup_path.stat().st_size, 'mtime': datetime.fromtimestamp(backup_path.stat().st_mtime).strftime('%Y-%m-%d %H:%M:%S'), 'version_guess': _guess_backup_version(backup_path.name), 'summary': summary})
 
 
 @settings_bp.route('/admin/api/settings/restore/full', methods=['POST'])
@@ -341,8 +372,11 @@ def admin_api_settings_restore_full():
     if not backup_name:
         return jsonify({'success': False, 'error': '缺少备份名称'}), 400
 
-    backup_path = _get_settings_backup_dir() / backup_name
+    backup_dir = _get_settings_backup_dir()
+    backup_path = backup_dir / backup_name
     if not _is_allowed_backup_file(backup_path):
+        backup_path = next((p for p in backup_dir.rglob(backup_name) if _is_allowed_backup_file(p)), None)
+    if not backup_path:
         return jsonify({'success': False, 'error': '备份文件不存在或不在允许目录中'}), 404
 
     ts = datetime.now().strftime('%Y%m%d_%H%M%S')
@@ -350,7 +384,9 @@ def admin_api_settings_restore_full():
     renamed_dir = BASE_DIR.parent / f'{BASE_DIR.name}_before_restore_{ts}'
     temp_extract_dir = Path(tempfile.mkdtemp(prefix='x1_restore_', dir=str(_get_settings_backup_dir())))
     restore_log = LOGS_DIR / f'manual_restore_{ts}.log'
-    kept_dirs = ['records_x1', 'reports_x1', 'uploads_x1', 'logs', 'logs_x1']
+    kept_dirs = ['records_x1', 'reports_x1', 'uploads', 'uploads_x1', 'uploaded_reports', 'logs', 'logs_x1']
+    kept_files = ['x1_data.db', 'users.json', 'x1_config.json']
+    kept_optional_files = ['data/x1_data.db']
     rebuilt_dirs = ['cache_x1', 'temp_x1']
 
     def _w(line: str):
@@ -375,13 +411,22 @@ def admin_api_settings_restore_full():
             src = BASE_DIR / d
             if src.exists():
                 shutil.copytree(src, temp_extract_dir / '__kept__' / d)
+        for f_rel in kept_files + kept_optional_files:
+            src = BASE_DIR / f_rel
+            if src.exists() and src.is_file():
+                dst = temp_extract_dir / '__kept_files__' / f_rel
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, dst)
         _w(f'kept_dirs={kept_dirs}')
+        _w(f'kept_files={kept_files}')
+        _w(f'kept_optional_files={kept_optional_files}')
 
         os.rename(BASE_DIR, renamed_dir)
         os.rename(extracted_root, BASE_DIR)
         _w(f'renamed_old={renamed_dir}')
 
         kept_root = temp_extract_dir / '__kept__'
+        kept_files_root = temp_extract_dir / '__kept_files__'
         for d in kept_dirs:
             src = kept_root / d
             dst = BASE_DIR / d
@@ -389,6 +434,14 @@ def admin_api_settings_restore_full():
                 _safe_rmtree(dst) if dst.is_dir() else dst.unlink()
             if src.exists():
                 shutil.copytree(src, dst)
+        for f_rel in kept_files + kept_optional_files:
+            src = kept_files_root / f_rel
+            dst = BASE_DIR / f_rel
+            if dst.exists():
+                dst.unlink()
+            if src.exists():
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, dst)
         for d in rebuilt_dirs:
             dst = BASE_DIR / d
             if dst.exists():
@@ -443,6 +496,131 @@ def admin_api_settings_restore_full():
             return jsonify({'success': False, 'error': '还原完成，但在线进程未切到新目录', **result_payload}), 500
 
         log_action(current_user.id, '执行整体还原', 'system_settings', json.dumps({**result_payload, 'result': 'success'}, ensure_ascii=False))
+        return jsonify({'success': True, **result_payload})
+    except Exception as e:
+        _w(f'error={e}')
+        return jsonify({'success': False, 'error': str(e), 'log_path': str(restore_log)}), 500
+    finally:
+        try:
+            _safe_rmtree(temp_extract_dir)
+        except Exception:
+            pass
+
+
+@settings_bp.route('/admin/api/settings/restore/code', methods=['POST'])
+@login_required
+@require_permission('admin.maintenance.run')
+def admin_api_settings_restore_code():
+    data = request.get_json(silent=True) or {}
+    backup_name = Path(str(data.get('backup_name', '') or '').strip()).name
+    confirm = str(data.get('confirm', '') or '').strip()
+    if confirm != 'RESTORE':
+        return jsonify({'success': False, 'error': '确认词不正确'}), 400
+    if not backup_name:
+        return jsonify({'success': False, 'error': '缺少备份名称'}), 400
+    backup_path = next((p for p in _get_settings_backup_dir().rglob(backup_name) if _is_allowed_backup_file(p)), None)
+    if not backup_path:
+        return jsonify({'success': False, 'error': '备份文件不存在或不在允许目录中'}), 404
+
+    ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+    temp_extract_dir = Path(tempfile.mkdtemp(prefix='x1_restore_code_', dir=str(_get_settings_backup_dir())))
+    restore_log = LOGS_DIR / f'manual_restore_code_{ts}.log'
+    code_items = ['app_x1.py', 'customer_routes.py', 'customer_admin_routes.py', 'feishu_utils.py', 'judgement_engine.py', 'payload_normalizer.py', 'report_context_builder.py', 'package.json', 'requirements.txt', 'routes', 'static', 'templates', 'adapters', 'helpers']
+
+    def _w(line: str):
+        restore_log.parent.mkdir(parents=True, exist_ok=True)
+        with open(restore_log, 'a', encoding='utf-8') as f:
+            f.write(line.rstrip() + '\n')
+
+    try:
+        with tarfile.open(backup_path, 'r:gz') as tf:
+            tf.extractall(temp_extract_dir)
+        roots = [p for p in temp_extract_dir.iterdir() if p.is_dir()]
+        if not roots:
+            raise RuntimeError('备份包解压后未找到项目目录')
+        extracted_root = min(roots, key=lambda p: len(str(p)))
+        for item in code_items:
+            src = extracted_root / item
+            dst = BASE_DIR / item
+            if not src.exists():
+                continue
+            if dst.exists():
+                if dst.is_dir():
+                    _safe_rmtree(dst)
+                else:
+                    dst.unlink()
+            if src.is_dir():
+                shutil.copytree(src, dst)
+            else:
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, dst)
+        restart_script = BASE_DIR / 'restart_x1_daemon.sh'
+        restart_proc = subprocess.run([str(restart_script)], cwd=str(BASE_DIR), capture_output=True, text=True, timeout=180)
+        health = _health_json()
+        result_payload = {'backup_name': backup_path.name, 'type': 'code', 'log_path': str(restore_log), 'health': health, 'restart_rc': restart_proc.returncode, 'version': load_x1_config(BASE_DIR).get('version', APP_VERSION)}
+        log_action(current_user.id, '执行代码还原', 'system_settings', json.dumps({**result_payload, 'result': 'success' if restart_proc.returncode == 0 else 'restart_failed'}, ensure_ascii=False))
+        if restart_proc.returncode != 0:
+            return jsonify({'success': False, 'error': '代码还原完成，但自动重启失败', **result_payload}), 500
+        return jsonify({'success': True, **result_payload})
+    except Exception as e:
+        _w(f'error={e}')
+        return jsonify({'success': False, 'error': str(e), 'log_path': str(restore_log)}), 500
+    finally:
+        try:
+            _safe_rmtree(temp_extract_dir)
+        except Exception:
+            pass
+
+
+@settings_bp.route('/admin/api/settings/restore/data', methods=['POST'])
+@login_required
+@require_permission('admin.maintenance.run')
+def admin_api_settings_restore_data():
+    data = request.get_json(silent=True) or {}
+    backup_name = Path(str(data.get('backup_name', '') or '').strip()).name
+    confirm = str(data.get('confirm', '') or '').strip()
+    if confirm != 'RESTORE':
+        return jsonify({'success': False, 'error': '确认词不正确'}), 400
+    if not backup_name:
+        return jsonify({'success': False, 'error': '缺少备份名称'}), 400
+    backup_path = next((p for p in _get_settings_backup_dir().rglob(backup_name) if _is_allowed_backup_file(p)), None)
+    if not backup_path:
+        return jsonify({'success': False, 'error': '备份文件不存在或不在允许目录中'}), 404
+
+    ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+    temp_extract_dir = Path(tempfile.mkdtemp(prefix='x1_restore_data_', dir=str(_get_settings_backup_dir())))
+    restore_log = LOGS_DIR / f'manual_restore_data_{ts}.log'
+    data_items = ['x1_data.db', 'users.json', 'x1_config.json', 'records_x1', 'reports_x1', 'uploads', 'uploaded_reports', 'data/x1_data.db']
+
+    def _w(line: str):
+        restore_log.parent.mkdir(parents=True, exist_ok=True)
+        with open(restore_log, 'a', encoding='utf-8') as f:
+            f.write(line.rstrip() + '\n')
+
+    try:
+        with tarfile.open(backup_path, 'r:gz') as tf:
+            tf.extractall(temp_extract_dir)
+        roots = [p for p in temp_extract_dir.iterdir() if p.is_dir()]
+        if not roots:
+            raise RuntimeError('备份包解压后未找到项目目录')
+        extracted_root = min(roots, key=lambda p: len(str(p)))
+        for item in data_items:
+            src = extracted_root / item
+            dst = BASE_DIR / item
+            if not src.exists():
+                continue
+            if dst.exists():
+                if dst.is_dir():
+                    _safe_rmtree(dst)
+                else:
+                    dst.unlink()
+            if src.is_dir():
+                shutil.copytree(src, dst)
+            else:
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, dst)
+        result_payload = {'backup_name': backup_path.name, 'type': 'data', 'log_path': str(restore_log), 'version': load_x1_config(BASE_DIR).get('version', APP_VERSION)}
+        log_action(current_user.id, '执行数据还原', 'system_settings', json.dumps({**result_payload, 'result': 'success'}, ensure_ascii=False))
         return jsonify({'success': True, **result_payload})
     except Exception as e:
         _w(f'error={e}')

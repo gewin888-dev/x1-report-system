@@ -9,7 +9,12 @@
     OPS_FAQ:{title:'常见问题排障手册',meta:'启动失败、端口占用、模板缺失、飞书上传失败等常见问题'},
     OPS_DAEMON:{title:'运维启动-停止-验活说明',meta:'守护进程启停、PID 管理、端口检查、健康体检'},
     OPS_DEPLOY:{title:'部署与迁移说明',meta:'macOS 部署、路径迁移、配置更新、备份还原'},
-    OPS_FEISHU_SOP:{title:'飞书上传失败治理 SOP',meta:'飞书上传失败的排查流程、Token 刷新、重试机制'}
+    OPS_FEISHU_SOP:{title:'飞书上传失败治理 SOP',meta:'飞书上传失败的排查流程、Token 刷新、重试机制'},
+    OPS_BACKUP_POLICY:{title:'备份恢复规范',meta:'X1 分层备份目录、命名规则、恢复策略与频率建议'},
+    OPS_RESTORE_PLAYBOOK:{title:'恢复操作说明',meta:'代码层 / 数据层 / 全量恢复步骤与恢复后最小验收'},
+    OPS_ADMIN_RUNBOOK:{title:'后台备份恢复手册',meta:'值班与管理员在后台执行备份/恢复的操作手册'},
+    X1_SYSTEM_UNDERSTANDING:{title:'X1 系统认知报告',meta:'系统结构、三端组成、双数据库、六条核心业务链与系统级风险'},
+    X1_FULL_AUDIT_PLAN:{title:'X1 全链路巡检与修复总计划',meta:'员工端 / 客户端 / 后台的系统性巡检顺序、优先级、修复与回归策略'}
   };
 
   var WORKSPACE_DOC_MAP={
@@ -22,7 +27,12 @@
     OPS_FAQ:'/Users/fuwuqi/检测报告生成系统_X1/docs/X1 常见问题排障手册.md',
     OPS_DAEMON:'/Users/fuwuqi/检测报告生成系统_X1/docs/X1 运维启动-停止-验活说明.md',
     OPS_DEPLOY:'/Users/fuwuqi/检测报告生成系统_X1/docs/X1 部署与迁移说明.md',
-    OPS_FEISHU_SOP:'/Users/fuwuqi/检测报告生成系统_X1/docs/X1 飞书上传失败治理 SOP.md'
+    OPS_FEISHU_SOP:'/Users/fuwuqi/检测报告生成系统_X1/docs/X1 飞书上传失败治理 SOP.md',
+    OPS_BACKUP_POLICY:'/Users/fuwuqi/backups_x1/X1_BACKUP_AND_RESTORE_POLICY.md',
+    OPS_RESTORE_PLAYBOOK:'/Users/fuwuqi/backups_x1/X1_RESTORE_PLAYBOOK.md',
+    OPS_ADMIN_RUNBOOK:'/Users/fuwuqi/backups_x1/X1_ADMIN_BACKUP_RESTORE_RUNBOOK.md',
+    X1_SYSTEM_UNDERSTANDING:'/Users/fuwuqi/检测报告生成系统_X1/docs/X1_SYSTEM_UNDERSTANDING_REPORT.md',
+    X1_FULL_AUDIT_PLAN:'/Users/fuwuqi/检测报告生成系统_X1/docs/X1_FULL_AUDIT_AND_REPAIR_PLAN.md'
   };
 
   function setActiveDocButton(docKey){

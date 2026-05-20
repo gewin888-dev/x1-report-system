@@ -276,16 +276,23 @@ def customer_get_history():
     results = []
     seen_projects = set()  # 用于去重
 
-    # 数据源1：已确认的项目（从 business_projects 表）
+    # 数据源1：项目主记录（统一历史口径）
     conn = _get_x1_data_conn()
     try:
         confirmed_rows = conn.execute(
-            "SELECT * FROM business_projects WHERE client_name=? AND report_status IN ('客户已确认','已发送客户','已出报告') ORDER BY updated_at DESC",
+            "SELECT * FROM business_projects WHERE client_name=? AND report_status IN ('客户已确认','已发送客户','已出报告','已出具','待客户确认') ORDER BY updated_at DESC",
             (client_name,)
         ).fetchall()
         for row in confirmed_rows:
             pname = row['project_name'] or ''
             seen_projects.add(pname)
+            report_status = row['report_status'] or ''
+            if report_status in ('已出报告', '已出具', '已发送客户'):
+                normalized_status = '已出报告'
+            elif report_status == '客户已确认':
+                normalized_status = '客户已确认'
+            else:
+                normalized_status = '待客户确认'
             results.append({
                 'export_id': '',
                 'project_id': row['id'],
@@ -299,7 +306,7 @@ def customer_get_history():
                 'contact_name': row['contact_name'] or '',
                 'contact_phone': row['contact_phone'] or '',
                 'client_name': row['client_name'] or '',
-                'status': '已出报告' if row['report_status'] == '已出报告' else ('客户已确认' if row['report_status'] == '客户已确认' else '已完成'),
+                'status': normalized_status,
                 'feishu_report_url': '',
                 'feishu_export_url': '',
                 'can_preview_pdf': True,
@@ -307,8 +314,11 @@ def customer_get_history():
     finally:
         conn.close()
 
-    # 数据源2：导出记录（从 reports_x1/*.json）
+    # 数据源2：导出记录只用于补充飞书链接和正式报告编号，不再生成第二条重复历史项
     reports_dir = BASE_DIR / 'reports_x1'
+    report_link_map = {}
+    report_export_link_map = {}
+    report_number_map = {}
     if reports_dir.exists():
         for json_file in sorted(reports_dir.glob('*.json'), reverse=True):
             try:
@@ -323,26 +333,30 @@ def customer_get_history():
                     continue
 
                 pname = project.get('project_name', '')
-                if pname in seen_projects:
-                    continue  # 已经从确认项目源取到，跳过重复
-                seen_projects.add(pname)
+                if not pname:
+                    continue
 
                 feishu = data.get('feishu', {})
                 feishu_report = feishu.get('report', {})
                 feishu_export = feishu.get('export', {})
-
-                results.append({
-                    'export_id': data.get('export_id', ''),
-                    'project_name': pname,
-                    'detection_object': project.get('inspection_area', ''),
-                    'detection_date': project.get('detection_date', ''),
-                    'report_number': project.get('report_number', ''),
-                    'status': '已出具' if feishu_report.get('success') else '生成中',
-                    'feishu_report_url': feishu_report.get('feishu_url', ''),
-                    'feishu_export_url': feishu_export.get('feishu_url', ''),
-                })
+                if pname not in report_link_map and feishu_report.get('feishu_url'):
+                    report_link_map[pname] = feishu_report.get('feishu_url', '')
+                if pname not in report_export_link_map and feishu_export.get('feishu_url'):
+                    report_export_link_map[pname] = feishu_export.get('feishu_url', '')
+                if pname not in report_number_map and project.get('report_number'):
+                    report_number_map[pname] = project.get('report_number', '')
             except (json.JSONDecodeError, KeyError, IOError):
                 continue
+
+    for item in results:
+        pname = item.get('project_name', '')
+        if not item.get('feishu_report_url') and pname in report_link_map:
+            item['feishu_report_url'] = report_link_map[pname]
+        if not item.get('feishu_export_url') and pname in report_export_link_map:
+            item['feishu_export_url'] = report_export_link_map[pname]
+        if not item.get('report_number') and pname in report_number_map:
+            item['report_number'] = report_number_map[pname]
+            item['report_no'] = report_number_map[pname]
 
     return jsonify({'success': True, 'items': results})
 

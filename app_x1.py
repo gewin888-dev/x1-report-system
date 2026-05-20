@@ -1622,6 +1622,8 @@ def admin_api_workspace_doc():
         'X1_全量代码审计报告_2026-05-16_v2.md',
         'X1_架构重构计划_2026-05-16.md',
         'X1_飞书月目录自动切换运维说明_2026-05-12.md',
+        'X1_SYSTEM_UNDERSTANDING_REPORT.md',
+        'X1_FULL_AUDIT_AND_REPAIR_PLAN.md',
     }
     requested = request.args.get('path', '').strip()
     if not requested:

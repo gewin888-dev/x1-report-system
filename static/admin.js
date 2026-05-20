@@ -973,22 +973,7 @@ function loadRecords(page){
 function openRecordAsset(kind, target, failMessage){
   if(kind === 'local'){
     if(!target){ showToast(failMessage || '文件保存失败', 'error'); return; }
-    fetch('/admin/api/open_file/'+encodeURIComponent(target), {method:'POST', credentials:'same-origin'})
-      .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, status:r.status, data:d}; }); })
-      .then(function(res){
-        var d = res.data || {};
-        if(d.success){
-          showToast((d.message || '已调用本机软件打开文件'), 'success');
-          return;
-        }
-        if(res.status === 409){
-          showToast((d.error || '当前主机不支持本机打开，改为浏览器下载'), 'info');
-          window.location.href = '/download/' + encodeURIComponent(target);
-          return;
-        }
-        showToast(d.error || failMessage || '打开失败', 'error');
-      })
-      .catch(function(){ showToast(failMessage || '打开失败', 'error'); });
+    previewFile(target);
     return;
   }
   if(kind === 'feishu'){
@@ -1090,8 +1075,8 @@ function renderRecords(filtered){
     h += '</div>';
     h += '<div class="record-actions">';
     if(r.type === 'export'){
-      h += buildRecordAssetButton('本地报告', localReportOk, 'local', reportFile ? reportFile.name : '', '本地检测报告保存失败', 'local', 'admin.records.open_local');
-      h += buildRecordAssetButton('本地记录', localRecordOk, 'local', rawExcel ? rawExcel.name : '', '本地原始记录保存失败', 'local', 'admin.records.open_local');
+      h += buildRecordAssetButton('查看检测报告', localReportOk, 'local', reportFile ? reportFile.name : '', '本地检测报告保存失败', 'local', 'admin.records.open_local');
+      h += buildRecordAssetButton('查看原始记录', localRecordOk, 'local', rawExcel ? rawExcel.name : '', '本地原始记录保存失败', 'local', 'admin.records.open_local');
       h += buildRecordAssetButton('飞书报告', feishuReportOk, 'feishu', r.feishu_report_url || '', '飞书检测报告保存失败', 'feishu', 'admin.records.open_feishu');
       h += buildRecordAssetButton('飞书记录', feishuRecordOk, 'feishu', r.feishu_export_url || '', '飞书原始记录保存失败', 'feishu', 'admin.records.open_feishu');
       if(!isVoided){
@@ -3100,9 +3085,13 @@ function closeBackupChoiceModal(){
 }
 
 function submitBackupChoice(mode){
+  var typeInput = prompt('请输入备份类型：code（代码）/ data（数据）/ full（全量）', mode==='update' ? 'full' : 'data');
+  if(typeInput === null) return;
+  var backupType = (typeInput||'').trim().toLowerCase();
+  if(['code','data','full'].indexOf(backupType) < 0){ showToast('备份类型不合法，请输入 code / data / full','error'); return; }
   if(mode==='direct'){
     closeBackupChoiceModal();
-    executeSettingsBackup({});
+    executeSettingsBackup({type: backupType});
     return;
   }
   if(mode==='update'){
@@ -3111,12 +3100,12 @@ function submitBackupChoice(mode){
     if(nextVersion === null) return;
     nextVersion = (nextVersion||'').trim();
     if(!nextVersion){ showToast('版本号不能为空','error'); return; }
-    var backupName = prompt('请输入备份名称：', 'X1_'+nextVersion+'_manual_backup');
+    var backupName = prompt('请输入备份名称：', 'X1_'+nextVersion+'_'+backupType+'_manual_backup');
     if(backupName === null) return;
     backupName = (backupName||'').trim();
     if(!backupName){ showToast('备份名称不能为空','error'); return; }
     closeBackupChoiceModal();
-    executeSettingsBackup({updateVersion:true, version:nextVersion, backupName:backupName});
+    executeSettingsBackup({updateVersion:true, version:nextVersion, backupName:backupName, type: backupType});
     return;
   }
   closeBackupChoiceModal();
@@ -3125,7 +3114,9 @@ function submitBackupChoice(mode){
 function executeSettingsBackup(payload){
   fetch('/admin/api/settings/backup_now',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload||{})}).then(function(r){return r.json()}).then(function(d){
     if(d.success){
-      showToast('备份完成：'+d.backup_file,'success');
+      var backupTypeMap={code:'代码备份',data:'数据备份',full:'全量备份'};
+      var label=backupTypeMap[d.type]||'备份';
+      showToast(label+'完成：'+d.backup_file,'success');
       if(d.version_updated){ showToast('系统版本已更新为 '+d.version,'success'); loadSettingsPanel(); }
       refreshRestoreBackups();
     } else showToast(d.error||'备份失败','error');
@@ -3148,8 +3139,10 @@ function refreshRestoreBackups(){
     restoreBackupItems=d.items||[];
     if(status) status.textContent='备份目录：'+(d.backup_dir||'-')+' ｜ 共 '+restoreBackupItems.length+' 个备份';
     if(select){
+      var typeLabelMap={code:'代码',data:'数据',full:'全量'};
       select.innerHTML='<option value="">请选择备份...</option>' + restoreBackupItems.map(function(x){
-        return '<option value="'+escapeHtml(x.name||'')+'">'+escapeHtml((x.version_guess||'-')+' ｜ '+(x.mtime||'-')+' ｜ '+(x.name||''))+'</option>';
+        var typeLabel=typeLabelMap[x.type]||x.type||'全量';
+        return '<option value="'+escapeHtml(x.name||'')+'">['+escapeHtml(typeLabel)+'] '+escapeHtml((x.version_guess||'-')+' ｜ '+(x.mtime||'-')+' ｜ '+(x.name||''))+'</option>';
       }).join('');
     }
     if(!mount) return;
@@ -3169,18 +3162,25 @@ function onRestoreBackupSelected(name){
     return;
   }
   var sizeMb=((item.size||0)/1024/1024).toFixed(1)+' MB';
+  var typeLabelMap={code:'代码备份',data:'数据备份',full:'全量备份'};
+  var typeLabel=typeLabelMap[item.type]||item.type||'全量备份';
   mount.innerHTML=''
     +'<div class="settings-plain" style="border:1px solid #eef2f7;border-radius:12px;padding:14px 16px;background:#fbfdff;">'
     +'<div style="font-size:15px;font-weight:700;color:#1f2937;margin-bottom:8px;">当前选中备份</div>'
     +'<div style="font-family:monospace;font-size:12px;color:#334155;word-break:break-all;">'+escapeHtml(item.name||'')+'</div>'
-    +'<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px;">'
+    +'<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px;">'
+    +'<div><div class="settings-meta">类型</div><div style="font-weight:600;">'+escapeHtml(typeLabel)+'</div></div>'
     +'<div><div class="settings-meta">版本</div><div style="font-weight:600;">'+escapeHtml(item.version_guess||'-')+'</div></div>'
     +'<div><div class="settings-meta">时间</div><div style="font-weight:600;">'+escapeHtml(item.mtime||'-')+'</div></div>'
     +'<div><div class="settings-meta">大小</div><div style="font-weight:600;">'+sizeMb+'</div></div>'
     +'</div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;">'
     +'<button class="btn settings-btn-ghost" type="button" onclick="viewRestoreBackupDetail(\''+String(item.name||'').replace(/'/g,"&#39;")+'\')">查看详情</button>'
-    +'<button class="btn settings-btn-main" type="button" onclick="openRestoreConfirmModal(\''+String(item.name||'').replace(/'/g,"&#39;")+'\')">整体还原</button>'
+    +(item.type==='code'
+      ? '<button class="btn settings-btn-main" type="button" onclick="openRestoreConfirmModal(\''+String(item.name||'').replace(/'/g,"&#39;")+'\',\'code\')">恢复代码层</button>'
+      : (item.type==='data'
+        ? '<button class="btn settings-btn-main" type="button" onclick="openRestoreConfirmModal(\''+String(item.name||'').replace(/'/g,"&#39;")+'\',\'data\')">恢复数据层</button>'
+        : '<button class="btn settings-btn-main" type="button" onclick="openRestoreConfirmModal(\''+String(item.name||'').replace(/'/g,"&#39;")+'\',\'full\')">整体还原</button>'))
     +'</div>'
     +'</div>';
 }
@@ -3188,13 +3188,16 @@ function viewRestoreBackupDetail(name){
   fetch('/admin/api/settings/backups/'+encodeURIComponent(name)).then(function(r){return r.json()}).then(function(d){
     if(!d.success){ showToast(d.error||'读取备份详情失败','error'); return; }
     var s=d.summary||{}; var checks=s.checks||{};
-    alert('备份详情\n\n文件：'+(d.name||'-')+'\n时间：'+(d.mtime||'-')+'\n版本：'+(d.version_guess||'-')+'\n大小：'+(((d.size||0)/1024/1024).toFixed(1))+' MB\n\n根目录：'+((s.root_names||[]).join(', ')||'-')+'\napp_x1.py：'+(checks['app_x1.py']?'存在':'缺失')+'\nstatic/record.js：'+(checks['static/record.js']?'存在':'缺失')+'\ntemplates/record_index.html：'+(checks['templates/record_index.html']?'存在':'缺失')+'\nx1_config.json：'+(checks['x1_config.json']?'存在':'缺失'));
+    alert('备份详情\n\n文件：'+(d.name||'-')+'\n类型：'+((({code:'代码备份',data:'数据备份',full:'全量备份'})[d.type])||d.type||'-')+'\n目录：'+(d.relative_dir||'.')+'\n时间：'+(d.mtime||'-')+'\n版本：'+(d.version_guess||'-')+'\n大小：'+(((d.size||0)/1024/1024).toFixed(1))+' MB\n\n根目录：'+((s.root_names||[]).join(', ')||'-')+'\napp_x1.py：'+(checks['app_x1.py']?'存在':'缺失')+'\nstatic/record.js：'+(checks['static/record.js']?'存在':'缺失')+'\ntemplates/record_index.html：'+(checks['templates/record_index.html']?'存在':'缺失')+'\nx1_config.json：'+(checks['x1_config.json']?'存在':'缺失'));
   }).catch(function(){showToast('读取备份详情失败','error')});
 }
-function openRestoreConfirmModal(name){
+function openRestoreConfirmModal(name, restoreType){
   pendingRestoreItem=(restoreBackupItems||[]).find(function(x){return x.name===name;}) || {name:name};
+  pendingRestoreItem.restore_type = restoreType || pendingRestoreItem.type || 'full';
   var body=document.getElementById('restore-confirm-body');
-  if(body){ body.innerHTML='目标备份：<strong>'+escapeHtml(pendingRestoreItem.name||'-')+'</strong><br>版本推测：'+escapeHtml(pendingRestoreItem.version_guess||'-')+'<br>时间：'+escapeHtml(pendingRestoreItem.mtime||'-')+'<br><br>执行前将自动创建恢复前快照；将整体恢复代码与配置；默认保留 <code>records_x1 / reports_x1 / uploads_x1 / logs / logs_x1</code>；恢复后需要手动重启服务完成真正切换。'; }
+  var typeLabelMap={code:'代码层恢复',data:'数据层恢复',full:'整体还原'};
+  var actionLabel=typeLabelMap[pendingRestoreItem.restore_type]||'整体还原';
+  if(body){ body.innerHTML='目标备份：<strong>'+escapeHtml(pendingRestoreItem.name||'-')+'</strong><br>恢复类型：'+escapeHtml(actionLabel)+'<br>版本推测：'+escapeHtml(pendingRestoreItem.version_guess||'-')+'<br>时间：'+escapeHtml(pendingRestoreItem.mtime||'-')+'<br><br>'+(pendingRestoreItem.restore_type==='code' ? '将仅恢复代码层，并自动尝试重启服务；不会覆盖数据库、上传资源与配置。' : (pendingRestoreItem.restore_type==='data' ? '将仅恢复数据层（数据库/记录/报告/上传资源/配置）；不会覆盖代码层。' : '执行前将自动创建恢复前快照；将整体恢复代码与配置；当前会保留 <code>records_x1 / reports_x1 / uploads / uploads_x1 / uploaded_reports / logs / logs_x1</code>，并保留 <code>x1_data.db / data/x1_data.db / users.json / x1_config.json</code>；恢复后需要手动重启服务完成真正切换。')); }
   var input=document.getElementById('restore-confirm-input');
   if(input) input.value='';
   var modal=document.getElementById('restore-confirm-modal');
@@ -3211,7 +3214,9 @@ function renderRestoreResultCard(d, ok){
   var healthOk=!!(d.health&&d.health.success);
   var tone=ok?'#f6ffed':'#fff2f0';
   var border=ok?'#b7eb8f':'#ffccc7';
-  var title=ok?'最近一次整体还原结果：成功':'最近一次整体还原结果：失败';
+  var typeLabelMap={code:'代码层恢复',data:'数据层恢复',full:'整体还原'};
+  var restoreLabel=typeLabelMap[d.type]||'整体还原';
+  var title=ok?'最近一次'+restoreLabel+'结果：成功':'最近一次'+restoreLabel+'结果：失败';
   mount.style.display='block';
   mount.innerHTML=''
     +'<div style="border:1px solid '+border+';background:'+tone+';border-radius:12px;padding:14px 16px;">'
@@ -3234,19 +3239,21 @@ function submitFullRestore(){
   if(!pendingRestoreItem || !pendingRestoreItem.name){ showToast('未选择备份','error'); return; }
   var confirmText=(document.getElementById('restore-confirm-input')||{}).value||'';
   if(confirmText.trim() !== 'RESTORE'){ showToast('确认词不正确','error'); return; }
-  fetch('/admin/api/settings/restore/full',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({backup_name:pendingRestoreItem.name,confirm:'RESTORE'})}).then(function(r){return r.json()}).then(function(d){
+  var restoreType = pendingRestoreItem.restore_type || pendingRestoreItem.type || 'full';
+  var endpoint = restoreType==='code' ? '/admin/api/settings/restore/code' : (restoreType==='data' ? '/admin/api/settings/restore/data' : '/admin/api/settings/restore/full');
+  fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({backup_name:pendingRestoreItem.name,confirm:'RESTORE'})}).then(function(r){return r.json()}).then(function(d){
     if(d.success){
       closeRestoreConfirmModal();
       renderRestoreResultCard(d, true);
-      showToast('整体还原完成','success');
+      showToast((restoreType==='code' ? '代码层恢复完成' : (restoreType==='data' ? '数据层恢复完成' : '整体还原完成')),'success');
       refreshRestoreBackups();
       onRestoreBackupSelected(d.backup_name||pendingRestoreItem.name);
     } else {
       renderRestoreResultCard(d, false);
-      alert('整体还原失败\n\n原因：'+(d.error||'未知错误'));
-      showToast(d.error||'整体还原失败','error');
+      alert((restoreType==='code' ? '代码层恢复失败' : (restoreType==='data' ? '数据层恢复失败' : '整体还原失败'))+'\n\n原因：'+(d.error||'未知错误'));
+      showToast(d.error||'恢复失败','error');
     }
-  }).catch(function(){showToast('整体还原失败','error')});
+  }).catch(function(){showToast('恢复失败','error')});
 }
 function ensureSettingsPath(key){
   fetch('/admin/api/settings/ensure_path',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:key})}).then(function(r){return r.json()}).then(function(d){
