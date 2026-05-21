@@ -8,6 +8,9 @@ from datetime import datetime
 import sqlite3, json
 from pathlib import Path
 
+from customer_routes import _serialize_feedback_attachments
+from monitor import log_action
+
 BASE_DIR = Path(__file__).parent
 
 customer_admin_bp = Blueprint('customer_admin', __name__)
@@ -21,6 +24,20 @@ def _get_x1_conn():
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
+    try:
+        cols = {r['name'] for r in conn.execute("PRAGMA table_info(client_profiles)").fetchall()}
+        if 'version' not in cols:
+            conn.execute("ALTER TABLE client_profiles ADD COLUMN version INTEGER NOT NULL DEFAULT 1")
+        if 'updated_by' not in cols:
+            conn.execute("ALTER TABLE client_profiles ADD COLUMN updated_by TEXT DEFAULT ''")
+        fcols = {r['name'] for r in conn.execute("PRAGMA table_info(client_feedback)").fetchall()}
+        if 'version' not in fcols:
+            conn.execute("ALTER TABLE client_feedback ADD COLUMN version INTEGER NOT NULL DEFAULT 1")
+        if 'updated_by' not in fcols:
+            conn.execute("ALTER TABLE client_feedback ADD COLUMN updated_by TEXT DEFAULT ''")
+        conn.commit()
+    except Exception:
+        pass
     return conn
 
 
@@ -42,7 +59,12 @@ def customer_mgmt_list():
     - 关联 client_profiles 的开票/收件信息
     - 关联 users 的客户账号
     - 统计项目数、合同总额、已收款、应收款、催单数、反馈数
+    - 支持服务端分页和关键词搜索
     """
+    page = max(1, int(request.args.get('page', 1) or 1))
+    page_size = max(1, min(100, int(request.args.get('page_size', 20) or 20)))
+    keyword = (request.args.get('keyword') or '').strip().lower()
+
     conn = _get_x1_conn()
     try:
         # 获取所有有项目的客户
@@ -151,7 +173,18 @@ def customer_mgmt_list():
                 'has_profile': True,
             })
 
-        # 汇总
+        # 关键词过滤（服务端）
+        if keyword:
+            items = [x for x in items if (
+                keyword in (x.get('client_name') or '').lower()
+                or keyword in (x.get('contact_name') or '').lower()
+                or keyword in (x.get('contact_phone') or '').lower()
+            )]
+
+        # 排序保持稳定：按最近项目日期倒序，再按客户名升序
+        items.sort(key=lambda x: ((x.get('last_project_date') or ''), x.get('client_name') or ''), reverse=True)
+
+        # 汇总（基于过滤后的全集，不基于当前页）
         summary = {
             'total': len(items),
             'with_projects': sum(1 for x in items if x['project_count'] > 0),
@@ -160,7 +193,23 @@ def customer_mgmt_list():
             'receivable_clients': sum(1 for x in items if x['receivable'] > 0),
         }
 
-        return jsonify({'success': True, 'items': items, 'summary': summary})
+        total = len(items)
+        total_pages = max(1, (total + page_size - 1) // page_size)
+        page = min(page, total_pages)
+        start = (page - 1) * page_size
+        end = start + page_size
+        page_items = items[start:end]
+
+        return jsonify({
+            'success': True,
+            'items': page_items,
+            'summary': summary,
+            'page': page,
+            'page_size': page_size,
+            'total': total,
+            'total_pages': total_pages,
+            'keyword': keyword,
+        })
     finally:
         conn.close()
 
@@ -186,6 +235,7 @@ def customer_mgmt_detail():
             'invoice_company': '', 'invoice_tax_no': '',
             'invoice_address_phone': '', 'invoice_bank': '', 'invoice_bank_account': '',
             'recipient_name': '', 'recipient_phone': '', 'recipient_address': '',
+            'version': 1, 'updated_by': '', 'updated_at': '',
         }
 
         # 项目列表
@@ -213,7 +263,9 @@ def customer_mgmt_detail():
             "SELECT * FROM client_feedback WHERE client_name = ? ORDER BY created_at DESC",
             (client_name,)
         ).fetchall():
-            feedbacks.append(dict(r))
+            item = dict(r)
+            item['attachments'] = _serialize_feedback_attachments(conn, r['id'])
+            feedbacks.append(item)
 
         # 报告记录（扫描 reports_x1）
         reports = []
@@ -279,7 +331,7 @@ def customer_mgmt_update_profile():
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     try:
         existing = conn.execute(
-            "SELECT id FROM client_profiles WHERE client_name = ?", (client_name,)
+            "SELECT * FROM client_profiles WHERE client_name = ?", (client_name,)
         ).fetchone()
 
         fields = {
@@ -292,22 +344,48 @@ def customer_mgmt_update_profile():
             'recipient_phone': data.get('recipient_phone', ''),
             'recipient_address': data.get('recipient_address', ''),
         }
+        expected_version = data.get('version', None)
+        if expected_version is not None:
+            try:
+                expected_version = int(expected_version)
+            except (TypeError, ValueError):
+                return jsonify({'success': False, 'error': 'version 参数非法'}), 400
 
         if existing:
+            current_version = int(existing['version']) if 'version' in existing.keys() and existing['version'] else 1
+            if expected_version is not None and expected_version != current_version:
+                return jsonify({'success': False, 'error': '客户资料已被其他人修改，请刷新后重试', 'code': 'version_conflict', 'current_version': current_version}), 409
             sets = ', '.join(f"{k} = ?" for k in fields)
-            conn.execute(
-                f"UPDATE client_profiles SET {sets}, updated_at = ? WHERE client_name = ?",
-                list(fields.values()) + [now, client_name]
-            )
+            params = list(fields.values()) + [now, getattr(current_user, 'id', None), current_version + 1, client_name]
+            sql = f"UPDATE client_profiles SET {sets}, updated_at = ?, updated_by = ?, version = ? WHERE client_name = ?"
+            if expected_version is not None:
+                sql += " AND COALESCE(version, 1) = ?"
+                params.append(expected_version)
+            cur = conn.execute(sql, params)
+            if cur.rowcount == 0:
+                return jsonify({'success': False, 'error': '客户资料已被其他人修改，请刷新后重试', 'code': 'version_conflict'}), 409
         else:
-            cols = ', '.join(['client_name'] + list(fields.keys()) + ['updated_at'])
-            phs = ', '.join(['?'] * (len(fields) + 2))
+            cols = ', '.join(['client_name'] + list(fields.keys()) + ['updated_at', 'updated_by', 'version'])
+            phs = ', '.join(['?'] * (len(fields) + 4))
             conn.execute(
                 f"INSERT INTO client_profiles ({cols}) VALUES ({phs})",
-                [client_name] + list(fields.values()) + [now]
+                [client_name] + list(fields.values()) + [now, getattr(current_user, 'id', None), 1]
             )
         conn.commit()
-        return jsonify({'success': True, 'message': '客户信息已更新'})
+        row = conn.execute("SELECT * FROM client_profiles WHERE client_name = ?", (client_name,)).fetchone()
+        try:
+            log_action(
+                getattr(current_user, 'id', 'system'),
+                '更新客户资料',
+                f'client_profile:{client_name}',
+                json.dumps({
+                    'client_name': client_name,
+                    'fields': sorted(list(fields.keys())),
+                }, ensure_ascii=False)
+            )
+        except Exception:
+            pass
+        return jsonify({'success': True, 'message': '客户信息已更新', 'profile': dict(row) if row else None})
     finally:
         conn.close()
 
@@ -327,12 +405,42 @@ def customer_mgmt_reply_feedback(feedback_id):
     conn = _get_x1_conn()
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     try:
-        conn.execute(
-            "UPDATE client_feedback SET reply = ?, status = ?, updated_at = ? WHERE id = ?",
-            (reply, status, now, feedback_id)
-        )
+        row = conn.execute("SELECT * FROM client_feedback WHERE id = ?", (feedback_id,)).fetchone()
+        if not row:
+            return jsonify({'success': False, 'error': '反馈不存在'}), 404
+        expected_version = data.get('version', None)
+        if expected_version is not None:
+            try:
+                expected_version = int(expected_version)
+            except (TypeError, ValueError):
+                return jsonify({'success': False, 'error': 'version 参数非法'}), 400
+        current_version = int(row['version']) if 'version' in row.keys() and row['version'] else 1
+        if expected_version is not None and expected_version != current_version:
+            return jsonify({'success': False, 'error': '反馈已被其他人处理，请刷新后重试', 'code': 'version_conflict', 'current_version': current_version}), 409
+        params = [reply, status, now, getattr(current_user, 'id', None), current_version + 1, feedback_id]
+        sql = "UPDATE client_feedback SET reply = ?, status = ?, updated_at = ?, updated_by = ?, version = ? WHERE id = ?"
+        if expected_version is not None:
+            sql += " AND COALESCE(version, 1) = ?"
+            params.append(expected_version)
+        cur = conn.execute(sql, params)
+        if cur.rowcount == 0:
+            return jsonify({'success': False, 'error': '反馈已被其他人处理，请刷新后重试', 'code': 'version_conflict'}), 409
         conn.commit()
-        return jsonify({'success': True, 'message': '已回复'})
+        updated = conn.execute("SELECT * FROM client_feedback WHERE id = ?", (feedback_id,)).fetchone()
+        try:
+            log_action(
+                getattr(current_user, 'id', 'system'),
+                '回复客户反馈',
+                f'client_feedback:{feedback_id}',
+                json.dumps({
+                    'feedback_id': feedback_id,
+                    'status': status,
+                    'reply_length': len(reply),
+                }, ensure_ascii=False)
+            )
+        except Exception:
+            pass
+        return jsonify({'success': True, 'message': '已回复', 'feedback': dict(updated) if updated else None})
     finally:
         conn.close()
 
@@ -369,6 +477,15 @@ def customer_mgmt_create():
              now)
         )
         conn.commit()
+        try:
+            log_action(
+                getattr(current_user, 'id', 'system'),
+                '创建客户',
+                f'client_profile:{client_name}',
+                json.dumps({'client_name': client_name, 'has_account_request': bool(data.get('username', '').strip())}, ensure_ascii=False)
+            )
+        except Exception:
+            pass
     finally:
         conn.close()
 
@@ -423,6 +540,15 @@ def customer_mgmt_clear_urge(project_id):
     try:
         conn.execute("UPDATE business_projects SET has_urge = '' WHERE id = ?", (project_id,))
         conn.commit()
+        try:
+            log_action(
+                getattr(current_user, 'id', 'system'),
+                '清除催单标记',
+                f'business_project:{project_id}',
+                json.dumps({'project_id': project_id}, ensure_ascii=False)
+            )
+        except Exception:
+            pass
         return jsonify({'success': True, 'message': '催单标记已清除'})
     finally:
         conn.close()
@@ -440,6 +566,7 @@ def customer_mgmt_delete():
         return jsonify({'success': False, 'error': '缺少客户名称'}), 400
 
     force = data.get('force', False)
+    inspect_only = bool(data.get('inspect_only', False))
 
     conn = _get_x1_conn()
     try:
@@ -450,12 +577,40 @@ def customer_mgmt_delete():
         ).fetchone()
         project_count = row['cnt'] if row else 0
 
+        feedback_row = conn.execute(
+            "SELECT COUNT(*) as cnt FROM client_feedback WHERE client_name = ?",
+            (client_name,)
+        ).fetchone()
+        feedback_count = feedback_row['cnt'] if feedback_row else 0
+
+        try:
+            with _get_user_conn() as uconn:
+                account_row = uconn.execute(
+                    "SELECT COUNT(*) as cnt FROM users WHERE role='customer' AND client_name=?",
+                    (client_name,)
+                ).fetchone()
+                account_count = account_row['cnt'] if account_row else 0
+        except Exception:
+            account_count = 0
+
+        if inspect_only:
+            return jsonify({'success': True, 'client_name': client_name, 'impact': {
+                'project_count': project_count,
+                'feedback_count': feedback_count,
+                'account_count': account_count,
+                'will_unbind_projects': project_count > 0,
+                'will_delete_profile': True,
+                'will_delete_feedbacks': feedback_count > 0,
+            }})
+
         if project_count > 0 and not force:
             return jsonify({
                 'success': False,
                 'error': f'该客户关联 {project_count} 个项目',
                 'has_projects': True,
-                'project_count': project_count
+                'project_count': project_count,
+                'feedback_count': feedback_count,
+                'account_count': account_count,
             }), 400
 
         if project_count > 0 and force:
@@ -472,6 +627,22 @@ def customer_mgmt_delete():
         # 删除反馈记录
         conn.execute("DELETE FROM client_feedback WHERE client_name = ?", (client_name,))
         conn.commit()
+
+        try:
+            log_action(
+                getattr(current_user, 'id', 'system'),
+                '删除客户',
+                f'client_profile:{client_name}',
+                json.dumps({
+                    'client_name': client_name,
+                    'project_count': project_count,
+                    'feedback_count': feedback_count,
+                    'account_count': account_count,
+                    'force': bool(force),
+                }, ensure_ascii=False)
+            )
+        except Exception:
+            pass
 
         msg = f'客户 {client_name} 已删除'
         if project_count > 0:

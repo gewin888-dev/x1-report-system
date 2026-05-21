@@ -6181,6 +6181,65 @@ function fuzzyKeywordsMatch(fields, keyword){
     return parts.every(part=>text.includes(part));
 }
 
+function previewReportFile(feishuUrl, localFilename, label){
+    // 统一预览入口：优先飞书 → 失败回退本地（带来源提示）
+    var overlay=document.createElement('div');
+    overlay.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10001';
+    overlay.innerHTML='<div style="background:#fff;border-radius:8px;padding:24px;width:92%;max-width:1200px;max-height:90vh;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.15);display:flex;flex-direction:column"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #f0f0f0;flex-shrink:0"><h3 style="margin:0">加载中...</h3><div style="display:flex;gap:8px"><span id="pv-source" style="display:none;padding:4px 10px;border-radius:4px;font-size:12px;align-self:center"></span><button onclick="this.closest(\'.pv-overlay\').remove()" style="padding:6px 14px;border:1px solid #d9d9d9;border-radius:4px;background:#fff;cursor:pointer;font-size:13px">关闭</button></div></div><div id="pv-body" style="border:1px solid #d9d9d9;border-radius:4px;padding:40px 60px;background:#fff;flex:1;overflow-y:auto;font-family:SimSun,serif;font-size:14px;line-height:1.8;color:#000"><p style="text-align:center;color:#999">加载中...</p></div></div>';
+    overlay.className='pv-overlay';
+    overlay.addEventListener('click',function(e){if(e.target===overlay)overlay.remove();});
+    document.body.appendChild(overlay);
+
+    function renderPreview(d, source){
+        overlay.querySelector('h3').textContent=(label||d.filename||'预览')+' ('+((d.file_size||0)/1024).toFixed(1)+' KB)';
+        var srcEl=overlay.querySelector('#pv-source');
+        if(source==='feishu'){
+            srcEl.textContent='☁️ 来源：飞书云盘';
+            srcEl.style.cssText='display:inline-block;padding:4px 10px;border-radius:4px;font-size:12px;background:#e6f4ff;color:#0958d9;border:1px solid #91caff;';
+        }else{
+            srcEl.textContent='💾 来源：本地文件';
+            srcEl.style.cssText='display:inline-block;padding:4px 10px;border-radius:4px;font-size:12px;background:#fff7e6;color:#d46b08;border:1px solid #ffd591;';
+        }
+        overlay.querySelector('#pv-body').innerHTML='<style>.pv-c table{border-collapse:collapse;width:100%;margin:16px 0}.pv-c td,.pv-c th{border:1px solid #000;padding:8px;text-align:center}.pv-c p{margin:8px 0}</style><div class="pv-c">'+d.html+'</div>';
+    }
+
+    function fallbackToLocal(){
+        if(!localFilename){
+            overlay.querySelector('#pv-body').innerHTML='<p style="text-align:center;color:#ff4d4f">飞书预览失败且本地文件不可用</p>';
+            return;
+        }
+        fetch('/api/preview/'+encodeURIComponent(localFilename),{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){
+            if(!d.success){overlay.querySelector('#pv-body').innerHTML='<p style="text-align:center;color:#ff4d4f">预览失败: '+(d.error||'未知错误')+'</p>';return;}
+            renderPreview(d, 'local');
+        }).catch(function(e){
+            overlay.querySelector('#pv-body').innerHTML='<p style="text-align:center;color:#ff4d4f">本地预览失败: '+e.message+'</p>';
+        });
+    }
+
+    // 优先飞书
+    if(feishuUrl){
+        var fileToken='';
+        var m=feishuUrl.match(/\/drive\/file\/([A-Za-z0-9]+)/);
+        if(m) fileToken=m[1];
+        if(!fileToken){m=feishuUrl.match(/\/(docx|sheets)\/([A-Za-z0-9]+)/); if(m) fileToken=m[2];}
+        if(fileToken){
+            fetch('/api/preview_feishu_file?file_token='+encodeURIComponent(fileToken),{credentials:'same-origin'})
+                .then(function(r){return r.json()})
+                .then(function(d){
+                    if(!d.success) throw new Error(d.error||'飞书预览失败');
+                    renderPreview(d, 'feishu');
+                })
+                .catch(function(e){
+                    console.warn('飞书预览失败，回退本地:', e.message);
+                    fallbackToLocal();
+                });
+            return;
+        }
+    }
+    // 没有飞书URL，直接本地
+    fallbackToLocal();
+}
+
 function previewFile(filename){
     var overlay=document.createElement('div');
     overlay.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10001';
@@ -6338,15 +6397,15 @@ function buildRecordItem(r){
     const isOwnRecord = !r.inspector || r.inspector === currentUser;
     const isDraft = isDraftRecord(r);
     if(hasReport || hasExport){
-        if(r.report_info?.feishu_url){
-            actionButtons+=`<button onclick="event.stopPropagation();openFeishuFile('${r.report_info.feishu_url}')" class="record-action-btn report-btn">📄 查看检测报告</button>`;
-        }else if(r.report_info?.filename){
-            actionButtons+=`<button onclick="event.stopPropagation();openFileWithWPS('${r.report_info.filename}')" class="record-action-btn report-btn">📄 查看检测报告</button>`;
+        if(hasReport){
+            var _rpFeishu = r.report_info?.feishu_url || '';
+            var _rpLocal = r.report_info?.filename || '';
+            actionButtons+=`<button onclick="event.stopPropagation();previewReportFile('${_rpFeishu}','${_rpLocal}','检测报告')" class="record-action-btn report-btn">📄 预览检测报告</button>`;
         }
-        if(r.export_info?.feishu_url){
-            actionButtons+=`<button onclick="event.stopPropagation();openFeishuFile('${r.export_info.feishu_url}')" class="record-action-btn export-btn">📋 查看原始记录</button>`;
-        }else if(r.export_info?.filename){
-            actionButtons+=`<button onclick="event.stopPropagation();openFileWithWPS('${r.export_info.filename}')" class="record-action-btn export-btn">📋 查看原始记录</button>`;
+        if(hasExport){
+            var _exFeishu = r.export_info?.feishu_url || '';
+            var _exLocal = r.export_info?.filename || '';
+            actionButtons+=`<button onclick="event.stopPropagation();previewReportFile('${_exFeishu}','${_exLocal}','原始记录')" class="record-action-btn export-btn">📋 预览原始记录</button>`;
         }
         if(hasReport || hasExport){
             actionButtons+= r.voided
@@ -7668,10 +7727,9 @@ function renderMyTasks(items){
   }
   var palette = {
     '待指派': 'background:#fafafa;color:#666;border:1px solid #d9d9d9;',
-    '已派单': 'background:#e6f4ff;color:#0958d9;border:1px solid #91caff;',
-    '已接单': 'background:#e6f4ff;color:#0958d9;border:1px solid #91caff;',
-    '执行中': 'background:#fff7e6;color:#d46b08;border:1px solid #ffd591;',
-    '已完成': 'background:#f6ffed;color:#389e0d;border:1px solid #b7eb8f;',
+    '待检测': 'background:#e6f4ff;color:#0958d9;border:1px solid #91caff;',
+    '检测中': 'background:#fff7e6;color:#d46b08;border:1px solid #ffd591;',
+    '检测完成': 'background:#f6ffed;color:#389e0d;border:1px solid #b7eb8f;',
     '已取消': 'background:#fff1f0;color:#cf1322;border:1px solid #ffa39e;'
   };
   function tag(label){
@@ -7698,43 +7756,47 @@ function renderMyTasks(items){
     if(t.completed_at) html += '<div style="color:#6b7280;">完成时间</div><div>' + esc(t.completed_at.replace('T',' ').slice(0,16)) + '</div>';
     if(t.remarks) html += '<div style="color:#6b7280;">备注</div><div style="grid-column:span 3;">' + esc(t.remarks) + '</div>';
     html += '</div>';
-    // 操作按钮
+    // 操作按钮（三态简化：只保留"进入录入"和"完成任务"）
     var btns = [];
-    if(status === 'assigned') btns.push('<button class="btn btn-sm" style="background:#0958d9;color:#fff;border:none;" onclick="doTaskAction(' + t.id + ',\'accept\')">接单</button>');
-    if(status === 'assigned' || status === 'accepted') btns.push('<button class="btn btn-sm" style="background:#d46b08;color:#fff;border:none;" onclick="doTaskAction(' + t.id + ',\'start\')">开始执行</button>');
-    if(status === 'accepted' || status === 'in_progress') btns.push('<button class="btn btn-sm" style="background:#389e0d;color:#fff;border:none;" onclick="doTaskAction(' + t.id + ',\'complete\')">完成任务</button>');
-    if(status === 'assigned' || status === 'accepted' || status === 'in_progress') btns.push('<button class="btn btn-sm" style="background:#667eea;color:#fff;border:none;" onclick="prefillFromTask(' + t.id + ')">进入录入</button>');
+    if(status === 'assigned' || status === 'accepted' || status === 'in_progress') btns.push('<button class="btn btn-sm" style="background:#667eea;color:#fff;border:none;" onclick="prefillFromTask(' + t.id + ', this)">进入录入</button>');
+    if(status === 'assigned' || status === 'accepted' || status === 'in_progress') btns.push('<button class="btn btn-sm" style="background:#389e0d;color:#fff;border:none;" onclick="doTaskAction(' + t.id + ',\'complete\', this)">完成任务</button>');
     if(btns.length) html += '<div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end;">' + btns.join('') + '</div>';
     html += '</div>';
   });
   box.innerHTML = html;
 }
-
-function doTaskAction(taskId, action){
-  var confirmMsg = {accept:'确认接单？', start:'确认开始执行？', complete:'确认完成任务？'}[action] || '确认？';
+function doTaskAction(taskId, action, btnEl){
+  var confirmMsg = {complete:'确认完成任务？'}[action] || '确认？';
   if(!confirm(confirmMsg)) return;
-  fetch('/api/project_tasks/' + taskId + '/' + action, {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: '{}'
-  })
+  var btn = btnEl || null;
+  var oldText = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = action === 'complete' ? '提交中...' : '处理中...'; }
+  fetch('/api/project_tasks/' + taskId + '/' + action, {method:'POST'})
     .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, data:d}; }); })
     .then(function(res){
       if(!res.ok || !res.data.success) throw new Error(res.data.error || '操作失败');
+      if(typeof showToast === 'function') showToast('操作成功','success');
       loadMyTasks(_myTasksFilter);
       if(typeof pollTaskCount === 'function') pollTaskCount();
     })
     .catch(function(err){
       console.error(err);
       alert(err.message || '操作失败');
+    })
+    .finally(function(){
+      if(btn){ btn.disabled = false; btn.textContent = oldText || '完成任务'; }
     });
 }
 
-function prefillFromTask(taskId){
+function prefillFromTask(taskId, btnEl){
+  var btn = btnEl || null;
+  var oldText = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = '进入中...'; }
   fetch('/api/project_tasks/' + taskId + '/prefill')
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      if(!d.success) throw new Error(d.error || '获取项目信息失败');
+    .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, data:d}; }); })
+    .then(function(res){
+      if(!res.ok || !res.data.success) throw new Error(res.data.error || '获取项目信息失败');
+      var d = res.data;
       var p = d.prefill || {};
       // 切到录入 tab
       showTab('new');
@@ -7751,26 +7813,27 @@ function prefillFromTask(taskId){
         var el = document.getElementById(id);
         if(el && map[id]){
           el.value = map[id];
-          // 触发 input/change 事件让其他逻辑感知到
           el.dispatchEvent(new Event('input', {bubbles:true}));
           el.dispatchEvent(new Event('change', {bubbles:true}));
         }
       }
-      // 记住任务来源
       window._currentTaskId = taskId;
       window._currentProjectId = d.project_id;
-      // 展开项目信息卡片（如果折叠了）
       var body = document.getElementById('projectInfoBody');
       if(body && body.style.display === 'none'){
         var card = document.getElementById('projectInfoCard');
         if(card) card.click();
       }
-      // 提示
       if(typeof showToast === 'function') showToast('已从任务自动填入项目信息');
+      loadMyTasks(_myTasksFilter);
+      if(typeof pollTaskCount === 'function') pollTaskCount();
     })
     .catch(function(err){
       console.error(err);
       alert(err.message || '获取项目信息失败');
+    })
+    .finally(function(){
+      if(btn){ btn.disabled = false; btn.textContent = oldText || '进入录入'; }
     });
 }
 

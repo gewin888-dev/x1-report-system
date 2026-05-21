@@ -365,13 +365,9 @@ function getRoleDisplay(role){
 
 function getUserPermissionSummary(role){
   var roleItem=(rolePermissionsData||[]).find(function(x){ return x.role===role; }) || {};
-  var defaults=roleItem.default_permissions || [];
-  var custom=roleItem.custom_permissions || {};
-  var combined={};
-  defaults.forEach(function(k){ combined[k]=true; });
-  Object.keys(custom).forEach(function(k){ combined[k]=!!custom[k]; });
+  var effectiveMap=roleItem.effective_map || {};
   var meta=getRolePermissionMeta();
-  return Object.keys(combined).filter(function(k){ return combined[k]; }).map(function(k){ return meta[k] || k; });
+  return Object.keys(effectiveMap).filter(function(k){ return !!effectiveMap[k]; }).map(function(k){ return meta[k] || k; });
 }
 
 var currentSelectedUser = null;
@@ -589,8 +585,17 @@ function getRolePermissionMeta(){
     'admin.stats.view':'查看统计',
     'admin.records.view':'查看记录管理',
     'admin.records.delete':'删除记录',
-    'admin.users.view':'查看用户列表',
-    'admin.users.manage':'管理用户',
+    'admin.users.view':'查看用户列表（旧）',
+    'admin.users.manage':'管理用户（旧）',
+    'admin.users.internal.view':'查看内部用户',
+    'admin.users.internal.create':'新增内部用户',
+    'admin.users.internal.update':'修改内部用户',
+    'admin.users.internal.delete':'删除内部用户',
+    'admin.users.customer.view':'查看客户用户',
+    'admin.users.customer.create':'新增客户用户',
+    'admin.users.customer.update':'修改客户用户',
+    'admin.users.customer.delete':'删除客户用户',
+    'admin.users.customer.approve':'审核客户注册',
     'admin.migration.check':'系统迁移检查',
     'admin.settings.view':'查看系统设置',
     'admin.settings.edit':'修改系统设置',
@@ -685,7 +690,9 @@ function getRolePermissionGroups(){
     {title:'📤 导出与文件', keys:['record.export','record.export.void','files.preview','files.preview.own','files.download.own']},
     {title:'👁️ 数据可见范围', keys:['record.scope.self','record.scope.department','record.scope.company','admin.records.scope.self','admin.records.scope.department','admin.records.scope.company']},
     // ═══ 系统管理 ═══
-    {title:'👤 用户管理', keys:['admin.users.view','admin.users.manage','admin.permissions.view','admin.permissions.manage']},
+    {title:'👤 内部用户管理', keys:['admin.users.internal.view','admin.users.internal.create','admin.users.internal.update','admin.users.internal.delete']},
+    {title:'👥 客户用户管理', keys:['admin.users.customer.view','admin.users.customer.create','admin.users.customer.update','admin.users.customer.delete','admin.users.customer.approve']},
+    {title:'🔐 权限管理', keys:['admin.users.view','admin.users.manage','admin.permissions.view','admin.permissions.manage']},
     {title:'📝 操作日志', keys:['admin.logs.view','admin.logs.delete']},
     {title:'⚙️ 系统设置', keys:['admin.settings.view','admin.settings.edit','admin.maintenance.run','admin.migration.check']},
     {title:'📚 系统文档', keys:['admin.docs.view']},
@@ -763,31 +770,48 @@ function renderRolePermissions(){
   if(!role){ listBox.innerHTML='<div class="empty">请先从左侧选择角色</div>'; summary.innerHTML='<span style="color:#64748b">当前显示全部角色导航，请点击左侧角色后查看并编辑该角色权限。系统设置、记录范围、导出能力等新权限已纳入可配置项。</span>'; if(saveBtn) saveBtn.disabled = true; return; }
   if(!item){ listBox.innerHTML='<div class="empty">暂无权限数据</div>'; summary.innerHTML=''; return; }
   var meta=getRolePermissionMeta();
+  var defaults=new Set(item.default_permissions || []);
+  var custom=item.custom_permissions || {};
+  var effectiveMap=item.effective_map || {};
   var combined={};
-  Object.keys(meta).forEach(function(k){ combined[k]={base:false, enabled:false}; });
-  (item.default_permissions||[]).forEach(function(k){ combined[k]={base:true, enabled:true}; });
-  Object.keys(item.custom_permissions||{}).forEach(function(k){ combined[k]={base:(item.default_permissions||[]).indexOf(k)>=0, enabled:!!item.custom_permissions[k]}; });
+  Object.keys(meta).forEach(function(k){
+    combined[k]={
+      base: defaults.has(k),
+      enabled: Object.prototype.hasOwnProperty.call(effectiveMap, k) ? !!effectiveMap[k] : defaults.has(k),
+      custom: Object.prototype.hasOwnProperty.call(custom, k),
+      customEnabled: Object.prototype.hasOwnProperty.call(custom, k) ? !!custom[k] : null
+    };
+  });
+  Object.keys(effectiveMap).forEach(function(k){
+    if(!Object.prototype.hasOwnProperty.call(combined, k)){
+      combined[k]={
+        base: defaults.has(k),
+        enabled: !!effectiveMap[k],
+        custom: Object.prototype.hasOwnProperty.call(custom, k),
+        customEnabled: Object.prototype.hasOwnProperty.call(custom, k) ? !!custom[k] : null
+      };
+    }
+  });
   var keys=Object.keys(combined).sort();
   var readonly = role === 'admin';
+  var customCount = Object.keys(custom).length;
+  var effectiveCount = keys.filter(function(k){ return !!(combined[k] && combined[k].enabled); }).length;
   summary.innerHTML = readonly
     ? '<strong style="color:#1e3a8a;display:block;margin-bottom:6px;">管理员角色</strong><span>admin 为内建超管：固定拥有全部最高权限，不可修改。请在左侧切换到其他角色后再勾选权限。</span>'
-    : '<strong style="color:#1e3a8a;display:block;margin-bottom:6px;">当前角色：'+getRoleDisplay(role)+'</strong><span>默认权限 '+(item.default_permissions||[]).length+' 项；当前展示 '+keys.length+' 项；带覆盖配置 '+Object.keys(item.custom_permissions||{}).length+' 项。</span>';
+    : '<strong style="color:#1e3a8a;display:block;margin-bottom:6px;">当前角色：'+getRoleDisplay(role)+'</strong>'
+      + '<div style="display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 8px 0;">'
+      + '<span class="users-perm-pill">默认权限 '+(item.default_permissions||[]).length+' 项</span>'
+      + '<span class="users-perm-pill">自定义覆盖 '+customCount+' 项</span>'
+      + '<span class="users-perm-pill">最终生效 '+effectiveCount+' 项</span>'
+      + '</div>'
+      + '<span style="color:#64748b;">当前勾选展示的是【最终生效权限】；保存的是相对默认权限的覆盖项。已登录用户需重新登录后生效。</span>';
   if(saveBtn) saveBtn.disabled = readonly;
   var groups = getRolePermissionGroups();
-  if(role==='customer'){
-    groups = groups.filter(function(g){ return g.keys.some(function(k){ return k.indexOf('customer.')===0; }); });
-  } else if(role==='inspector'){
-    var inspectorPrefixes = ['draft.','record.','files.','tasks.'];
-    groups = groups.filter(function(g){ return g.keys.some(function(k){ return inspectorPrefixes.some(function(p){ return k.indexOf(p)===0; }); }); });
-  }
   var groupedKeys = new Set();
   var h='';
-  groups.forEach(function(group){
-    group.keys.forEach(function(k){ groupedKeys.add(k); });
-    h += renderPermissionGroup(group.title, group.keys, combined, meta, readonly);
-  });
+  groups.forEach(function(group){ groupedKeys.add(group.title); group.keys.forEach(function(k){ groupedKeys.add(k); }); h += renderPermissionGroup(group.title, group.keys, combined, meta, readonly); });
   var extraKeys = keys.filter(function(k){ return !groupedKeys.has(k); });
-  if(role!=='customer' && extraKeys.length){
+  if(extraKeys.length){
     h += renderPermissionGroup('其他权限', extraKeys, combined, meta, readonly);
   }
   listBox.innerHTML=h;
@@ -798,21 +822,20 @@ function saveRolePermissions(){
   var item=(rolePermissionsData||[]).find(function(x){return x.role===role;});
   if(!item){showToast('未找到角色权限数据','error');return;}
   if(role==='admin'){showToast('admin 角色权限不可修改','info');return;}
-  var defaults=new Set(item.default_permissions||[]);
-  var body={custom_permissions:{}};
+  var effectivePermissions=[];
   Array.prototype.slice.call(document.querySelectorAll('#role-permission-list .perm-check')).forEach(function(el){
     var key=el.getAttribute('data-key');
     var checked=!!el.checked;
-    if(defaults.has(key)){
-      if(!checked) body.custom_permissions[key]=false;
-    }else if(checked){
-      body.custom_permissions[key]=true;
-    }
+    if(checked && key) effectivePermissions.push(key);
   });
+  var body={effective_permissions:effectivePermissions};
   fetch('/admin/api/permissions/roles/'+encodeURIComponent(role),{
     method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)
   }).then(function(r){return r.json().then(function(d){if(!r.ok) throw new Error(d.error||'保存失败'); return d;});})
-    .then(function(){showToast('角色权限已保存','success');loadRolePermissions();})
+    .then(function(){
+      return ensureCurrentUserProfile(true).catch(function(){ return null; });
+    })
+    .then(function(){showToast('角色权限已保存；当前账号权限已刷新，其他已登录用户需重新登录后生效','success');loadRolePermissions();})
     .catch(function(e){showToast(e.message||'保存失败','error')});
 }
 
@@ -846,8 +869,8 @@ function loadRecordSummary(keyword, domain, type){
   });
 }
 
-function ensureCurrentUserProfile(){
-  if(currentUserProfile){ return Promise.resolve(currentUserProfile);
+function ensureCurrentUserProfile(forceReload){
+  if(currentUserProfile && !forceReload){ return Promise.resolve(currentUserProfile);
   startNotifPoll(); }
   return fetch('/api/user')
     .then(function(r){return r.json()})
@@ -973,7 +996,24 @@ function loadRecords(page){
 function openRecordAsset(kind, target, failMessage){
   if(kind === 'local'){
     if(!target){ showToast(failMessage || '文件保存失败', 'error'); return; }
-    previewFile(target);
+    // 后台：打开本地原文件（WPS/系统默认程序）
+    fetch('/admin/api/open_file/'+encodeURIComponent(target), {method:'POST', credentials:'same-origin'})
+      .then(function(r){ return r.json().then(function(d){ return {ok:r.ok, status:r.status, data:d}; }); })
+      .then(function(res){
+        var d = res.data || {};
+        if(d && d.success){
+          showToast((d.message || '已打开文件'), 'success');
+          return;
+        }
+        if(res.status === 409){
+          // server 模式，降级为浏览器下载
+          showToast('当前为远程访问模式，改为浏览器下载', 'info');
+          window.location.href = '/download/' + encodeURIComponent(target);
+          return;
+        }
+        showToast((d && d.error) || '打开失败', 'error');
+      })
+      .catch(function(){ showToast('打开失败', 'error'); });
     return;
   }
   if(kind === 'feishu'){
@@ -1075,8 +1115,8 @@ function renderRecords(filtered){
     h += '</div>';
     h += '<div class="record-actions">';
     if(r.type === 'export'){
-      h += buildRecordAssetButton('查看检测报告', localReportOk, 'local', reportFile ? reportFile.name : '', '本地检测报告保存失败', 'local', 'admin.records.open_local');
-      h += buildRecordAssetButton('查看原始记录', localRecordOk, 'local', rawExcel ? rawExcel.name : '', '本地原始记录保存失败', 'local', 'admin.records.open_local');
+      h += buildRecordAssetButton('查看本地报告', localReportOk, 'local', reportFile ? reportFile.name : '', '本地检测报告保存失败', 'local', 'admin.records.open_local');
+      h += buildRecordAssetButton('查看本地记录', localRecordOk, 'local', rawExcel ? rawExcel.name : '', '本地原始记录保存失败', 'local', 'admin.records.open_local');
       h += buildRecordAssetButton('飞书报告', feishuReportOk, 'feishu', r.feishu_report_url || '', '飞书检测报告保存失败', 'feishu', 'admin.records.open_feishu');
       h += buildRecordAssetButton('飞书记录', feishuRecordOk, 'feishu', r.feishu_export_url || '', '飞书原始记录保存失败', 'feishu', 'admin.records.open_feishu');
       if(!isVoided){
@@ -2607,8 +2647,6 @@ function loadMonitor(){
   ]).then(([health,stats])=>{
     document.getElementById('sys-version').textContent=health.version||'-';
     document.getElementById('sys-port').textContent=health.port||'-';
-    document.getElementById('mon-exports').textContent=stats.total_exports||0;
-    document.getElementById('mon-drafts').textContent=stats.total_records||0;
     document.getElementById('mon-basedir').textContent=health.base_dir||'-';
     document.getElementById('mon-template').textContent=health.template_base||'-';
     document.getElementById('mon-records').textContent=health.records_dir||'-';
@@ -2635,6 +2673,45 @@ function loadMonitor(){
       document.getElementById('mon-disk-bar').style.width=sys.disk_percent+'%';
     }
   }).catch(e=>console.error('加载监控数据失败:',e));
+  // 加载备份记录表格
+  fetch('/admin/api/backups',{credentials:'same-origin'}).then(r=>r.json()).then(function(d){
+    var tbody=document.getElementById('mon-backup-tbody');
+    if(!tbody) return;
+    if(!d.success || !d.items || !d.items.length){
+      document.getElementById('mon-exports').textContent='0';
+      document.getElementById('mon-drafts').textContent='0';
+      var fullEl=document.getElementById('mon-full-backups');
+      if(fullEl) fullEl.textContent='0';
+      tbody.innerHTML='<tr><td colspan="5" class="empty">暂无备份记录</td></tr>';
+      return;
+    }
+    var html='';
+    var dataCount=0, codeCount=0, fullCount=0;
+    d.items.forEach(function(b){
+      if(b.type==='data') dataCount++;
+      else if(b.type==='code') codeCount++;
+      else if(b.type==='full') fullCount++;
+      var typeBadge='';
+      var toneMap={code:'#e6f4ff;color:#0958d9;border:1px solid #91caff',data:'#f6ffed;color:#389e0d;border:1px solid #b7eb8f',full:'#f9f0ff;color:#722ed1;border:1px solid #d3adf7','自动':'#fff7e6;color:#d46b08;border:1px solid #ffd591','手动':'#e6f4ff;color:#0958d9;border:1px solid #91caff'};
+      var tone=toneMap[b.type]||toneMap['手动'];
+      typeBadge='<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;background:'+tone+'">'+escapeHtml(b.type)+'</span>';
+      html+='<tr>';
+      html+='<td style="padding:8px;border-bottom:1px solid #f0f0f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+escapeHtml(b.filename)+'">'+escapeHtml(b.filename)+'</td>';
+      html+='<td style="padding:8px;border-bottom:1px solid #f0f0f0;white-space:nowrap;">'+escapeHtml(b.time)+'</td>';
+      html+='<td style="padding:8px;border-bottom:1px solid #f0f0f0;">'+typeBadge+'</td>';
+      html+='<td style="padding:8px;border-bottom:1px solid #f0f0f0;text-align:right;">'+b.size_mb+' MB</td>';
+      html+='<td style="padding:8px;border-bottom:1px solid #f0f0f0;text-align:center;"><button class="btn btn-sm" style="color:#cf1322;border-color:#ff7875;font-size:12px;padding:2px 10px;" onclick="deleteBackupFile(\''+escapeHtml(b.filename).replace(/'/g,"\\'")+'\')">删除</button></td>';
+      html+='</tr>';
+    });
+    document.getElementById('mon-exports').textContent=dataCount;
+    document.getElementById('mon-drafts').textContent=codeCount;
+    var fullEl=document.getElementById('mon-full-backups');
+    if(fullEl) fullEl.textContent=fullCount;
+    tbody.innerHTML=html;
+  }).catch(function(e){
+    var tbody=document.getElementById('mon-backup-tbody');
+    if(tbody) tbody.innerHTML='<tr><td colspan="5" class="empty">加载备份记录失败</td></tr>';
+  });
 }
 
 function initLogs(){
@@ -3085,33 +3162,35 @@ function closeBackupChoiceModal(){
 }
 
 function submitBackupChoice(mode){
-  var typeInput = prompt('请输入备份类型：code（代码）/ data（数据）/ full（全量）', mode==='update' ? 'full' : 'data');
-  if(typeInput === null) return;
-  var backupType = (typeInput||'').trim().toLowerCase();
-  if(['code','data','full'].indexOf(backupType) < 0){ showToast('备份类型不合法，请输入 code / data / full','error'); return; }
-  if(mode==='direct'){
-    closeBackupChoiceModal();
-    executeSettingsBackup({type: backupType});
-    return;
-  }
-  if(mode==='update'){
-    var currentVersion = ((window.currentSettingsData||{})['basic.version']||{}).value || (document.getElementById('sys-version') ? document.getElementById('sys-version').textContent : 'X4.7.2') || 'X4.7.2';
-    var nextVersion = prompt('请输入新的版本号：', currentVersion);
-    if(nextVersion === null) return;
-    nextVersion = (nextVersion||'').trim();
-    if(!nextVersion){ showToast('版本号不能为空','error'); return; }
-    var backupName = prompt('请输入备份名称：', 'X1_'+nextVersion+'_'+backupType+'_manual_backup');
-    if(backupName === null) return;
-    backupName = (backupName||'').trim();
-    if(!backupName){ showToast('备份名称不能为空','error'); return; }
-    closeBackupChoiceModal();
-    executeSettingsBackup({updateVersion:true, version:nextVersion, backupName:backupName, type: backupType});
-    return;
-  }
+  // Legacy — no longer called from UI, kept for compat
+  if(mode==='code'||mode==='data'||mode==='full'){ doBackupDirect(mode); return; }
+  if(mode==='update'){ doBackupWithVersion(); return; }
   closeBackupChoiceModal();
 }
 
+function doBackupDirect(backupType){
+  if(['code','data','full'].indexOf(backupType)<0){ showToast('备份类型不合法','error'); return; }
+  closeBackupChoiceModal();
+  executeSettingsBackup({type: backupType});
+}
+
+function doBackupWithVersion(){
+  var currentVersion = ((window.currentSettingsData||{})['basic.version']||{}).value || (document.getElementById('sys-version') ? document.getElementById('sys-version').textContent : '4.8.1') || '4.8.1';
+  var nextVersion = prompt('请输入新的版本号：', currentVersion);
+  if(nextVersion === null) return;
+  nextVersion = (nextVersion||'').trim();
+  if(!nextVersion){ showToast('版本号不能为空','error'); return; }
+  var backupType = prompt('请选择备份类型：code / data / full', 'full');
+  if(backupType === null) return;
+  backupType = (backupType||'').trim().toLowerCase();
+  if(['code','data','full'].indexOf(backupType)<0){ showToast('备份类型不合法，请输入 code / data / full','error'); return; }
+  var backupName = 'X1_v'+nextVersion+'_'+backupType+'_release';
+  closeBackupChoiceModal();
+  executeSettingsBackup({updateVersion:true, version:nextVersion, backupName:backupName, type: backupType});
+}
+
 function executeSettingsBackup(payload){
+  showToast('正在执行备份...', 'info');
   fetch('/admin/api/settings/backup_now',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload||{})}).then(function(r){return r.json()}).then(function(d){
     if(d.success){
       var backupTypeMap={code:'代码备份',data:'数据备份',full:'全量备份'};
@@ -3119,8 +3198,20 @@ function executeSettingsBackup(payload){
       showToast(label+'完成：'+d.backup_file,'success');
       if(d.version_updated){ showToast('系统版本已更新为 '+d.version,'success'); loadSettingsPanel(); }
       refreshRestoreBackups();
+      loadMonitor();  // 刷新备份记录表格
     } else showToast(d.error||'备份失败','error');
   }).catch(function(){showToast('备份失败','error')});
+}
+
+function deleteBackupFile(filename){
+  if(!confirm('确认删除备份文件？\n\n'+filename+'\n\n此操作不可逆！')) return;
+  fetch('/admin/api/backups/'+encodeURIComponent(filename),{method:'DELETE',credentials:'same-origin'})
+    .then(function(r){return r.json()})
+    .then(function(d){
+      if(d.success){ showToast('已删除：'+filename,'success'); loadMonitor(); }
+      else showToast(d.error||'删除失败','error');
+    })
+    .catch(function(){showToast('删除失败','error')});
 }
 function loadRestoreCenter(){
   switchPanel('settings', document.querySelector('.nav-item[data-panel="settings"]'));
@@ -3328,6 +3419,69 @@ function testFeishuSettings(){
     var x=d.result||{};
     showToast((x.message||'测试完成')+'｜AppID:'+(x.has_app_id?'已配':'未配')+'｜Secret:'+(x.has_app_secret?'已配':'未配')+'｜Token:'+(x.token_ok?'正常':'失败')+'｜报告目录:'+(x.reports_folder_ok?'正常':'异常')+'｜原始记录目录:'+(x.exports_folder_ok?'正常':'异常'),'info');
   }).catch(function(){showToast('飞书测试失败','error')});
+}
+
+/* ============================================================
+ * Typed Restore Picker (分类型恢复选择对话框)
+ * ============================================================ */
+var pendingTypedRestoreType = 'full';
+
+function openTypedRestorePicker(restoreType){
+  pendingTypedRestoreType = restoreType || 'full';
+  var modal=document.getElementById('typed-restore-picker-modal');
+  var title=document.getElementById('typed-restore-picker-title');
+  var desc=document.getElementById('typed-restore-picker-desc');
+  var select=document.getElementById('typed-restore-picker-select');
+  var empty=document.getElementById('typed-restore-picker-empty');
+  var preview=document.getElementById('typed-restore-picker-preview');
+  var btn=document.getElementById('typed-restore-picker-confirm');
+  var metaMap={
+    code:{title:'选择代码恢复备份',desc:'这里只显示代码备份，确认后进入代码层恢复确认对话框。'},
+    data:{title:'选择数据恢复备份',desc:'这里只显示数据备份，确认后进入数据层恢复确认对话框。'},
+    full:{title:'选择全量恢复备份',desc:'这里只显示全量备份，确认后进入整体还原确认对话框。'}
+  };
+  var meta=metaMap[pendingTypedRestoreType] || metaMap.full;
+  var items=(restoreBackupItems||[]).filter(function(x){ return (x.type||'full')===pendingTypedRestoreType; });
+  if(title) title.textContent=meta.title;
+  if(desc) desc.textContent=meta.desc;
+  if(select){
+    var typeLabelMap={code:'代码',data:'数据',full:'全量'};
+    select.innerHTML='<option value="">请选择备份...</option>' + items.map(function(x){
+      var typeLabel=typeLabelMap[x.type]||x.type||'全量';
+      return '<option value="'+escapeHtml(x.name||'')+'">['+escapeHtml(typeLabel)+'] '+escapeHtml((x.version_guess||'-')+' ｜ '+(x.mtime||'-')+' ｜ '+(x.name||''))+'</option>';
+    }).join('');
+    select.value='';
+    select.onchange=function(){ renderTypedRestorePickerPreview(this.value); };
+  }
+  if(empty) empty.style.display = items.length ? 'none' : 'block';
+  if(preview){ preview.style.display='none'; preview.innerHTML=''; }
+  if(btn) btn.disabled = !items.length;
+  if(modal) modal.style.display='flex';
+}
+
+function renderTypedRestorePickerPreview(name){
+  var preview=document.getElementById('typed-restore-picker-preview');
+  var btn=document.getElementById('typed-restore-picker-confirm');
+  var item=(restoreBackupItems||[]).find(function(x){ return x.name===name; });
+  if(!preview) return;
+  if(!item){ preview.style.display='none'; preview.innerHTML=''; if(btn) btn.disabled=true; return; }
+  var typeLabelMap={code:'代码备份',data:'数据备份',full:'全量备份'};
+  preview.style.display='block';
+  preview.innerHTML='已选备份：<strong>'+escapeHtml(item.name||'-')+'</strong><br>类型：'+escapeHtml(typeLabelMap[item.type]||item.type||'-')+'<br>版本：'+escapeHtml(item.version_guess||'-')+'<br>时间：'+escapeHtml(item.mtime||'-')+'<br>大小：'+(((item.size||0)/1024/1024).toFixed(1))+' MB';
+  if(btn) btn.disabled=false;
+}
+
+function confirmTypedRestorePicker(){
+  var select=document.getElementById('typed-restore-picker-select');
+  var name=select ? select.value : '';
+  if(!name){ showToast('请先选择备份','error'); return; }
+  closeTypedRestorePicker();
+  openRestoreConfirmModal(name, pendingTypedRestoreType || 'full');
+}
+
+function closeTypedRestorePicker(){
+  var modal=document.getElementById('typed-restore-picker-modal');
+  if(modal) modal.style.display='none';
 }
 
 ensureCurrentUserProfile().then(function(){

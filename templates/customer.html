@@ -965,7 +965,7 @@
         <div id="feedback-panel">
             <div class="panel-toolbar">
                 <span class="title">我的反馈</span>
-                <button class="btn btn-primary" id="btn-new-feedback">💬 新增反馈</button>
+                <button class="btn btn-primary" id="btn-new-feedback" onclick="document.getElementById('feedback-modal').classList.add('show')">💬 新增反馈</button>
             </div>
             <div id="feedback-list">
                 <!-- JS 填充反馈条目，示例结构如下：
@@ -1041,6 +1041,12 @@
         </div>
         <div class="modal-body">
             <div class="form-group">
+                <label>关联项目</label>
+                <select id="feedback-project">
+                    <option value="">请选择项目</option>
+                </select>
+            </div>
+            <div class="form-group">
                 <label>反馈类型</label>
                 <select id="feedback-type">
                     <option value="">请选择类型</option>
@@ -1061,10 +1067,15 @@
                 <label>联系方式</label>
                 <input type="text" id="feedback-contact" placeholder="手机号或邮箱，方便我们回复您">
             </div>
+            <div class="form-group">
+                <label>上传附件（可多选，支持图片、PDF、Office、压缩包等）</label>
+                <input type="file" id="feedback-attachments" multiple>
+                <div style="font-size:12px;color:#94a3b8;margin-top:6px;">建议单个文件不要过大，附件会随反馈一并留存在项目与客户管理中。</div>
+            </div>
         </div>
         <div class="modal-footer">
-            <button class="btn btn-default" id="feedback-cancel">取消</button>
-            <button class="btn btn-primary" id="feedback-submit">提交反馈</button>
+            <button class="btn btn-default" id="feedback-cancel" onclick="closeFeedbackModal()">取消</button>
+            <button class="btn btn-primary" id="feedback-submit" onclick="submitFeedback()">提交反馈</button>
         </div>
     </div>
 </div>
@@ -1087,6 +1098,11 @@
             <div class="form-group" style="margin-top:16px;">
                 <label>联系方式（选填）</label>
                 <input type="text" id="rf-contact" placeholder="手机号或微信，方便我们确认细节">
+            </div>
+            <div class="form-group" style="margin-top:16px;">
+                <label>上传附件（可多选）</label>
+                <input type="file" id="rf-attachments" multiple>
+                <div style="font-size:12px;color:#94a3b8;margin-top:6px;">可附截图、图片、PDF、Word/Excel 等说明材料。</div>
             </div>
         </div>
         <div class="modal-footer">
@@ -1144,7 +1160,8 @@
 </script>
 
 <!-- ===== Business JS ===== -->
-<script src="/static/customer.js?v=20260518v2">
+<script src="/static/customer.js?v=20260521_feedback_v3"></script>
+<script>
 // ====== 客户端消息通知 ======
 function loadCustNotifications(){
   api('/api/notifications?limit=30').then(function(d){

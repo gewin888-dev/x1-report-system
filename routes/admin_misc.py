@@ -13,7 +13,14 @@ from pathlib import Path
 from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
 
-from auth import require_role, require_permission, DEFAULT_ROLE_PERMISSIONS
+from auth import (
+    require_role,
+    require_permission,
+    DEFAULT_ROLE_PERMISSIONS,
+    _ensure_role_permission_final_table,
+    _get_final_permissions_from_db,
+    _save_final_permissions,
+)
 from config_loader import load_x1_config
 from database import get_db
 from monitor import log_action
@@ -137,7 +144,7 @@ def api_notification_read_all():
 
 @admin_misc_bp.route('/admin/api/registrations')
 @login_required
-@require_permission('admin.users.manage')
+@require_permission('admin.users.customer.view')
 def admin_api_registrations():
     """获取客户注册申请列表"""
     status = request.args.get('status', 'pending')
@@ -167,7 +174,7 @@ def admin_api_registrations():
 
 @admin_misc_bp.route('/admin/api/registrations/<int:reg_id>/approve', methods=['POST'])
 @login_required
-@require_permission('admin.users.manage')
+@require_permission('admin.users.customer.approve')
 def admin_api_approve_registration(reg_id):
     """审核通过客户注册，同时自动创建/更新 client_profiles"""
     with get_db() as conn:
@@ -226,7 +233,7 @@ def admin_api_approve_registration(reg_id):
 
 @admin_misc_bp.route('/admin/api/registrations/<int:reg_id>/reject', methods=['POST'])
 @login_required
-@require_permission('admin.users.manage')
+@require_permission('admin.users.customer.approve')
 def admin_api_reject_registration(reg_id):
     """驳回客户注册"""
     data = request.get_json(silent=True) or {}
@@ -260,19 +267,29 @@ def admin_api_reject_registration(reg_id):
 def admin_api_role_permissions():
     result = []
     with get_db() as conn:
-        rows = conn.execute('SELECT role, permission_key, enabled FROM role_permissions ORDER BY role, permission_key').fetchall()
-    custom_map = {}
-    for row in rows:
-        custom_map.setdefault(row['role'], {})[row['permission_key']] = bool(row['enabled'])
+        _ensure_role_permission_final_table(conn)
     for role, defaults in DEFAULT_ROLE_PERMISSIONS.items():
-        effective = sorted(set(defaults) | {k for k, v in custom_map.get(role, {}).items() if v})
-        disabled = sorted([k for k, v in custom_map.get(role, {}).items() if not v])
+        with get_db() as conn:
+            final_set = _get_final_permissions_from_db(conn, role)
+        effective_map = {}
+        all_keys = sorted(set(defaults) | set(final_set))
+        for key in all_keys:
+            effective_map[key] = key in final_set
+        disabled = sorted([k for k in all_keys if k not in final_set])
+        custom_permissions = {}
+        for key in all_keys:
+            base_enabled = key in defaults
+            final_enabled = key in final_set
+            if base_enabled != final_enabled:
+                custom_permissions[key] = final_enabled
         result.append({
             'role': role,
             'default_permissions': sorted(defaults),
-            'custom_permissions': custom_map.get(role, {}),
-            'effective_permissions': effective,
+            'custom_permissions': custom_permissions,
+            'effective_permissions': sorted(final_set),
+            'effective_map': effective_map,
             'disabled_permissions': disabled,
+            'storage_mode': 'final',
         })
     return jsonify({'success': True, 'roles': result})
 
@@ -286,22 +303,29 @@ def admin_api_role_permissions_update(role):
     if role not in DEFAULT_ROLE_PERMISSIONS:
         return jsonify({'success': False, 'error': '角色不存在'}), 404
     data = request.get_json(silent=True) or {}
-    custom_permissions = data.get('custom_permissions', {})
-    if not isinstance(custom_permissions, dict):
-        return jsonify({'success': False, 'error': 'custom_permissions 必须为对象'}), 400
+    effective_permissions = data.get('effective_permissions')
+    if not isinstance(effective_permissions, list):
+        return jsonify({'success': False, 'error': 'effective_permissions 必须为数组'}), 400
+    clean_permissions = sorted({str(key or '').strip() for key in effective_permissions if str(key or '').strip()})
     now = datetime.now().isoformat()
+    defaults = set(DEFAULT_ROLE_PERMISSIONS.get(role, set()))
+    custom_permissions = {}
+    for key in sorted(set(defaults) | set(clean_permissions)):
+        base_enabled = key in defaults
+        final_enabled = key in clean_permissions
+        if base_enabled != final_enabled:
+            custom_permissions[key] = final_enabled
     with get_db() as conn:
-        conn.execute('DELETE FROM role_permissions WHERE role = ?', (role,))
-        for key, enabled in custom_permissions.items():
-            key = str(key or '').strip()
-            if not key:
-                continue
-            conn.execute(
-                'INSERT INTO role_permissions (role, permission_key, enabled, updated_at) VALUES (?, ?, ?, ?)',
-                (role, key, 1 if bool(enabled) else 0, now)
-            )
-    log_action(current_user.id if current_user.is_authenticated else 'unknown', '更新角色权限', role, json.dumps(custom_permissions, ensure_ascii=False))
-    return jsonify({'success': True, 'role': role, 'custom_permissions': custom_permissions})
+        _ensure_role_permission_final_table(conn)
+        _save_final_permissions(conn, role, clean_permissions, updated_at=now)
+    log_action(current_user.id if current_user.is_authenticated else 'unknown', '更新角色权限', role, json.dumps({'effective_permissions': clean_permissions}, ensure_ascii=False))
+    return jsonify({
+        'success': True,
+        'role': role,
+        'effective_permissions': clean_permissions,
+        'custom_permissions': custom_permissions,
+        'storage_mode': 'final'
+    })
 
 
 # ============================================================

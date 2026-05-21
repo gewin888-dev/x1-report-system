@@ -35,10 +35,10 @@ TASK_TYPE_LABELS = {
 
 TASK_STATUS_LABELS = {
     'pending_assign': '待指派',
-    'assigned': '已派单',
-    'accepted': '已接单',
-    'in_progress': '执行中',
-    'completed': '已完成',
+    'assigned': '待检测',
+    'accepted': '待检测',
+    'in_progress': '检测中',
+    'completed': '检测完成',
     'cancelled': '已取消',
 }
 
@@ -186,6 +186,7 @@ def serialize_project_task(row, project_row=None):
         client_name = project_row['client_name'] or ''
     assigned_to = row['assigned_to']
     created_by = row['created_by']
+    updated_by = row['updated_by'] if 'updated_by' in row.keys() else ''
     return {
         'id': row['id'],
         'project_id': row['project_id'],
@@ -207,6 +208,9 @@ def serialize_project_task(row, project_row=None):
         'created_by_name': _get_user_display_name(created_by),
         'created_at': row['created_at'] or '',
         'updated_at': row['updated_at'] or '',
+        'updated_by': updated_by,
+        'updated_by_name': _get_user_display_name(updated_by),
+        'version': row['version'] if 'version' in row.keys() else 1,
     }
 
 

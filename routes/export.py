@@ -322,7 +322,7 @@ def api_x_submit_export():
     # 自动同步项目信息到后台项目管理
     _auto_sync_project_and_task(export_payload, export_id)
 
-    # 自动流转：导出报告成功 → 检测完成 + 已出具
+    # 自动流转：导出报告成功 → 推进到"检测中"（不自动完成任务）
     _try_advance_on_export(export_payload)
 
     return jsonify({

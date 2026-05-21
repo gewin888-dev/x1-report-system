@@ -228,9 +228,11 @@ def _build_export_payload(project: dict) -> dict:
 
 
 def _try_advance_on_export(export_payload):
-    """导出报告成功后，尝试推进已存在项目的状态到 检测完成 + 报告编制中。
-    注意：导出后还需人工审核，审核通过后才上传审核稿推进到“待客户确认”。
-    同时将该项目的活跃任务收口为 completed，避免项目已检测完成但任务仍显示执行中。
+    """导出报告成功后，将项目推进到"检测中"（如果尚未到达更高阶段）。
+    
+    注意：导出 ≠ 完成任务。一个项目可能需要录入多份报告，
+    "检测完成"应由检测员主动点击"完成任务"来触发。
+    同时将该项目未开始的任务自动推进到 in_progress（检测中）。
     """
     try:
         project_info = export_payload.get('project', {}) or {}
@@ -249,22 +251,23 @@ def _try_advance_on_export(export_payload):
             project_id = row['id']
         finally:
             conn.close()
+        # 只推进到"检测中"，不跳到"检测完成"
         _auto_advance_project_stage(
             project_id,
-            target_inspection='检测完成',
-            target_report='报告编制中'
+            target_inspection='检测中'
         )
+        # 将仍处于待检测状态的任务推进到 in_progress
         conn = get_x1_data_conn()
         try:
             now = datetime.now().isoformat(timespec='seconds')
             conn.execute(
                 """
                 UPDATE project_tasks
-                SET task_status='completed',
-                    completed_at=COALESCE(NULLIF(completed_at, ''), ?),
+                SET task_status='in_progress',
+                    started_at=COALESCE(NULLIF(started_at, ''), ?),
                     updated_at=?
                 WHERE project_id=?
-                  AND task_status IN ('pending_assign', 'assigned', 'accepted', 'in_progress')
+                  AND task_status IN ('pending_assign', 'assigned', 'accepted')
                 """,
                 (now, now, project_id)
             )

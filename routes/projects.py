@@ -23,6 +23,7 @@ from helpers.project_utils import (
     _get_business_project_by_id, _get_user_display_name,
     _clean_project_payload, refresh_project_task_summary,
 )
+from customer_routes import _serialize_report_feedback_attachments
 
 # ============================================================
 # Blueprint 定义
@@ -168,7 +169,41 @@ def admin_api_business_project_detail(project_id):
         row = conn.execute('SELECT * FROM business_projects WHERE id=?', [project_id]).fetchone()
         if not row:
             return jsonify({'success': False, 'error': '项目不存在'}), 404
-        return jsonify({'success': True, 'item': serialize_business_project(row)})
+        feedback_rows = conn.execute(
+            "SELECT * FROM report_feedback WHERE project_id=? ORDER BY created_at DESC, id DESC",
+            (project_id,)
+        ).fetchall()
+        report_feedbacks = []
+        for fb in feedback_rows:
+            # 管理员专用附件序列化：使用管理员下载路径
+            att_rows = conn.execute(
+                "SELECT id, report_feedback_id, original_name, stored_name, file_ext, mime_type, file_size, relative_path, created_at FROM report_feedback_attachments WHERE report_feedback_id=? ORDER BY id ASC",
+                (fb['id'],)
+            ).fetchall()
+            attachments = []
+            for att in att_rows:
+                attachments.append({
+                    'id': att['id'],
+                    'report_feedback_id': att['report_feedback_id'],
+                    'original_name': att['original_name'] or '',
+                    'stored_name': att['stored_name'] or '',
+                    'file_ext': att['file_ext'] or '',
+                    'mime_type': att['mime_type'] or '',
+                    'file_size': att['file_size'] or 0,
+                    'relative_path': att['relative_path'] or '',
+                    'download_url': '/admin/api/report_feedback/attachments/%s/download' % att['id'],
+                    'created_at': att['created_at'] or '',
+                })
+            report_feedbacks.append({
+                'id': fb['id'],
+                'project_id': fb['project_id'],
+                'client_name': fb['client_name'] or '',
+                'action': fb['action'] or '',
+                'content': fb['content'] or '',
+                'created_at': fb['created_at'] or '',
+                'attachments': attachments,
+            })
+        return jsonify({'success': True, 'item': serialize_business_project(row), 'report_feedbacks': report_feedbacks})
     finally:
         conn.close()
 
@@ -247,6 +282,38 @@ def admin_api_download_file():
 
 
 # ============================================================
+# 管理员下载客户报告修正反馈附件
+# ============================================================
+
+@projects_bp.route('/admin/api/report_feedback/attachments/<int:attachment_id>/download', methods=['GET'])
+@login_required
+@require_permission('admin.projects.view')
+def admin_api_download_report_feedback_attachment(attachment_id):
+    """管理员下载报告修正反馈附件（不受 client_name 过滤限制）"""
+    conn = get_x1_data_conn()
+    try:
+        row = conn.execute(
+            """
+            SELECT a.*, f.project_id
+            FROM report_feedback_attachments a
+            JOIN report_feedback f ON f.id = a.report_feedback_id
+            WHERE a.id=?
+            """,
+            (attachment_id,)
+        ).fetchone()
+        if not row:
+            return jsonify({'success': False, 'error': '附件不存在或关联反馈已失效'}), 404
+        if not row['project_id']:
+            return jsonify({'success': False, 'error': '附件关联项目无效'}), 404
+        file_path = BASE_DIR / 'uploads_x1' / (row['relative_path'] or '')
+        if not file_path.exists():
+            return jsonify({'success': False, 'error': '附件文件不存在'}), 404
+        return send_file(str(file_path), as_attachment=True, download_name=row['original_name'] or row['stored_name'])
+    finally:
+        conn.close()
+
+
+# ============================================================
 # 创建项目
 # ============================================================
 
@@ -268,18 +335,34 @@ def admin_api_business_project_create():
                 detection_domain, detection_type, expected_detection_date, project_desc,
                 business_stage, contract_status, contract_amount, paid_amount, inspection_stage,
                 report_status, invoice_status, payment_status, owner, remarks,
-                assigned_to, assigned_at, task_status, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                assigned_to, assigned_at, task_status, created_at, updated_at, version, updated_by
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', [
             project_no,
             payload['project_name'], payload['client_name'], payload['project_address'], payload['contact_name'], payload['contact_phone'],
             payload['detection_domain'], payload['detection_type'], payload['expected_detection_date'], payload['project_desc'],
             payload['business_stage'], payload['contract_status'], payload['contract_amount'], payload['paid_amount'], payload['inspection_stage'],
             payload['report_status'], payload['invoice_status'], payload['payment_status'], payload['owner'], payload['remarks'],
-            payload['assigned_to'], payload['assigned_at'], payload['task_status'], now, now
+            payload['assigned_to'], payload['assigned_at'], payload['task_status'], now, now, 1, getattr(current_user, 'id', None)
         ])
         conn.commit()
         row = conn.execute('SELECT * FROM business_projects WHERE id=?', [cur.lastrowid]).fetchone()
+        try:
+            log_action(
+                getattr(current_user, 'id', 'system'),
+                '创建项目',
+                f'business_project:{cur.lastrowid}',
+                json.dumps({
+                    'project_id': cur.lastrowid,
+                    'project_no': project_no,
+                    'project_name': payload['project_name'],
+                    'client_name': payload['client_name'],
+                    'inspection_stage': payload['inspection_stage'],
+                    'report_status': payload['report_status'],
+                }, ensure_ascii=False)
+            )
+        except Exception:
+            pass
         return jsonify({'success': True, 'item': serialize_business_project(row)})
     finally:
         conn.close()
@@ -302,6 +385,16 @@ def admin_api_business_project_update(project_id):
             return jsonify({'success': False, 'error': '项目不存在'}), 404
         # 合并：以现有数据为底，用请求数据覆盖（部分更新）
         existing = dict(row)
+        expected_version = data.get('version', None)
+        if expected_version is not None:
+            try:
+                expected_version = int(expected_version)
+            except (TypeError, ValueError):
+                return jsonify({'success': False, 'error': 'version 参数非法'}), 400
+        current_version = int(existing.get('version') or 1)
+        if expected_version is not None and expected_version != current_version:
+            return jsonify({'success': False, 'error': '项目数据已被其他人修改，请刷新后重试', 'code': 'version_conflict', 'current_version': current_version}), 409
+
         merged = {k: data[k] if k in data else existing.get(k, '') for k in [
             'project_name', 'client_name', 'project_address', 'contact_name', 'contact_phone',
             'detection_domain', 'detection_type', 'expected_detection_date', 'project_desc',
@@ -311,22 +404,48 @@ def admin_api_business_project_update(project_id):
         ]}
         if not merged.get('project_name'):
             return jsonify({'success': False, 'error': '项目名称不能为空'}), 400
-        conn.execute('''
+
+        params = [
+            merged['project_name'], merged['client_name'], merged['project_address'], merged['contact_name'], merged['contact_phone'],
+            merged['detection_domain'], merged['detection_type'], merged['expected_detection_date'], merged['project_desc'],
+            merged['business_stage'], merged['contract_status'], merged.get('contract_amount', 0), merged.get('paid_amount', 0), merged.get('inspection_stage', ''),
+            merged.get('report_status', ''), merged.get('invoice_status', ''), merged.get('payment_status', ''), merged.get('owner', ''), merged.get('remarks', ''),
+            merged.get('assigned_to', ''), merged.get('assigned_at', ''), merged.get('task_status', ''), now, getattr(current_user, 'id', None), current_version + 1,
+            project_id,
+        ]
+        update_sql = '''
             UPDATE business_projects SET
                 project_name=?, client_name=?, project_address=?, contact_name=?, contact_phone=?,
                 detection_domain=?, detection_type=?, expected_detection_date=?, project_desc=?,
                 business_stage=?, contract_status=?, contract_amount=?, paid_amount=?, inspection_stage=?,
                 report_status=?, invoice_status=?, payment_status=?, owner=?, remarks=?,
-                assigned_to=?, assigned_at=?, task_status=?, updated_at=?
+                assigned_to=?, assigned_at=?, task_status=?, updated_at=?, updated_by=?, version=?
             WHERE id=?
-        ''', [
-            merged['project_name'], merged['client_name'], merged['project_address'], merged['contact_name'], merged['contact_phone'],
-            merged['detection_domain'], merged['detection_type'], merged['expected_detection_date'], merged['project_desc'],
-            merged['business_stage'], merged['contract_status'], merged.get('contract_amount', 0), merged.get('paid_amount', 0), merged.get('inspection_stage', ''),
-            merged.get('report_status', ''), merged.get('invoice_status', ''), merged.get('payment_status', ''), merged.get('owner', ''), merged.get('remarks', ''),
-            merged.get('assigned_to', ''), merged.get('assigned_at', ''), merged.get('task_status', ''), now, project_id
-        ])
+        '''
+        if expected_version is not None:
+            update_sql += ' AND COALESCE(version, 1)=?'
+            params.append(expected_version)
+
+        cur = conn.execute(update_sql, params)
+        if cur.rowcount == 0:
+            return jsonify({'success': False, 'error': '项目数据已被其他人修改，请刷新后重试', 'code': 'version_conflict'}), 409
         conn.commit()
+
+        try:
+            changes = {}
+            for k in ['project_name','client_name','inspection_stage','report_status','invoice_status','payment_status','owner','remarks']:
+                old_v = existing.get(k, '')
+                new_v = merged.get(k, '')
+                if str(old_v) != str(new_v):
+                    changes[k] = {'old': old_v, 'new': new_v}
+            log_action(
+                getattr(current_user, 'id', 'system'),
+                '更新项目',
+                f'business_project:{project_id}',
+                json.dumps({'project_id': project_id, 'changes': changes}, ensure_ascii=False)
+            )
+        except Exception:
+            pass
 
         # 检测阶段或报告状态变更时通知客户
         try:
@@ -351,14 +470,37 @@ def admin_api_business_project_update(project_id):
 @login_required
 @require_permission('admin.projects.delete')
 def admin_api_business_project_delete(project_id):
+    inspect_only = request.args.get('inspect_only', '').strip() in ('1', 'true', 'yes')
     conn = get_x1_data_conn()
     try:
-        exists = conn.execute('SELECT id FROM business_projects WHERE id=?', [project_id]).fetchone()
-        if not exists:
+        project = conn.execute('SELECT id, project_name, client_name, report_file_path FROM business_projects WHERE id=?', [project_id]).fetchone()
+        if not project:
             return jsonify({'success': False, 'error': '项目不存在'}), 404
+        task_row = conn.execute('SELECT COUNT(*) AS cnt FROM project_tasks WHERE project_id=?', [project_id]).fetchone()
+        feedback_row = conn.execute('SELECT COUNT(*) AS cnt FROM report_feedback WHERE project_id=?', [project_id]).fetchone()
+        attachment_count = len(_parse_report_file_list((project['report_file_path'] if 'report_file_path' in project.keys() else '') or ''))
+        impact = {
+            'project_name': project['project_name'] or '',
+            'client_name': project['client_name'] or '',
+            'task_count': task_row['cnt'] if task_row else 0,
+            'feedback_count': feedback_row['cnt'] if feedback_row else 0,
+            'attachment_count': attachment_count,
+        }
+        if inspect_only:
+            return jsonify({'success': True, 'impact': impact})
+        conn.execute('DELETE FROM project_tasks WHERE project_id=?', [project_id])
         conn.execute('DELETE FROM business_projects WHERE id=?', [project_id])
         conn.commit()
-        return jsonify({'success': True})
+        try:
+            log_action(
+                getattr(current_user, 'id', 'system'),
+                '删除项目',
+                f'business_project:{project_id}',
+                json.dumps(impact, ensure_ascii=False)
+            )
+        except Exception:
+            pass
+        return jsonify({'success': True, 'impact': impact})
     finally:
         conn.close()
 
@@ -417,6 +559,7 @@ def admin_api_upload_report(project_id):
         existing_files = _parse_report_file_list(existing_raw)
 
         saved_files = []
+        saved_file_paths = []
         pdf_paths = []
         errors = []
 
@@ -432,6 +575,7 @@ def admin_api_upload_report(project_id):
             safe_name = f"project_{project_id}_{ts}_{idx}_{orig_stem}{ext}"
             save_path = upload_dir / safe_name
             f.save(str(save_path))
+            saved_file_paths.append(str(save_path))
             saved_files.append({
                 'path': str(save_path),
                 'name': f.filename,
@@ -475,7 +619,7 @@ def admin_api_upload_report(project_id):
 
         # 更新项目记录
         now = datetime.now().isoformat(timespec='seconds')
-        updates = {'report_file_path': file_list_json, 'updated_at': now}
+        updates = {'report_file_path': file_list_json, 'updated_at': now, 'updated_by': getattr(current_user, 'id', None)}
 
         # 状态推进（只前进不后退，除非是从编制中到待确认）
         if file_type == 'draft' and current_rs in ('', '未开始', '编制中', '报告编制中', '审核中', '待修改', '待出具'):
@@ -485,15 +629,49 @@ def admin_api_upload_report(project_id):
         elif file_type == 'final' and current_rs in ('客户已确认',):
             updates['report_status'] = '已出报告'
 
-        set_clause = ', '.join(f"{k}=?" for k in updates.keys())
-        conn.execute(f'UPDATE business_projects SET {set_clause} WHERE id=?',
-                     list(updates.values()) + [project_id])
-        conn.commit()
+        try:
+            current_version = int(project['version']) if 'version' in project.keys() and project['version'] else 1
+            updates['version'] = current_version + 1
+            set_clause = ', '.join(f"{k}=?" for k in updates.keys())
+            conn.execute(f'UPDATE business_projects SET {set_clause} WHERE id=?',
+                         list(updates.values()) + [project_id])
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            for fp in saved_file_paths:
+                try:
+                    Path(fp).unlink(missing_ok=True)
+                except Exception:
+                    pass
+            for fp in pdf_paths:
+                try:
+                    Path(fp).unlink(missing_ok=True)
+                except Exception:
+                    pass
+            raise
 
         # 通知客户
         try:
             if file_type == 'draft':
                 notify_project_report_uploaded(project['project_name'], project['client_name'])
+        except Exception:
+            pass
+
+        try:
+            log_action(
+                getattr(current_user, 'id', 'system'),
+                '上传项目报告',
+                f'business_project:{project_id}',
+                json.dumps({
+                    'project_id': project_id,
+                    'project_name': project['project_name'],
+                    'client_name': project['client_name'],
+                    'file_type': file_type,
+                    'file_count': len(saved_files),
+                    'target_status': target_status,
+                    'errors': len(errors),
+                }, ensure_ascii=False)
+            )
         except Exception:
             pass
 

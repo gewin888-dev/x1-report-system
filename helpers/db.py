@@ -25,13 +25,21 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 _DATA_DIR = BASE_DIR / 'data'
 
 
+def _apply_sqlite_pragmas(conn):
+    """统一业务库 SQLite 并发参数。"""
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA busy_timeout=5000")
+    return conn
+
+
 def get_x1_data_conn():
     """获取业务数据库连接 (data/x1_data.db)"""
     db_path = _DATA_DIR / 'x1_data.db'
     os.makedirs(str(_DATA_DIR), exist_ok=True)
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
+    _apply_sqlite_pragmas(conn)
     return conn
 
 
@@ -102,34 +110,53 @@ def init_business_projects_table():
 
 
 def init_project_tasks_table():
-    """初始化项目任务表"""
+    """初始化/补齐项目任务表并发字段（兼容现网真实 schema）。"""
     conn = get_x1_data_conn()
-    conn.executescript('''
-        CREATE TABLE IF NOT EXISTS project_tasks (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            project_id INTEGER NOT NULL,
-            task_type TEXT NOT NULL DEFAULT 'inspection',
-            assigned_to TEXT DEFAULT '',
-            assigned_by TEXT DEFAULT '',
-            status TEXT DEFAULT 'pending_assign',
-            priority TEXT DEFAULT 'normal',
-            notes TEXT DEFAULT '',
-            result_summary TEXT DEFAULT '',
-            created_at TEXT DEFAULT '',
-            updated_at TEXT DEFAULT '',
-            accepted_at TEXT DEFAULT '',
-            started_at TEXT DEFAULT '',
-            completed_at TEXT DEFAULT '',
-            cancelled_at TEXT DEFAULT '',
-            cancel_reason TEXT DEFAULT ''
-        );
-        
-        CREATE INDEX IF NOT EXISTS idx_pt_project ON project_tasks(project_id);
-        CREATE INDEX IF NOT EXISTS idx_pt_assigned ON project_tasks(assigned_to);
-        CREATE INDEX IF NOT EXISTS idx_pt_status ON project_tasks(status);
-    ''')
-    conn.commit()
-    conn.close()
+    try:
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(project_tasks)").fetchall()}
+        if not cols:
+            conn.executescript('''
+                CREATE TABLE IF NOT EXISTS project_tasks (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    project_id INTEGER NOT NULL,
+                    task_type TEXT NOT NULL DEFAULT 'inspection',
+                    assigned_to TEXT DEFAULT '',
+                    assigned_by TEXT DEFAULT '',
+                    status TEXT DEFAULT 'pending_assign',
+                    priority TEXT DEFAULT 'normal',
+                    notes TEXT DEFAULT '',
+                    result_summary TEXT DEFAULT '',
+                    created_at TEXT DEFAULT '',
+                    updated_at TEXT DEFAULT '',
+                    accepted_at TEXT DEFAULT '',
+                    started_at TEXT DEFAULT '',
+                    completed_at TEXT DEFAULT '',
+                    cancelled_at TEXT DEFAULT '',
+                    cancel_reason TEXT DEFAULT ''
+                );
+            ''')
+            cols = {row[1] for row in conn.execute("PRAGMA table_info(project_tasks)").fetchall()}
+
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_pt_project ON project_tasks(project_id)")
+        if 'assigned_to' in cols:
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_pt_assigned ON project_tasks(assigned_to)")
+        if 'task_status' in cols:
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_pt_status ON project_tasks(task_status)")
+        elif 'status' in cols:
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_pt_status ON project_tasks(status)")
+
+        if 'version' not in cols:
+            conn.execute("ALTER TABLE project_tasks ADD COLUMN version INTEGER NOT NULL DEFAULT 1")
+        if 'updated_by' not in cols:
+            conn.execute("ALTER TABLE project_tasks ADD COLUMN updated_by TEXT DEFAULT ''")
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def ensure_project_tasks_concurrency_columns():
+    """为现网 project_tasks 表补齐并发控制字段。"""
+    init_project_tasks_table()
 
 
 # ==================== 通用数据访问函数 ====================

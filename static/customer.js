@@ -34,7 +34,7 @@
 
   /* ========== 进度条 ========== */
 
-  var STEPS = ['待审核', '已派单', '检测中', '报告编制中', '待客户确认', '客户已确认', '已出报告'];
+  var STEPS = ['待审核', '已排期', '检测中', '报告编制中', '待客户确认', '客户已确认', '已出报告'];
 
   function getStepIndex(project) {
     // 根据 report_status / inspection_stage 推断当前步骤
@@ -275,10 +275,13 @@
 
   /* ========== 检测项目 ========== */
 
+  var _allProjects = [];
+
   function loadProjects() {
     api('GET', '/customer/api/projects').then(function (d) {
       var list = d.items || d.list || d.data || [];
       if (!Array.isArray(list)) list = [];
+      _allProjects = list;
       var container = document.getElementById('customer-projects-list');
       var empty = document.getElementById('projects-empty');
       if (!list.length) {
@@ -288,9 +291,30 @@
       }
       empty.style.display = 'none';
       container.innerHTML = list.map(function (p) {
-        var statusColor = p.status === '已完成' ? 'background:#f6ffed;color:#52c41a;'
-          : p.status === '进行中' ? 'background:#e6f7ff;color:#1677ff;'
-          : 'background:#fff7e6;color:#fa8c16;';
+        var rptStatus = (p.report_status || '').trim();
+        var inspStage = (p.inspection_stage || '').trim();
+        var projectStatusText = '待审核';
+        var statusColor = 'background:#fff7e6;color:#fa8c16;';
+
+        if (rptStatus === '已出报告' || rptStatus === '已出具' || rptStatus === '已发送客户') {
+          projectStatusText = '已出报告';
+          statusColor = 'background:#f6ffed;color:#52c41a;';
+        } else if (rptStatus === '客户已确认') {
+          projectStatusText = '客户已确认';
+          statusColor = 'background:#f6ffed;color:#52c41a;';
+        } else if (rptStatus === '待客户确认') {
+          projectStatusText = '待客户确认';
+          statusColor = 'background:#e6f7ff;color:#1677ff;';
+        } else if (rptStatus === '报告编制中' || rptStatus === '编制中' || rptStatus === '审核中' || rptStatus === '待修改' || rptStatus === '待出具') {
+          projectStatusText = '报告编制中';
+          statusColor = 'background:#e6f7ff;color:#1677ff;';
+        } else if (inspStage === '检测中' || inspStage === '补测中' || inspStage === '检测完成') {
+          projectStatusText = '检测中';
+          statusColor = 'background:#e6f7ff;color:#1677ff;';
+        } else if (inspStage === '已派单' || inspStage === '已排期' || inspStage === '待进场') {
+          projectStatusText = '已排期';
+          statusColor = 'background:#fff7e6;color:#fa8c16;';
+        }
         // === 催单按钮（冷却期内灰色） ===
         var coolingReport = p.urge_cooling_report;
         var coolingInvoice = p.urge_cooling_invoice;
@@ -307,7 +331,6 @@
         }
 
         // === 报告操作按钮（状态驱动高亮/灰色） ===
-        var rptStatus = (p.report_status || '').trim();
         var canPreview = (rptStatus === '待客户确认' || rptStatus === '客户已确认' || rptStatus === '已出报告' || rptStatus === '已出具' || rptStatus === '已发送客户');
         var canFeedback = (rptStatus === '待客户确认');
         var canConfirm = (rptStatus === '待客户确认');
@@ -329,11 +352,25 @@
         } else {
           reportBtns += '<button class="btn btn-sm btn-disabled" disabled>✅ 确认</button>';
         }
+        var projectFeedbackHtml = '';
+        if ((p.feedback_count || 0) > 0) {
+          var latest = p.latest_feedback || {};
+          var latestTitle = latest.title || '已提交反馈';
+          var latestDesc = latest.content || '';
+          projectFeedbackHtml = '<div style="margin-top:12px;padding:10px 12px;border-radius:10px;background:#f8fbff;border:1px solid #dbeafe;">'
+            + '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-bottom:4px;">'
+            + '<span style="font-size:12px;font-weight:700;color:#1d4ed8;">💬 项目反馈 ' + (p.feedback_count || 0) + ' 条</span>'
+            + (p.feedback_has_attachments ? '<span style="font-size:11px;color:#0f766e;">含附件</span>' : '')
+            + '</div>'
+            + '<div style="font-size:12px;color:#334155;font-weight:600;">' + escapeHtml(latestTitle) + '</div>'
+            + (latestDesc ? '<div style="font-size:12px;color:#64748b;margin-top:4px;line-height:1.5;">' + escapeHtml(latestDesc).slice(0, 120) + '</div>' : '')
+            + '</div>';
+        }
 
         return '<div class="project-card">'
           + '<div class="project-card-header">'
           + '<span class="project-name">' + escapeHtml(p.project_name || '') + '</span>'
-          + '<span class="project-status" style="' + statusColor + '">' + escapeHtml(p.status || '进行中') + '</span>'
+          + '<span class="project-status" style="' + statusColor + '">' + escapeHtml(projectStatusText) + '</span>'
           + '</div>'
           + '<div class="project-meta">'
           + '<span>客户：' + escapeHtml(p.client_name || '') + '</span>'
@@ -344,6 +381,7 @@
           + '<span>下单日期：' + escapeHtml((p.created_at || '').slice(0, 10)) + '</span>'
           + '</div>'
           + renderProgressBar(p)
+          + projectFeedbackHtml
           + '<div class="project-card-actions">'
           + '<div class="action-group">' + urgeBtns + '</div>'
           + '<div class="action-group">' + reportBtns + '</div>'
@@ -464,6 +502,8 @@
     _rfItemCount = 0;
     document.getElementById('rf-items-list').innerHTML = '';
     document.getElementById('rf-contact').value = '';
+    var rfFiles = document.getElementById('rf-attachments');
+    if (rfFiles) rfFiles.value = '';
     addFeedbackItem(); // 默认一条
     document.getElementById('report-feedback-modal').classList.add('show');
   };
@@ -489,13 +529,26 @@
     }
     var contact = (document.getElementById('rf-contact').value || '').trim();
     var fullContent = problems.join('\n') + (contact ? '\n联系方式：' + contact : '');
-    api('POST', '/customer/api/projects/' + _currentReportProjectId + '/report_feedback', { content: fullContent })
-      .then(function (d) {
-        closeReportFeedbackModal();
-        showToast(d.message || '反馈已提交（共' + problems.length + '条），我们将尽快处理', 'success');
-        loadProjects();
-      })
-      .catch(function (e) { showToast(e.message || '提交失败，请重试', 'error'); });
+    var formData = new FormData();
+    formData.append('content', fullContent);
+    var rfFiles = ((document.getElementById('rf-attachments') || {}).files || []);
+    Array.prototype.forEach.call(rfFiles, function (file) {
+      formData.append('attachments', file);
+    });
+    fetch('/customer/api/projects/' + _currentReportProjectId + '/report_feedback', {
+      method: 'POST',
+      credentials: 'same-origin',
+      body: formData
+    }).then(function (r) {
+      return r.json().then(function (d) {
+        if (!r.ok || !d.success) throw new Error(d.message || d.error || '提交失败');
+        return d;
+      });
+    }).then(function (d) {
+      closeReportFeedbackModal();
+      showToast(d.message || '反馈已提交（共' + problems.length + '条），我们将尽快处理', 'success');
+      loadProjects();
+    }).catch(function (e) { showToast(e.message || '提交失败，请重试', 'error'); });
   };
 
   /* --- 确认报告弹窗 --- */
@@ -555,6 +608,15 @@
         var typeCls = f.feedback_type === '投诉' ? 'complaint' : (f.feedback_type === '建议' ? 'suggestion' : 'other');
         var typeLabel = f.feedback_type || '其他';
         var statusLabel = f.status || '';
+        var projectHtml = f.project_name
+          ? '<div style="font-size:12px;color:#1677ff;margin-bottom:4px;">关联项目：' + escapeHtml(f.project_name) + '</div>'
+          : '';
+        var attachments = Array.isArray(f.attachments) ? f.attachments : [];
+        var attachmentHtml = attachments.length
+          ? '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">' + attachments.map(function (att) {
+              return '<a href="' + escapeHtml(att.download_url || '#') + '" target="_blank" rel="noopener noreferrer" style="font-size:12px;padding:4px 8px;border:1px solid #dbeafe;border-radius:999px;background:#eff6ff;color:#1d4ed8;text-decoration:none;">📎 ' + escapeHtml(att.original_name || '附件') + '</a>';
+            }).join('') + '</div>'
+          : '';
         var replyHtml = f.reply
           ? '<div style="margin-top:8px;padding:10px 14px;background:#f7f9fc;border-radius:6px;font-size:13px;color:#555;"><b>回复：</b>' + escapeHtml(f.reply) + '</div>'
           : '';
@@ -563,36 +625,68 @@
           + '<span class="fb-title">' + escapeHtml(f.title || '') + '</span>'
           + '<span class="feedback-type-tag ' + typeCls + '">' + typeLabel + '</span>'
           + '</div>'
+          + projectHtml
           + '<div class="feedback-desc">' + escapeHtml(f.content || '') + '</div>'
           + '<div class="feedback-meta">' + escapeHtml(f.created_at || '') + (statusLabel ? ' · <span style="color:' + (statusLabel === '已处理' ? '#52c41a' : '#aaa') + ';">' + escapeHtml(statusLabel) + '</span>' : '') + '</div>'
+          + attachmentHtml
           + replyHtml
           + '</div>';
       }).join('');
     }).catch(function () {});
   }
 
-  function openFeedbackModal() {
-    document.getElementById('feedback-modal').classList.add('show');
-  }
-  function closeFeedbackModal() {
+  window.openFeedbackModal = function () {
+    var select = document.getElementById('feedback-project');
+    if (select) {
+      select.innerHTML = '<option value="">请选择项目</option>';
+      (_allProjects || []).forEach(function (p) {
+        var label = (p.project_no ? (p.project_no + ' · ') : '') + (p.project_name || ('项目#' + p.id));
+        select.innerHTML += '<option value="' + p.id + '">' + escapeHtml(label) + '</option>';
+      });
+    }
+    var modal = document.getElementById('feedback-modal');
+    if (modal) modal.classList.add('show');
+  };
+  window.closeFeedbackModal = function () {
     document.getElementById('feedback-modal').classList.remove('show');
-    ['feedback-type', 'feedback-title', 'feedback-detail', 'feedback-contact']
+    ['feedback-project', 'feedback-type', 'feedback-title', 'feedback-detail', 'feedback-contact']
       .forEach(function (id) { var el = document.getElementById(id); if (el) el.value = ''; });
-  }
-  function submitFeedback() {
-    var data = {
-      feedback_type: (document.getElementById('feedback-type') || {}).value || '',
-      title: (document.getElementById('feedback-title') || {}).value || '',
-      content: (document.getElementById('feedback-detail') || {}).value || '',
-      contact: (document.getElementById('feedback-contact') || {}).value || ''
-    };
-    if (!data.feedback_type || !data.title) { showToast('请填写反馈类型和标题', 'error'); return; }
-    api('POST', '/customer/api/feedback', data).then(function () {
+    var fileEl = document.getElementById('feedback-attachments');
+    if (fileEl) fileEl.value = '';
+  };
+  window.submitFeedback = function () {
+    var projectId = ((document.getElementById('feedback-project') || {}).value || '').trim();
+    var feedbackType = ((document.getElementById('feedback-type') || {}).value || '').trim();
+    var title = ((document.getElementById('feedback-title') || {}).value || '').trim();
+    var content = ((document.getElementById('feedback-detail') || {}).value || '').trim();
+    var contact = ((document.getElementById('feedback-contact') || {}).value || '').trim();
+    if (!projectId || !feedbackType || !title || !content) { showToast('请选择项目，并填写反馈类型、标题和详细描述', 'error'); return; }
+    var formData = new FormData();
+    formData.append('project_id', projectId);
+    formData.append('feedback_type', feedbackType);
+    formData.append('title', title);
+    formData.append('content', content);
+    formData.append('contact', contact);
+    var files = ((document.getElementById('feedback-attachments') || {}).files || []);
+    Array.prototype.forEach.call(files, function (file) {
+      formData.append('attachments', file);
+    });
+    fetch('/customer/api/feedback', {
+      method: 'POST',
+      credentials: 'same-origin',
+      body: formData
+    }).then(function (r) {
+      return r.json().then(function (d) {
+        if (!r.ok || !d.success) throw new Error(d.message || d.error || '提交失败');
+        return d;
+      });
+    }).then(function () {
       closeFeedbackModal();
       loadFeedback();
+      loadProjects();
       showToast('反馈提交成功');
-    }).catch(function () { showToast('提交失败，请重试', 'error'); });
-  }
+    }).catch(function (e) { showToast(e.message || '提交失败，请重试', 'error'); });
+  };
 
   /* ========== 弹窗绑定 ========== */
 

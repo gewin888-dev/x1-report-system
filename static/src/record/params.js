@@ -1717,9 +1717,12 @@ function renderMyTasks(items){
   }
   var palette = {
     '待指派': 'background:#fafafa;color:#666;border:1px solid #d9d9d9;',
+    '待检测': 'background:#e6f4ff;color:#0958d9;border:1px solid #91caff;',
     '已派单': 'background:#e6f4ff;color:#0958d9;border:1px solid #91caff;',
     '已接单': 'background:#e6f4ff;color:#0958d9;border:1px solid #91caff;',
+    '检测中': 'background:#fff7e6;color:#d46b08;border:1px solid #ffd591;',
     '执行中': 'background:#fff7e6;color:#d46b08;border:1px solid #ffd591;',
+    '检测完成': 'background:#f6ffed;color:#389e0d;border:1px solid #b7eb8f;',
     '已完成': 'background:#f6ffed;color:#389e0d;border:1px solid #b7eb8f;',
     '已取消': 'background:#fff1f0;color:#cf1322;border:1px solid #ffa39e;'
   };
@@ -1747,12 +1750,10 @@ function renderMyTasks(items){
     if(t.completed_at) html += '<div style="color:#6b7280;">完成时间</div><div>' + esc(t.completed_at.replace('T',' ').slice(0,16)) + '</div>';
     if(t.remarks) html += '<div style="color:#6b7280;">备注</div><div style="grid-column:span 3;">' + esc(t.remarks) + '</div>';
     html += '</div>';
-    // 操作按钮
+    // 操作按钮（三态简化：只保留"进入录入"和"完成任务"）
     var btns = [];
-    if(status === 'assigned') btns.push('<button class="btn btn-sm" style="background:#0958d9;color:#fff;border:none;" onclick="doTaskAction(' + t.id + ',\'accept\')">接单</button>');
-    if(status === 'assigned' || status === 'accepted') btns.push('<button class="btn btn-sm" style="background:#d46b08;color:#fff;border:none;" onclick="doTaskAction(' + t.id + ',\'start\')">开始执行</button>');
-    if(status === 'accepted' || status === 'in_progress') btns.push('<button class="btn btn-sm" style="background:#389e0d;color:#fff;border:none;" onclick="doTaskAction(' + t.id + ',\'complete\')">完成任务</button>');
     if(status === 'assigned' || status === 'accepted' || status === 'in_progress') btns.push('<button class="btn btn-sm" style="background:#667eea;color:#fff;border:none;" onclick="prefillFromTask(' + t.id + ')">进入录入</button>');
+    if(status === 'assigned' || status === 'accepted' || status === 'in_progress') btns.push('<button class="btn btn-sm" style="background:#389e0d;color:#fff;border:none;" onclick="doTaskAction(' + t.id + ',\'complete\')">完成任务</button>');
     if(btns.length) html += '<div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end;">' + btns.join('') + '</div>';
     html += '</div>';
   });

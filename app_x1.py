@@ -234,6 +234,12 @@ def get_x1_data_conn():
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
+    try:
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA synchronous=NORMAL")
+        conn.execute("PRAGMA busy_timeout=5000")
+    except Exception:
+        pass
     return conn
 
 
@@ -283,9 +289,22 @@ def init_business_projects_table():
             conn.execute("ALTER TABLE business_projects ADD COLUMN report_file_path TEXT DEFAULT ''")
         except sqlite3.OperationalError:
             pass
+        # 增量迁移：并发控制字段
+        try:
+            conn.execute("ALTER TABLE business_projects ADD COLUMN version INTEGER NOT NULL DEFAULT 1")
+        except sqlite3.OperationalError:
+            pass
+        try:
+            conn.execute("ALTER TABLE business_projects ADD COLUMN updated_by TEXT DEFAULT ''")
+        except sqlite3.OperationalError:
+            pass
         conn.commit()
     finally:
         conn.close()
+
+
+def ensure_business_projects_concurrency_columns():
+    init_business_projects_table()
 
 
 def _generate_project_no():
@@ -342,6 +361,8 @@ def serialize_business_project(row):
         'task_status': row['task_status'] or '',
         'created_at': row['created_at'] or '',
         'updated_at': row['updated_at'] or '',
+        'version': row['version'] if 'version' in row.keys() else 1,
+        'updated_by': row['updated_by'] if 'updated_by' in row.keys() else '',
         'source': row['source'] if 'source' in row.keys() else '',
         'has_urge': row['has_urge'] if 'has_urge' in row.keys() else '',
         'report_file_path': row['report_file_path'] if 'report_file_path' in row.keys() else '',
@@ -765,15 +786,18 @@ def _compute_record_asset_state(record: dict) -> dict:
 @app.route('/api/user')
 def api_user_compat():
     if current_user.is_authenticated:
+        user = get_user(current_user.id)
+        if not user:
+            return jsonify({'username': 'guest', 'display_name': '访客'})
         data = {
-            'username': current_user.id,
-            'display_name': current_user.display_name,
-            'role': current_user.role,
-            'department': current_user.department,
-            'permissions': sorted(list(current_user.permissions or []))
+            'username': user.id,
+            'display_name': user.display_name,
+            'role': user.role,
+            'department': user.department,
+            'permissions': sorted(list(user.permissions or []))
         }
-        if hasattr(current_user, 'client_name') and current_user.client_name:
-            data['client_name'] = current_user.client_name
+        if hasattr(user, 'client_name') and user.client_name:
+            data['client_name'] = user.client_name
         return jsonify(data)
     return jsonify({
         'username': 'guest',
@@ -1511,6 +1535,72 @@ def preview_file(filename):
 
 
 
+@app.route('/api/preview_feishu_file')
+@login_required
+@require_permission('files.preview.own')
+def preview_feishu_file():
+    """从飞书云盘下载文件并转成HTML在线预览（不落盘到报告目录）"""
+    file_token = (request.args.get('file_token') or '').strip()
+    if not file_token:
+        return jsonify({'success': False, 'error': '缺少 file_token'}), 400
+    result = download_file_content_from_feishu(file_token)
+    if not result.get('success'):
+        return jsonify({'success': False, 'error': result.get('error', '飞书下载失败')}), 500
+    filename = result['filename']
+    content = result['content']  # bytes
+    suffix = Path(filename).suffix.lower()
+    try:
+        if suffix == '.docx':
+            import mammoth
+            from io import BytesIO
+            r = mammoth.convert_to_html(BytesIO(content))
+            return jsonify({
+                'success': True,
+                'html': r.value,
+                'filename': filename,
+                'file_size': len(content),
+                'type': 'docx',
+                'source': 'feishu'
+            })
+        elif suffix in ('.xlsx', '.xls'):
+            import html as html_mod
+            import openpyxl
+            from io import BytesIO
+            wb = openpyxl.load_workbook(BytesIO(content), data_only=True)
+            html_parts = []
+            for sheet_name in wb.sheetnames:
+                ws = wb[sheet_name]
+                html_parts.append(f'<h3 style="margin:16px 0 8px;color:#1890ff">{html_mod.escape(str(sheet_name))}</h3>')
+                html_parts.append('<table style="border-collapse:collapse;width:100%;margin-bottom:16px">')
+                for row in ws.iter_rows(values_only=False):
+                    html_parts.append('<tr>')
+                    for cell in row:
+                        val = cell.value if cell.value is not None else ''
+                        safe_val = html_mod.escape(str(val))
+                        style = 'border:1px solid #d9d9d9;padding:6px 8px;font-size:13px'
+                        if isinstance(val, (int, float)):
+                            style += ';text-align:right'
+                        html_parts.append(f'<td style="{style}">{safe_val}</td>')
+                    html_parts.append('</tr>')
+                html_parts.append('</table>')
+            wb.close()
+            return jsonify({
+                'success': True,
+                'html': ''.join(html_parts),
+                'filename': filename,
+                'file_size': len(content),
+                'type': 'xlsx',
+                'source': 'feishu'
+            })
+        else:
+            return jsonify({'success': False, 'error': f'不支持预览 {suffix} 格式'}), 400
+    except ImportError as e:
+        return jsonify({'success': False, 'error': f'缺少依赖库: {str(e)}'}), 500
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'飞书文件预览失败: {str(e)}'}), 500
+
+
+
 # ==================== Blueprint 注册 ====================
 # ==================== /admin/api/backups 备份列表 ====================
 @app.route('/admin/api/backups')
@@ -1524,17 +1614,59 @@ def admin_api_backups():
     backup_dir = str(Path(str(settings_values.get('paths.backup_dir', {}).get('value', BASE_DIR / 'backups'))).expanduser())
     items = []
     try:
-        for f in sorted(os.listdir(backup_dir), reverse=True):
-            if f.endswith('.tar.gz') or f.endswith('.zip'):
-                fpath = os.path.join(backup_dir, f)
-                stat = os.stat(fpath)
-                size_mb = round(stat.st_size / 1024 / 1024, 1)
-                mtime = datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S')
-                btype = '自动' if '_auto_' in f else '手动'
-                items.append({'filename': f, 'size_mb': size_mb, 'time': mtime, 'type': btype})
+        # 扫描根目录和 code/data/full 子目录
+        scan_dirs = [backup_dir]
+        for sub in ('code', 'data', 'full'):
+            sub_dir = os.path.join(backup_dir, sub)
+            if os.path.isdir(sub_dir):
+                scan_dirs.append(sub_dir)
+        for scan_dir in scan_dirs:
+            for f in os.listdir(scan_dir):
+                if f.endswith('.tar.gz') or f.endswith('.zip'):
+                    fpath = os.path.join(scan_dir, f)
+                    stat = os.stat(fpath)
+                    size_mb = round(stat.st_size / 1024 / 1024, 1)
+                    mtime = datetime.fromtimestamp(stat.st_mtime).strftime('%Y-%m-%d %H:%M:%S')
+                    if scan_dir != backup_dir:
+                        btype = os.path.basename(scan_dir)
+                    elif '_auto_' in f:
+                        btype = '自动'
+                    else:
+                        btype = '手动'
+                    items.append({'filename': f, 'size_mb': size_mb, 'time': mtime, 'type': btype})
+        items.sort(key=lambda x: x['time'], reverse=True)
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
     return jsonify({'success': True, 'items': items, 'backup_dir': backup_dir})
+
+
+@app.route('/admin/api/backups/<filename>', methods=['DELETE'])
+@login_required
+@require_permission('admin.maintenance.run')
+def admin_api_delete_backup(filename):
+    """物理删除指定备份文件"""
+    import os
+    if '..' in filename or '/' in filename or '\\' in filename:
+        return jsonify({'success': False, 'error': '非法文件名'}), 400
+    from helpers.settings_utils import _load_system_settings
+    settings_values = _load_system_settings()
+    backup_dir = str(Path(str(settings_values.get('paths.backup_dir', {}).get('value', BASE_DIR / 'backups'))).expanduser())
+    # 在根目录和子目录中查找
+    target_path = None
+    for scan in [backup_dir] + [os.path.join(backup_dir, s) for s in ('code', 'data', 'full')]:
+        candidate = os.path.join(scan, filename)
+        if os.path.isfile(candidate):
+            target_path = candidate
+            break
+    if not target_path:
+        return jsonify({'success': False, 'error': '文件不存在'}), 404
+    try:
+        os.remove(target_path)
+        log_action(current_user.id, '删除备份文件', 'system_settings', json.dumps({'filename': filename, 'path': target_path}, ensure_ascii=False))
+        return jsonify({'success': True, 'filename': filename})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'删除失败: {e}'}), 500
+
 
 # ==================== /api/x/health 健康检查 ====================
 @app.route('/api/x/health')

@@ -5,9 +5,10 @@ from datetime import datetime
 
 from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
+import json
 
 from auth import require_permission
-from helpers.db import get_x1_data_conn
+from helpers.db import get_x1_data_conn, x1_transaction, ensure_project_tasks_concurrency_columns
 from helpers.project_utils import (
     serialize_project_task,
     _clean_project_task_payload,
@@ -20,8 +21,11 @@ from helpers.project_utils import (
     TASK_STATUS_OPTIONS,
 )
 from notifications import create_notification
+from monitor import log_action
 
 tasks_bp = Blueprint('tasks', __name__)
+
+ensure_project_tasks_concurrency_columns()
 
 
 def _x_now():
@@ -49,23 +53,12 @@ def create_project_task():
     # ── 派单可用性检查 ──
     stage = project_row['inspection_stage'] or ''
     rpt_st = project_row['report_status'] or ''
-    done_stages = ('已完结', '已关闭')
-    done_reports = ('客户已确认', '已发送客户')
-    if stage in done_stages and rpt_st in done_reports:
-        return jsonify({'success': False, 'error': '项目已完结，无法继续派单'}), 400
+    done_stages = ('检测完成', '已完结', '已关闭')
+    done_reports = ('客户已确认', '已发送客户', '已出报告', '已出具')
+    if stage in done_stages or rpt_st in done_reports:
+        return jsonify({'success': False, 'error': '项目已进入完成/交付阶段，无法继续派单'}), 400
 
     task_type_req = payload.get('task_type') or 'inspection'
-    conn_chk = get_x1_data_conn()
-    try:
-        active_tasks = conn_chk.execute(
-            "SELECT COUNT(*) as cnt FROM project_tasks "
-            "WHERE project_id=? AND task_type=? AND task_status IN ('pending_assign','assigned','accepted','in_progress')",
-            (payload['project_id'], task_type_req)
-        ).fetchone()
-        if active_tasks and active_tasks['cnt'] > 0:
-            return jsonify({'success': False, 'error': f'该项目已有进行中的同类任务（{active_tasks["cnt"]}个），请等现有任务完成或取消后再派单'}), 400
-    finally:
-        conn_chk.close()
 
     task_name = payload.get('task_name') or ''
     if not task_name:
@@ -84,15 +77,22 @@ def create_project_task():
         task_status = 'pending_assign'
         assigned_at = None
 
-    conn = get_x1_data_conn()
-    try:
+    with x1_transaction() as conn:
+        active_tasks = conn.execute(
+            "SELECT COUNT(*) as cnt FROM project_tasks "
+            "WHERE project_id=? AND task_type=? AND task_status IN ('pending_assign','assigned','accepted','in_progress')",
+            (payload['project_id'], task_type_req)
+        ).fetchone()
+        if active_tasks and active_tasks['cnt'] > 0:
+            return jsonify({'success': False, 'error': f'该项目已有进行中的同类任务（{active_tasks["cnt"]}个），请等现有任务完成或取消后再派单'}), 400
+
         cur = conn.cursor()
         cur.execute(
             "INSERT INTO project_tasks "
             "(project_id, task_name, task_type, assigned_to, assigned_at, "
             " task_status, expected_execute_date, started_at, completed_at, "
-            " remarks, created_by, created_at, updated_at) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            " remarks, created_by, created_at, updated_at, updated_by, version) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (
                 payload['project_id'],
                 task_name,
@@ -107,16 +107,31 @@ def create_project_task():
                 getattr(current_user, 'id', None),
                 now,
                 now,
+                getattr(current_user, 'id', None),
+                1,
             ),
         )
         task_id = cur.lastrowid
-        conn.commit()
-    finally:
-        conn.close()
 
     refresh_project_task_summary(payload['project_id'])
     # 自动流转：派单 → 已排期
     _auto_advance_project_stage(payload['project_id'], target_inspection='已排期')
+
+    try:
+        log_action(
+            getattr(current_user, 'id', 'system'),
+            '创建任务/派单',
+            f'project_task:{task_id}',
+            json.dumps({
+                'task_id': task_id,
+                'project_id': payload['project_id'],
+                'task_type': task_type,
+                'assigned_to': assigned_to or '',
+                'task_status': task_status,
+            }, ensure_ascii=False)
+        )
+    except Exception:
+        pass
 
     # 通知被派单人员
     if assigned_to:
@@ -188,6 +203,7 @@ def get_project_task_detail(task_id):
 def update_project_task(task_id):
     data = request.get_json(silent=True) or {}
     payload = _clean_project_task_payload(data)
+    expected_version = data.get('version', None)
 
     conn = get_x1_data_conn()
     try:
@@ -203,6 +219,14 @@ def update_project_task(task_id):
         return jsonify({'success': False, 'error': '关联项目不存在'}), 404
 
     now = _x_now()
+    if expected_version is not None:
+        try:
+            expected_version = int(expected_version)
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'error': 'version 参数非法'}), 400
+    current_version = int(old_row['version']) if 'version' in old_row.keys() and old_row['version'] else 1
+    if expected_version is not None and expected_version != current_version:
+        return jsonify({'success': False, 'error': '任务数据已被其他人修改，请刷新后重试', 'code': 'version_conflict', 'current_version': current_version}), 409
 
     new_task_name = payload.get('task_name') or old_row['task_name']
     new_task_type = payload.get('task_type') or old_row['task_type']
@@ -225,29 +249,52 @@ def update_project_task(task_id):
 
     conn = get_x1_data_conn()
     try:
-        conn.execute(
+        params = (
+            new_task_name,
+            new_task_type,
+            new_assigned_to,
+            new_assigned_at,
+            new_status,
+            new_expected,
+            new_started_at,
+            new_completed_at,
+            new_remarks,
+            now,
+            getattr(current_user, 'id', None),
+            current_version + 1,
+            task_id,
+        )
+        sql = (
             "UPDATE project_tasks SET "
             "task_name=?, task_type=?, assigned_to=?, assigned_at=?, "
             "task_status=?, expected_execute_date=?, started_at=?, completed_at=?, "
-            "remarks=?, updated_at=? "
-            "WHERE id=?",
-            (
-                new_task_name,
-                new_task_type,
-                new_assigned_to,
-                new_assigned_at,
-                new_status,
-                new_expected,
-                new_started_at,
-                new_completed_at,
-                new_remarks,
-                now,
-                task_id,
-            ),
+            "remarks=?, updated_at=?, updated_by=?, version=? "
+            "WHERE id=?"
         )
+        if expected_version is not None:
+            sql += " AND COALESCE(version, 1)=?"
+            params = params + (expected_version,)
+        cur = conn.execute(sql, params)
+        if cur.rowcount == 0:
+            return jsonify({'success': False, 'error': '任务数据已被其他人修改，请刷新后重试', 'code': 'version_conflict'}), 409
         conn.commit()
     finally:
         conn.close()
+
+    try:
+        log_action(
+            getattr(current_user, 'id', 'system'),
+            '更新任务',
+            f'project_task:{task_id}',
+            json.dumps({
+                'task_id': task_id,
+                'project_id': old_row['project_id'],
+                'task_status': new_status,
+                'assigned_to': new_assigned_to or '',
+            }, ensure_ascii=False)
+        )
+    except Exception:
+        pass
 
     refresh_project_task_summary(old_row['project_id'])
 
@@ -278,6 +325,17 @@ def cancel_project_task(task_id):
     if old_row['task_status'] == 'cancelled':
         return jsonify({'success': False, 'error': '任务已取消，无需重复操作'}), 400
 
+    project_row = _get_business_project_by_id(old_row['project_id'])
+    if not project_row:
+        return jsonify({'success': False, 'error': '关联项目不存在'}), 404
+
+    stage = project_row['inspection_stage'] or ''
+    rpt_st = project_row['report_status'] or ''
+    done_stages = ('检测完成', '已完结', '已关闭')
+    done_reports = ('客户已确认', '已发送客户', '已出报告', '已出具')
+    if stage in done_stages or rpt_st in done_reports:
+        return jsonify({'success': False, 'error': '项目已进入完成/交付阶段，任务不可再取消'}), 400
+
     now = _x_now()
     cancel_note = str(data.get('remarks') or '').strip()
 
@@ -288,16 +346,25 @@ def cancel_project_task(task_id):
         else:
             remarks = '取消原因：' + cancel_note
 
-    conn = get_x1_data_conn()
-    try:
-        conn.execute(
+    with x1_transaction() as conn:
+        cur = conn.execute(
             "UPDATE project_tasks SET task_status='cancelled', "
-            "remarks=?, updated_at=? WHERE id=?",
-            (remarks, now, task_id),
+            "remarks=?, updated_at=?, updated_by=?, version=COALESCE(version, 1)+1 "
+            "WHERE id=? AND task_status IN ('pending_assign','assigned','accepted','in_progress')",
+            (remarks, now, getattr(current_user, 'id', None), task_id),
         )
-        conn.commit()
-    finally:
-        conn.close()
+        if cur.rowcount == 0:
+            return jsonify({'success': False, 'error': '任务状态已变化，无法取消，请刷新后重试'}), 409
+
+    try:
+        log_action(
+            getattr(current_user, 'id', 'system'),
+            '取消任务',
+            f'project_task:{task_id}',
+            json.dumps({'task_id': task_id, 'project_id': old_row['project_id'], 'reason': cancel_note}, ensure_ascii=False)
+        )
+    except Exception:
+        pass
 
     refresh_project_task_summary(old_row['project_id'])
 
@@ -359,6 +426,7 @@ def api_my_tasks():
 
 @tasks_bp.route('/api/my_tasks/pending_count')
 @login_required
+@require_permission('tasks.execute')
 def api_my_tasks_pending_count():
     """返回当前用户待处理任务数（assigned + accepted + in_progress）"""
     user_id = current_user.id
@@ -394,15 +462,23 @@ def api_task_accept(task_id):
         return jsonify({'success': False, 'error': f"当前状态为{_get_task_status_label(row['task_status'])}，无法接单"}), 400
 
     now = _x_now()
-    conn = get_x1_data_conn()
-    try:
-        conn.execute(
-            "UPDATE project_tasks SET task_status='accepted', updated_at=? WHERE id=?",
-            (now, task_id)
+    with x1_transaction() as conn:
+        cur = conn.execute(
+            "UPDATE project_tasks SET task_status='accepted', updated_at=?, updated_by=?, version=COALESCE(version, 1)+1 WHERE id=? AND assigned_to=? AND task_status='assigned'",
+            (now, user_id, task_id, user_id)
         )
-        conn.commit()
-    finally:
-        conn.close()
+        if cur.rowcount == 0:
+            return jsonify({'success': False, 'error': '任务状态已变化，无法接单，请刷新后重试'}), 409
+
+    try:
+        log_action(
+            user_id,
+            '检测员接单',
+            f'project_task:{task_id}',
+            json.dumps({'task_id': task_id, 'project_id': row['project_id']}, ensure_ascii=False)
+        )
+    except Exception:
+        pass
 
     refresh_project_task_summary(row['project_id'])
     # 自动流转：接单 → 已排期
@@ -436,15 +512,23 @@ def api_task_start(task_id):
         return jsonify({'success': False, 'error': f"当前状态为{_get_task_status_label(row['task_status'])}，无法开始执行"}), 400
 
     now = _x_now()
-    conn = get_x1_data_conn()
-    try:
-        conn.execute(
-            "UPDATE project_tasks SET task_status='in_progress', started_at=?, updated_at=? WHERE id=?",
-            (now, now, task_id)
+    with x1_transaction() as conn:
+        cur = conn.execute(
+            "UPDATE project_tasks SET task_status='in_progress', started_at=COALESCE(NULLIF(started_at,''), ?), updated_at=?, updated_by=?, version=COALESCE(version, 1)+1 WHERE id=? AND assigned_to=? AND task_status IN ('assigned', 'accepted')",
+            (now, now, user_id, task_id, user_id)
         )
-        conn.commit()
-    finally:
-        conn.close()
+        if cur.rowcount == 0:
+            return jsonify({'success': False, 'error': '任务状态已变化，无法开始执行，请刷新后重试'}), 409
+
+    try:
+        log_action(
+            user_id,
+            '检测员开始执行',
+            f'project_task:{task_id}',
+            json.dumps({'task_id': task_id, 'project_id': row['project_id']}, ensure_ascii=False)
+        )
+    except Exception:
+        pass
 
     refresh_project_task_summary(row['project_id'])
     # 自动流转：开始执行 → 检测中
@@ -474,24 +558,32 @@ def api_task_complete(task_id):
         return jsonify({'success': False, 'error': '任务不存在'}), 404
     if str(row['assigned_to'] or '') != user_id:
         return jsonify({'success': False, 'error': '该任务未分配给你'}), 403
-    if row['task_status'] not in ('accepted', 'in_progress'):
+    if row['task_status'] not in ('assigned', 'accepted', 'in_progress'):
         return jsonify({'success': False, 'error': f"当前状态为{_get_task_status_label(row['task_status'])}，无法完成"}), 400
 
     now = _x_now()
     started_at = row['started_at'] or now
-    conn = get_x1_data_conn()
-    try:
-        conn.execute(
-            "UPDATE project_tasks SET task_status='completed', started_at=?, completed_at=?, updated_at=? WHERE id=?",
-            (started_at, now, now, task_id)
+    with x1_transaction() as conn:
+        cur = conn.execute(
+            "UPDATE project_tasks SET task_status='completed', started_at=COALESCE(NULLIF(started_at,''), ?), completed_at=?, updated_at=?, updated_by=?, version=COALESCE(version, 1)+1 WHERE id=? AND assigned_to=? AND task_status IN ('assigned', 'accepted', 'in_progress')",
+            (started_at, now, now, user_id, task_id, user_id)
         )
-        conn.commit()
-    finally:
-        conn.close()
+        if cur.rowcount == 0:
+            return jsonify({'success': False, 'error': '任务状态已变化，无法完成，请刷新后重试'}), 409
+
+    try:
+        log_action(
+            user_id,
+            '检测员完成任务',
+            f'project_task:{task_id}',
+            json.dumps({'task_id': task_id, 'project_id': row['project_id']}, ensure_ascii=False)
+        )
+    except Exception:
+        pass
 
     refresh_project_task_summary(row['project_id'])
-    # 自动流转：完成任务 → 检测完成 + 报告编制中
-    _auto_advance_project_stage(row['project_id'], target_inspection='检测完成', target_report='编制中')
+    # 三态流转：检测员点"完成任务" → inspection_stage='检测完成', report_status='报告编制中'
+    _auto_advance_project_stage(row['project_id'], target_inspection='检测完成', target_report='报告编制中')
     conn = get_x1_data_conn()
     try:
         updated = conn.execute("SELECT * FROM project_tasks WHERE id=?", (task_id,)).fetchone()
@@ -505,7 +597,7 @@ def api_task_complete(task_id):
 @login_required
 @require_permission('tasks.execute')
 def api_task_prefill(task_id):
-    """返回任务关联的项目基础信息，用于前端录入页自动填入"""
+    """返回任务关联的项目基础信息，用于前端录入页自动填入。首次进入录入时自动推进到检测中。"""
     conn = get_x1_data_conn()
     try:
         row = conn.execute("SELECT * FROM project_tasks WHERE id=?", (task_id,)).fetchone()
@@ -514,6 +606,38 @@ def api_task_prefill(task_id):
 
     if not row:
         return jsonify({'success': False, 'error': '任务不存在'}), 404
+    if str(row['assigned_to'] or '') != current_user.id:
+        return jsonify({'success': False, 'error': '该任务未分配给你'}), 403
+    if row['task_status'] not in ('assigned', 'accepted', 'in_progress'):
+        return jsonify({'success': False, 'error': f"当前状态为{_get_task_status_label(row['task_status'])}，无法进入录入"}), 400
+
+    # 进入录入即视为开始检测：待检测（assigned/accepted）→ 检测中（in_progress）
+    if row['task_status'] in ('assigned', 'accepted'):
+        now = _x_now()
+        started_at = row['started_at'] or now
+        with x1_transaction() as conn:
+            cur = conn.execute(
+                "UPDATE project_tasks SET task_status='in_progress', started_at=COALESCE(NULLIF(started_at,''), ?), updated_at=?, updated_by=?, version=COALESCE(version, 1)+1 WHERE id=? AND assigned_to=? AND task_status IN ('assigned', 'accepted')",
+                (started_at, now, current_user.id, task_id, current_user.id)
+            )
+            if cur.rowcount == 0:
+                return jsonify({'success': False, 'error': '任务状态已变化，无法进入录入，请刷新后重试'}), 409
+        try:
+            log_action(
+                current_user.id,
+                '检测员进入录入',
+                f'project_task:{task_id}',
+                json.dumps({'task_id': task_id, 'project_id': row['project_id']}, ensure_ascii=False)
+            )
+        except Exception:
+            pass
+        refresh_project_task_summary(row['project_id'])
+        _auto_advance_project_stage(row['project_id'], target_inspection='检测中')
+        conn = get_x1_data_conn()
+        try:
+            row = conn.execute("SELECT * FROM project_tasks WHERE id=?", (task_id,)).fetchone()
+        finally:
+            conn.close()
 
     project_row = _get_business_project_by_id(row['project_id'])
     if not project_row:
@@ -523,6 +647,8 @@ def api_task_prefill(task_id):
         'success': True,
         'task_id': task_id,
         'project_id': row['project_id'],
+        'task_status': row['task_status'] or '',
+        'task_status_label': _get_task_status_label(row['task_status']),
         'prefill': {
             'project_name': project_row['project_name'] or '',
             'client_name': project_row['client_name'] or '',

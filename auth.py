@@ -20,6 +20,7 @@ DEFAULT_ROLE_PERMISSIONS = {
         'admin.settings.view', 'admin.records.export',
         'admin.records.open_local', 'admin.records.open_feishu',
         'admin.records.scope.self', 'admin.records.scope.department',
+        'tasks.execute',
         # 模板管理（细粒度）
         'admin.templates.registry.create', 'admin.templates.registry.update', 'admin.templates.registry.delete',
         'admin.templates.verify', 'admin.templates.smoke_export',
@@ -38,19 +39,25 @@ DEFAULT_ROLE_PERMISSIONS = {
         # 上传历史报告
         'admin.projects.upload_report',
         # 财务查看
-        'admin.finance.contract_amount', 'admin.finance.paid_amount', 'admin.finance.receivable_amount'
+        'admin.finance.contract_amount', 'admin.finance.paid_amount', 'admin.finance.receivable_amount',
+        # 用户管理（细分）
+        'admin.users.internal.view', 'admin.users.internal.create', 'admin.users.internal.update', 'admin.users.internal.delete',
+        'admin.users.customer.view', 'admin.users.customer.create', 'admin.users.customer.update', 'admin.users.customer.delete', 'admin.users.customer.approve',
     },
     'viewer': {
         'admin.access', 'admin.stats.view', 'admin.records.view', 'admin.logs.view', 'admin.logs.delete',
         'admin.standards.view', 'admin.templates.view', 'admin.templates.preview',
         'admin.templates.variables', 'admin.docs.view', 'admin.users.view', 'record.scope.company',
         'admin.records.scope.company', 'admin.records.open_local', 'admin.records.open_feishu',
+        'tasks.execute',
         # 项目管理（只读）
         'admin.projects.view',
         # 任务查看（只读）
         'admin.tasks.view',
         # 文件下载
-        'admin.files.download'
+        'admin.files.download',
+        # 用户管理（只读）
+        'admin.users.internal.view', 'admin.users.customer.view',
     },
     'inspector': {
         'draft.read', 'draft.write', 'draft.transfer', 'record.export', 'files.download.own', 'files.preview.own',
@@ -80,24 +87,68 @@ class User(UserMixin):
         return self._is_active
 
 
+def _ensure_role_permission_final_table(conn):
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS role_permission_final (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            role TEXT NOT NULL,
+            permission_key TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(role, permission_key)
+        )
+    ''')
+
+
+def _get_effective_permissions_from_legacy(conn, role):
+    """[已废弃] 遗留兼容路径，仅保留函数签名供历史参考。
+    运行时权限已完全由 role_permission_final 驱动，不再回退到 role_permissions。
+    """
+    if role == 'admin':
+        return {'*'}
+    return set(DEFAULT_ROLE_PERMISSIONS.get(role, set()))
+
+
+def _get_final_permissions_from_db(conn, role):
+    _ensure_role_permission_final_table(conn)
+    rows = conn.execute(
+        'SELECT permission_key FROM role_permission_final WHERE role = ? ORDER BY permission_key',
+        (role,)
+    ).fetchall()
+    return {row['permission_key'] for row in rows if row['permission_key']}
+
+
+def _save_final_permissions(conn, role, permissions, updated_at=None):
+    _ensure_role_permission_final_table(conn)
+    now = updated_at or datetime.now().isoformat()
+    clean_permissions = sorted({str(p or '').strip() for p in (permissions or set()) if str(p or '').strip()})
+    conn.execute('DELETE FROM role_permission_final WHERE role = ?', (role,))
+    for key in clean_permissions:
+        conn.execute(
+            'INSERT INTO role_permission_final (role, permission_key, updated_at) VALUES (?, ?, ?)',
+            (role, key, now)
+        )
+
+
+def migrate_role_permissions_to_final_store(force=False):
+    """[已废弃] 从 legacy role_permissions 迁移到 final 表。
+    此函数不再被任何运行时路径调用。保留仅供手动迁移脚本使用。
+    """
+    return []
+
+
 def _load_role_permissions(role):
     if role == 'admin':
         return {'*'}
-    perms = set(DEFAULT_ROLE_PERMISSIONS.get(role, set()))
     try:
         with get_db() as conn:
-            cursor = conn.cursor()
-            cursor.execute('SELECT permission_key, enabled FROM role_permissions WHERE role = ?', (role,))
-            rows = cursor.fetchall()
-            for row in rows:
-                key = row['permission_key']
-                if row['enabled']:
-                    perms.add(key)
-                else:
-                    perms.discard(key)
+            final_perms = _get_final_permissions_from_db(conn, role)
+            if final_perms:
+                return final_perms
     except Exception:
         pass
-    return perms
+    # 第三阶段起，运行时授权不再回退到 role_permissions。
+    # 若 final 表异常缺失，则仅退回默认权限基线，避免重新依赖旧补丁模型。
+    return set(DEFAULT_ROLE_PERMISSIONS.get(role, set()))
 
 
 def user_has_permission(user, permission):
@@ -119,6 +170,18 @@ def user_has_permission(user, permission):
         'record.scope.company': {'admin.records.scope.company'},
         'record.export.void': {'admin.records.void_export'},
         'record.export': {'admin.records.export'},
+        # 用户管理细分兼容：拥有旧粗粒度 key 等价于拥有新细分 key
+        'admin.users.view': {'admin.users.internal.view', 'admin.users.customer.view'},
+        'admin.users.manage': {'admin.users.internal.create', 'admin.users.internal.update', 'admin.users.internal.delete', 'admin.users.customer.create', 'admin.users.customer.update', 'admin.users.customer.delete', 'admin.users.customer.approve'},
+        'admin.users.internal.view': {'admin.users.view'},
+        'admin.users.customer.view': {'admin.users.view'},
+        'admin.users.internal.create': {'admin.users.manage'},
+        'admin.users.internal.update': {'admin.users.manage'},
+        'admin.users.internal.delete': {'admin.users.manage'},
+        'admin.users.customer.create': {'admin.users.manage'},
+        'admin.users.customer.update': {'admin.users.manage'},
+        'admin.users.customer.delete': {'admin.users.manage'},
+        'admin.users.customer.approve': {'admin.users.manage'},
     }
     if permission in perms:
         return True

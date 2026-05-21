@@ -18,11 +18,20 @@ DB_FILE = BASE_DIR / 'x1_data.db'
 BOOTSTRAP_ADMIN_FILE = BASE_DIR / 'data' / 'bootstrap_admin_password.txt'
 
 
+def _apply_sqlite_pragmas(conn):
+    """统一主库 SQLite 并发参数。"""
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA busy_timeout=5000")
+    return conn
+
+
 @contextmanager
 def get_db():
     """数据库连接上下文管理器"""
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
+    _apply_sqlite_pragmas(conn)
     try:
         yield conn
         conn.commit()

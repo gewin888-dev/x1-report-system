@@ -3,7 +3,7 @@
 提供客户门户的 API：个人信息、历史记录、项目管理、催单、投诉建议
 """
 
-from flask import Blueprint, render_template, request, jsonify
+from flask import Blueprint, render_template, request, jsonify, send_file
 from auth import require_permission
 from notifications import notify_customer_urge, notify_report_feedback, notify_report_ready
 from flask_login import current_user, login_required
@@ -11,9 +11,23 @@ from pathlib import Path
 from datetime import datetime, timedelta
 import json
 import sqlite3
+import shutil
 from functools import wraps
 
 BASE_DIR = Path(__file__).resolve().parent
+UPLOADS_DIR = BASE_DIR / 'uploads_x1'
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def _safe_filename_part(value: str, fallback: str = '未命名') -> str:
+    text = str(value or '').strip()
+    if not text:
+        text = fallback
+    for ch in ['/', '\\', ':', '*', '?', '"', '<', '>', '|']:
+        text = text.replace(ch, '_')
+    text = text.replace('\n', '_').replace('\r', '_').replace('\t', '_')
+    return text[:120].strip() or fallback
+
 
 customer_bp = Blueprint("customer", __name__)
 
@@ -56,6 +70,58 @@ def _get_x1_data_conn():
     return conn
 
 
+def _customer_feedback_upload_dir(client_name: str, project_id=None) -> Path:
+    client_part = _safe_filename_part(client_name or 'unknown_client')
+    project_part = str(project_id) if project_id else 'unbound'
+    target = UPLOADS_DIR / 'customer_feedback' / client_part / project_part
+    target.mkdir(parents=True, exist_ok=True)
+    return target
+
+
+def _serialize_feedback_attachments(conn, feedback_id: int):
+    rows = conn.execute(
+        "SELECT id, feedback_id, original_name, stored_name, file_ext, mime_type, file_size, relative_path, created_at FROM client_feedback_attachments WHERE feedback_id=? ORDER BY id ASC",
+        (feedback_id,)
+    ).fetchall()
+    items = []
+    for row in rows:
+        items.append({
+            'id': row['id'],
+            'feedback_id': row['feedback_id'],
+            'original_name': row['original_name'] or '',
+            'stored_name': row['stored_name'] or '',
+            'file_ext': row['file_ext'] or '',
+            'mime_type': row['mime_type'] or '',
+            'file_size': row['file_size'] or 0,
+            'relative_path': row['relative_path'] or '',
+            'download_url': '/customer/api/feedback/attachments/%s/download' % row['id'],
+            'created_at': row['created_at'] or '',
+        })
+    return items
+
+
+def _serialize_report_feedback_attachments(conn, report_feedback_id: int):
+    rows = conn.execute(
+        "SELECT id, report_feedback_id, original_name, stored_name, file_ext, mime_type, file_size, relative_path, created_at FROM report_feedback_attachments WHERE report_feedback_id=? ORDER BY id ASC",
+        (report_feedback_id,)
+    ).fetchall()
+    items = []
+    for row in rows:
+        items.append({
+            'id': row['id'],
+            'report_feedback_id': row['report_feedback_id'],
+            'original_name': row['original_name'] or '',
+            'stored_name': row['stored_name'] or '',
+            'file_ext': row['file_ext'] or '',
+            'mime_type': row['mime_type'] or '',
+            'file_size': row['file_size'] or 0,
+            'relative_path': row['relative_path'] or '',
+            'download_url': '/customer/api/report_feedback/attachments/%s/download' % row['id'],
+            'created_at': row['created_at'] or '',
+        })
+    return items
+
+
 def init_customer_tables():
     """创建客户相关表（在 data/x1_data.db 中）并执行增量迁移"""
     conn = _get_x1_data_conn()
@@ -93,14 +159,34 @@ def init_customer_tables():
             CREATE TABLE IF NOT EXISTS client_feedback (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 client_name TEXT NOT NULL,
+                project_id INTEGER DEFAULT NULL,
+                project_name TEXT DEFAULT '',
                 feedback_type TEXT NOT NULL,
                 title TEXT NOT NULL,
                 content TEXT DEFAULT '',
                 contact TEXT DEFAULT '',
                 status TEXT DEFAULT '待处理',
                 reply TEXT DEFAULT '',
+                attachment_count INTEGER DEFAULT 0,
                 created_at TEXT NOT NULL,
                 updated_at TEXT DEFAULT ''
+            )
+        """)
+
+        # client_feedback_attachments 表
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS client_feedback_attachments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                feedback_id INTEGER NOT NULL,
+                project_id INTEGER DEFAULT NULL,
+                client_name TEXT NOT NULL,
+                original_name TEXT NOT NULL,
+                stored_name TEXT NOT NULL,
+                file_ext TEXT DEFAULT '',
+                mime_type TEXT DEFAULT '',
+                file_size INTEGER DEFAULT 0,
+                relative_path TEXT NOT NULL,
+                created_at TEXT NOT NULL
             )
         """)
 
@@ -115,6 +201,35 @@ def init_customer_tables():
                 created_at TEXT NOT NULL
             )
         """)
+
+        # report_feedback_attachments 表
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS report_feedback_attachments (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                report_feedback_id INTEGER NOT NULL,
+                project_id INTEGER NOT NULL,
+                client_name TEXT NOT NULL,
+                original_name TEXT NOT NULL,
+                stored_name TEXT NOT NULL,
+                file_ext TEXT DEFAULT '',
+                mime_type TEXT DEFAULT '',
+                file_size INTEGER DEFAULT 0,
+                relative_path TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # 增量迁移：client_feedback 增加 project_id / project_name / attachment_count 字段
+        try:
+            cols = {r[1] for r in conn.execute("PRAGMA table_info(client_feedback)").fetchall()}
+            if 'project_id' not in cols:
+                conn.execute("ALTER TABLE client_feedback ADD COLUMN project_id INTEGER DEFAULT NULL")
+            if 'project_name' not in cols:
+                conn.execute("ALTER TABLE client_feedback ADD COLUMN project_name TEXT DEFAULT ''")
+            if 'attachment_count' not in cols:
+                conn.execute("ALTER TABLE client_feedback ADD COLUMN attachment_count INTEGER DEFAULT 0")
+        except Exception:
+            pass
 
         # 增量迁移：business_projects 增加 source 字段
         try:
@@ -390,6 +505,26 @@ def customer_get_projects():
                 urge_cooling[pid] = set()
             urge_cooling[pid].add(log['urge_type'])
 
+        # 查询项目反馈统计（客户反馈页关联到项目）
+        feedback_rows = conn.execute(
+            "SELECT project_id, COUNT(*) AS cnt, MAX(created_at) AS latest_created_at FROM client_feedback WHERE client_name=? AND project_id IS NOT NULL GROUP BY project_id",
+            (client_name,)
+        ).fetchall()
+        feedback_stats = {r['project_id']: {'count': r['cnt'], 'latest_created_at': r['latest_created_at']} for r in feedback_rows}
+        latest_feedback_map = {}
+        for r in conn.execute(
+            "SELECT id, project_id, title, content, attachment_count, created_at FROM client_feedback WHERE client_name=? AND project_id IS NOT NULL ORDER BY created_at DESC, id DESC",
+            (client_name,)
+        ).fetchall():
+            if r['project_id'] not in latest_feedback_map:
+                latest_feedback_map[r['project_id']] = {
+                    'id': r['id'],
+                    'title': r['title'] or '',
+                    'content': r['content'] or '',
+                    'attachment_count': r['attachment_count'] if 'attachment_count' in r.keys() else 0,
+                    'created_at': r['created_at'] or '',
+                }
+
         projects = []
         for row in rows:
             pid = row['id']
@@ -398,6 +533,8 @@ def customer_get_projects():
             # 已确认/已出报告的项目不在进行中列表显示（转历史记录）
             if rs in ('客户已确认', '已发送客户', '已出报告'):
                 continue
+            feedback_info = feedback_stats.get(pid, {})
+            latest_feedback = latest_feedback_map.get(pid)
             projects.append({
                 'id': pid,
                 'project_no': row['project_no'] or '',
@@ -417,6 +554,9 @@ def customer_get_projects():
                 'has_urge': row['has_urge'] if 'has_urge' in row.keys() else '',
                 'urge_cooling_report': 'report' in cooling,
                 'urge_cooling_invoice': 'invoice' in cooling,
+                'feedback_count': feedback_info.get('count', 0),
+                'latest_feedback': latest_feedback,
+                'feedback_has_attachments': bool(latest_feedback and (latest_feedback.get('attachment_count') or 0) > 0),
                 'created_at': row['created_at'] or '',
                 'updated_at': row['updated_at'] or '',
             })
@@ -571,12 +711,16 @@ def customer_get_feedback():
         for row in rows:
             feedbacks.append({
                 'id': row['id'],
+                'project_id': row['project_id'] if 'project_id' in row.keys() else None,
+                'project_name': row['project_name'] if 'project_name' in row.keys() else '',
                 'feedback_type': row['feedback_type'] or '',
                 'title': row['title'] or '',
                 'content': row['content'] or '',
                 'contact': row['contact'] or '',
                 'status': row['status'] or '待处理',
                 'reply': row['reply'] or '',
+                'attachment_count': row['attachment_count'] if 'attachment_count' in row.keys() else 0,
+                'attachments': _serialize_feedback_attachments(conn, row['id']),
                 'created_at': row['created_at'] or '',
                 'updated_at': row['updated_at'] or '',
             })
@@ -593,36 +737,107 @@ def customer_create_feedback():
     if not client_name:
         return jsonify({'success': False, 'message': '未绑定客户单位'}), 400
 
-    data = request.get_json() or {}
-
-    feedback_type = data.get('feedback_type', '').strip()
-    title = data.get('title', '').strip()
+    feedback_type = (request.form.get('feedback_type', '') if request.form else '').strip()
+    title = (request.form.get('title', '') if request.form else '').strip()
+    content = (request.form.get('content', '') if request.form else '').strip()
+    contact = (request.form.get('contact', '') if request.form else '').strip()
+    project_id_raw = (request.form.get('project_id', '') if request.form else '').strip()
+    project_id = int(project_id_raw) if project_id_raw.isdigit() else None
 
     if not feedback_type or feedback_type not in ('投诉', '建议', '其他'):
         return jsonify({'success': False, 'message': '反馈类型无效'}), 400
     if not title:
         return jsonify({'success': False, 'message': '标题不能为空'}), 400
+    if not project_id:
+        return jsonify({'success': False, 'message': '请选择关联项目'}), 400
 
     now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    uploaded_files = [f for f in request.files.getlist('attachments') if f and getattr(f, 'filename', '')]
 
     conn = _get_x1_data_conn()
+    saved_paths = []
     try:
-        conn.execute("""
+        project = conn.execute(
+            "SELECT id, project_name FROM business_projects WHERE id=? AND client_name=?",
+            (project_id, client_name)
+        ).fetchone()
+        if not project:
+            return jsonify({'success': False, 'message': '关联项目不存在'}), 404
+
+        cursor = conn.execute("""
             INSERT INTO client_feedback
-                (client_name, feedback_type, title, content, contact, status, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (client_name, project_id, project_name, feedback_type, title, content, contact, status, attachment_count, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             client_name,
+            project_id,
+            project['project_name'] or '',
             feedback_type,
             title,
-            data.get('content', '').strip(),
-            data.get('contact', '').strip(),
+            content,
+            contact,
             '待处理',
+            len(uploaded_files),
             now,
             now,
         ))
+        feedback_id = cursor.lastrowid
+
+        upload_dir = _customer_feedback_upload_dir(client_name, project_id)
+        for index, file in enumerate(uploaded_files, start=1):
+            original_name = (file.filename or '').strip()
+            safe_original = _safe_filename_part(original_name or ('attachment_%s' % index), fallback='attachment_%s' % index)
+            ext = Path(original_name).suffix.lower()[:20] if original_name else ''
+            stored_name = '%s_%s_%s%s' % (feedback_id, index, datetime.now().strftime('%Y%m%d%H%M%S%f'), ext)
+            stored_path = upload_dir / stored_name
+            file.save(str(stored_path))
+            saved_paths.append(stored_path)
+            relative_path = str(stored_path.relative_to(UPLOADS_DIR))
+            conn.execute(
+                "INSERT INTO client_feedback_attachments (feedback_id, project_id, client_name, original_name, stored_name, file_ext, mime_type, file_size, relative_path, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (
+                    feedback_id,
+                    project_id,
+                    client_name,
+                    original_name or safe_original,
+                    stored_name,
+                    ext,
+                    (getattr(file, 'mimetype', '') or '')[:120],
+                    stored_path.stat().st_size if stored_path.exists() else 0,
+                    relative_path,
+                    now,
+                )
+            )
         conn.commit()
         return jsonify({'success': True, 'message': '反馈已提交，感谢您的宝贵意见'})
+    except Exception:
+        for path in saved_paths:
+            try:
+                if path.exists():
+                    path.unlink()
+            except Exception:
+                pass
+        raise
+    finally:
+        conn.close()
+
+@customer_bp.route('/customer/api/feedback/attachments/<int:attachment_id>/download', methods=['GET'])
+@customer_required
+@require_permission('customer.feedback')
+def customer_download_feedback_attachment(attachment_id):
+    client_name = _get_client_name()
+    conn = _get_x1_data_conn()
+    try:
+        row = conn.execute(
+            "SELECT * FROM client_feedback_attachments WHERE id=? AND client_name=?",
+            (attachment_id, client_name)
+        ).fetchone()
+        if not row:
+            return jsonify({'success': False, 'error': '附件不存在'}), 404
+        file_path = UPLOADS_DIR / (row['relative_path'] or '')
+        if not file_path.exists():
+            return jsonify({'success': False, 'error': '附件文件不存在'}), 404
+        return send_file(str(file_path), as_attachment=True, download_name=row['original_name'] or row['stored_name'])
     finally:
         conn.close()
 
@@ -653,6 +868,7 @@ def customer_get_report_feedback(project_id):
             'id': r['id'],
             'action': r['action'],
             'content': r['content'],
+            'attachments': _serialize_report_feedback_attachments(conn, r['id']),
             'created_at': r['created_at'],
         } for r in rows]
         return jsonify({'success': True, 'items': items, 'report_status': project['report_status'] or ''})
@@ -665,12 +881,17 @@ def customer_get_report_feedback(project_id):
 def customer_submit_report_feedback(project_id):
     """客户提交报告修正意见，状态回退到“报告编制中”"""
     client_name = _get_client_name()
-    data = request.get_json(silent=True) or {}
-    content = (data.get('content') or '').strip()
+    content = (request.form.get('content') if request.form else '') or ''
+    if not content:
+        data = request.get_json(silent=True) or {}
+        content = data.get('content') or ''
+    content = content.strip()
     if not content:
         return jsonify({'success': False, 'error': '请填写反馈内容'}), 400
 
+    uploaded_files = [f for f in request.files.getlist('attachments') if f and getattr(f, 'filename', '')]
     conn = _get_x1_data_conn()
+    saved_paths = []
     try:
         project = conn.execute(
             "SELECT * FROM business_projects WHERE id=? AND client_name=?",
@@ -684,10 +905,37 @@ def customer_submit_report_feedback(project_id):
             return jsonify({'success': False, 'error': '当前状态不允许反馈'}), 400
 
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        conn.execute(
+        cursor = conn.execute(
             "INSERT INTO report_feedback (project_id, client_name, action, content, created_at) VALUES (?,?,?,?,?)",
             (project_id, client_name, 'feedback', content, now)
         )
+        report_feedback_id = cursor.lastrowid
+
+        upload_dir = _customer_feedback_upload_dir(client_name, project_id) / 'report_feedback'
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        for index, file in enumerate(uploaded_files, start=1):
+            original_name = (file.filename or '').strip()
+            ext = Path(original_name).suffix.lower()[:20] if original_name else ''
+            stored_name = 'rf_%s_%s_%s%s' % (report_feedback_id, index, datetime.now().strftime('%Y%m%d%H%M%S%f'), ext)
+            stored_path = upload_dir / stored_name
+            file.save(str(stored_path))
+            saved_paths.append(stored_path)
+            relative_path = str(stored_path.relative_to(UPLOADS_DIR))
+            conn.execute(
+                "INSERT INTO report_feedback_attachments (report_feedback_id, project_id, client_name, original_name, stored_name, file_ext, mime_type, file_size, relative_path, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (
+                    report_feedback_id,
+                    project_id,
+                    client_name,
+                    original_name or ('附件%s' % index),
+                    stored_name,
+                    ext,
+                    (getattr(file, 'mimetype', '') or '')[:120],
+                    stored_path.stat().st_size if stored_path.exists() else 0,
+                    relative_path,
+                    now,
+                )
+            )
         # 状态回退到“报告编制中”——管理员修改后重新上传审核稿
         conn.execute(
             "UPDATE business_projects SET report_status=?, updated_at=? WHERE id=?",
@@ -703,6 +951,34 @@ def customer_submit_report_feedback(project_id):
         except Exception:
             pass
         return jsonify({'success': True, 'message': '反馈已提交，报告将进入修改流程'})
+    except Exception:
+        for path in saved_paths:
+            try:
+                if path.exists():
+                    path.unlink()
+            except Exception:
+                pass
+        raise
+    finally:
+        conn.close()
+
+@customer_bp.route('/customer/api/report_feedback/attachments/<int:attachment_id>/download', methods=['GET'])
+@customer_required
+@require_permission('customer.feedback')
+def customer_download_report_feedback_attachment(attachment_id):
+    client_name = _get_client_name()
+    conn = _get_x1_data_conn()
+    try:
+        row = conn.execute(
+            "SELECT * FROM report_feedback_attachments WHERE id=? AND client_name=?",
+            (attachment_id, client_name)
+        ).fetchone()
+        if not row:
+            return jsonify({'success': False, 'error': '附件不存在'}), 404
+        file_path = UPLOADS_DIR / (row['relative_path'] or '')
+        if not file_path.exists():
+            return jsonify({'success': False, 'error': '附件文件不存在'}), 404
+        return send_file(str(file_path), as_attachment=True, download_name=row['original_name'] or row['stored_name'])
     finally:
         conn.close()
 

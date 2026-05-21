@@ -5,6 +5,11 @@
 var customerPanelInited = false;
 var customerListData = [];
 var customerSearchTimer = null;
+var customerCurrentPage = 1;
+var customerPageSize = 20;
+var customerTotalPages = 1;
+var customerTotal = 0;
+var customerKeyword = '';
 
 /* ========== 工具函数 ========== */
 function _money(v) {
@@ -21,19 +26,32 @@ function initCustomersPanel() {
 }
 
 /* ========== 2. 加载列表 ========== */
-function loadCustomerList() {
-  fetch('/admin/api/customer_management/list')
+function loadCustomerList(page) {
+  if (typeof page === 'number' && page > 0) customerCurrentPage = page;
+  var params = new URLSearchParams();
+  params.set('page', String(customerCurrentPage));
+  params.set('page_size', String(customerPageSize));
+  if (customerKeyword) params.set('keyword', customerKeyword);
+
+  fetch('/admin/api/customer_management/list?' + params.toString())
     .then(function(r) { return r.json(); })
     .then(function(d) {
       if (!d.success) throw new Error(d.error || '加载失败');
       customerListData = d.items || [];
+      customerCurrentPage = d.page || 1;
+      customerPageSize = d.page_size || 20;
+      customerTotalPages = d.total_pages || 1;
+      customerTotal = d.total || 0;
       renderCustomerSummary(d.summary || {});
       renderCustomerList(customerListData);
+      renderCustomerPagination();
     })
     .catch(function(err) {
       console.error(err);
       var box = document.getElementById('customer-list-container');
       if (box) box.innerHTML = '<div style="padding:60px;text-align:center;color:#94a3b8;font-size:14px;">加载客户列表失败</div>';
+      var pager = document.getElementById('customer-pagination');
+      if (pager) pager.innerHTML = '';
     });
 }
 
@@ -107,18 +125,44 @@ function renderCustomerList(items) {
   box.innerHTML = html;
 }
 
-/* ========== 5. 搜索 ========== */
+function renderCustomerPagination() {
+  var box = document.getElementById('customer-pagination');
+  if (!box) return;
+  if (customerTotal <= 0) { box.innerHTML = ''; return; }
+
+  var start = (customerCurrentPage - 1) * customerPageSize + 1;
+  var end = Math.min(customerCurrentPage * customerPageSize, customerTotal);
+
+  var html = '';
+  html += '<div style="font-size:13px;color:#64748b;">共 <strong style="color:#0f172a;">' + customerTotal + '</strong> 条，当前显示 ' + start + '-' + end + '</div>';
+  html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">';
+  html += '<select onchange="changeCustomerPageSize(this.value)" style="height:34px;border:1px solid #d9d9d9;border-radius:8px;padding:0 8px;background:#fff;">'
+    + '<option value="20"' + (customerPageSize===20?' selected':'') + '>20/页</option>'
+    + '<option value="50"' + (customerPageSize===50?' selected':'') + '>50/页</option>'
+    + '<option value="100"' + (customerPageSize===100?' selected':'') + '>100/页</option>'
+    + '</select>';
+  html += '<button class="btn" ' + (customerCurrentPage<=1?'disabled style="opacity:.45;cursor:not-allowed;"':'onclick="loadCustomerList(' + (customerCurrentPage-1) + ')"') + '>上一页</button>';
+  html += '<span style="font-size:13px;color:#334155;min-width:88px;text-align:center;">第 ' + customerCurrentPage + ' / ' + customerTotalPages + ' 页</span>';
+  html += '<button class="btn" ' + (customerCurrentPage>=customerTotalPages?'disabled style="opacity:.45;cursor:not-allowed;"':'onclick="loadCustomerList(' + (customerCurrentPage+1) + ')"') + '>下一页</button>';
+  html += '</div>';
+  box.innerHTML = html;
+}
+
+function changeCustomerPageSize(v) {
+  var n = parseInt(v, 10) || 20;
+  customerPageSize = Math.max(1, Math.min(100, n));
+  customerCurrentPage = 1;
+  loadCustomerList(1);
+}
+
+/* ========== 5. 搜索（服务端） ========== */
 function filterCustomerList() {
   clearTimeout(customerSearchTimer);
   customerSearchTimer = setTimeout(function() {
-    var kw = (document.getElementById('customer-search')?.value || '').trim().toLowerCase();
-    if (!kw) { renderCustomerList(customerListData); return; }
-    renderCustomerList(customerListData.filter(function(c) {
-      return (c.client_name || '').toLowerCase().indexOf(kw) >= 0
-        || (c.contact_name || '').toLowerCase().indexOf(kw) >= 0
-        || (c.contact_phone || '').toLowerCase().indexOf(kw) >= 0;
-    }));
-  }, 200);
+    customerKeyword = (document.getElementById('customer-search')?.value || '').trim();
+    customerCurrentPage = 1;
+    loadCustomerList(1);
+  }, 300);
 }
 
 /* ========== 6. 客户详情 ========== */
@@ -157,6 +201,7 @@ function renderCustomerDetail(data) {
     : '<span style="background:#f8fafc;color:#94a3b8;border:1px solid #e2e8f0;border-radius:999px;padding:3px 10px;font-size:12px;">未开通账号</span>';
 
   h += '<div style="background:linear-gradient(135deg,#1e40af 0%,#3b82f6 100%);border-radius:14px;padding:24px 28px;margin-bottom:16px;color:#fff;">'
+    + '<input type="hidden" id="customer-profile-version" value="' + _safeHtml(p.version || 1) + '">' 
     + '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">'
     + '<div>'
     + '<div style="font-size:22px;font-weight:800;margin-bottom:6px;">' + _safeHtml(p.client_name || '') + '</div>'
@@ -172,6 +217,7 @@ function renderCustomerDetail(data) {
     + '<div><div style="opacity:0.7;font-size:12px;margin-bottom:2px;">催单次数</div><div style="font-weight:700;font-size:18px;">' + urgeLogs.length + '</div></div>'
     + '<div><div style="opacity:0.7;font-size:12px;margin-bottom:2px;">反馈次数</div><div style="font-weight:700;font-size:18px;">' + feedbacks.length + '</div></div>'
     + '</div></div>';
+  h += '<div id="customer-profile-meta" style="margin:-6px 0 12px 0;font-size:12px;color:#64748b;">最后更新：' + _safeHtml(p.updated_by || '-') + ' · ' + _safeHtml((p.updated_at || '').slice(0,16) || '-') + '</div>';
 
   /* --- 开票/收件信息（默认折叠） --- */
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">';
@@ -234,7 +280,7 @@ function renderCustomerDetail(data) {
 
       var stageBadge = _stageBadge(pr.inspection_stage || '');
       var reportBadge = _reportBadge(pr.report_status || '');
-      var urgeMark = pr.has_urge ? '<span style="color:#dc2626;cursor:pointer;" title="点击清除催单" onclick="event.stopPropagation();clearUrge(' + pr.id + ',\'' + _safeHtml(pr.client_name||p.client_name||'').replace(/'/g,"\\'") + '\')">🔔 有催单</span>' : '<span style="color:#cbd5e1;">—</span>';
+      var urgeMark = pr.has_urge ? '<span style="color:#dc2626;cursor:pointer;" title="点击清除催单" onclick="event.stopPropagation();clearUrge(' + pr.id + ',\'' + _safeHtml(pr.client_name||p.client_name||'').replace(/'/g,"\\'") + '\', this)">🔔 有催单</span>' : '<span style="color:#cbd5e1;">—</span>';
 
       h += '<tr style="border-bottom:1px solid #f1f5f9;background:' + bgColor + ';">'
         + '<td style="padding:10px 8px;color:#3b82f6;font-weight:500;white-space:nowrap;">' + _safeHtml(pr.project_no || '-') + '</td>'
@@ -258,19 +304,27 @@ function renderCustomerDetail(data) {
       + '<div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:14px;">💬 反馈记录 <span style="color:#94a3b8;font-weight:400;font-size:13px;">(' + feedbacks.length + ')</span></div>';
     feedbacks.forEach(function(fb) {
       var statusColor = fb.status === '待处理' ? '#dc2626' : '#16a34a';
+      var attachments = Array.isArray(fb.attachments) ? fb.attachments : [];
+      var attachmentHtml = attachments.length
+        ? '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">' + attachments.map(function(att) {
+            return '<a href="' + _safeHtml(att.download_url || '#') + '" target="_blank" rel="noopener noreferrer" style="font-size:12px;padding:4px 8px;border:1px solid #dbeafe;border-radius:999px;background:#eff6ff;color:#1d4ed8;text-decoration:none;">📎 ' + _safeHtml(att.original_name || '附件') + '</a>';
+          }).join('') + '</div>'
+        : '';
       h += '<div style="padding:12px 16px;border-radius:8px;border:1px solid #f1f5f9;margin-bottom:8px;">'
         + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">'
         + '<span style="font-weight:600;font-size:13px;">' + _safeHtml(fb.project_name || '-') + '</span>'
         + '<span style="font-size:11px;color:' + statusColor + ';font-weight:600;">' + _safeHtml(fb.status || '') + '</span>'
         + '</div>'
         + '<div style="font-size:13px;color:#334155;margin-bottom:4px;">' + _safeHtml(fb.content || '') + '</div>'
-        + '<div style="font-size:11px;color:#94a3b8;">' + _safeHtml(fb.created_at || '') + '</div>';
+        + '<div style="font-size:11px;color:#94a3b8;">' + _safeHtml(fb.created_at || '') + '</div>'
+        + attachmentHtml;
       if (fb.reply) {
         h += '<div style="margin-top:8px;padding:8px 12px;background:#f0fdf4;border-radius:6px;font-size:12px;color:#16a34a;">↩️ ' + _safeHtml(fb.reply) + '</div>';
       } else if (fb.status === '待处理') {
         h += '<div style="margin-top:8px;">'
+          + '<input type="hidden" id="fb-version-' + fb.id + '" value="' + _safeHtml(fb.version || 1) + '">'
           + '<input type="text" id="fb-reply-' + fb.id + '" placeholder="输入回复..." style="padding:6px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:12px;width:70%;margin-right:6px;">'
-          + '<button class="btn btn-sm" onclick="replyFeedback(' + fb.id + ',\'' + _safeHtml(p.client_name||'').replace(/'/g,"\\'") + '\')" style="background:#1677ff;color:#fff;font-size:12px;">回复</button>'
+          + '<button class="btn btn-sm" onclick="replyFeedback(' + fb.id + ',\'' + _safeHtml(p.client_name||'').replace(/'/g,"\\'") + '\', this)" style="background:#1677ff;color:#fff;font-size:12px;">回复</button>'
           + '</div>';
       }
       h += '</div>';
@@ -367,24 +421,36 @@ function toggleCustomerProfileEdit(editing) {
 
 function saveCustomerProfile(clientName) {
   var payload = { client_name: clientName };
+  var verEl = document.getElementById('customer-profile-version');
+  if(verEl && verEl.value) payload.version = Number(verEl.value) || 1;
   document.querySelectorAll('[data-profile-field]').forEach(function(f) {
     payload[f.getAttribute('data-profile-field')] = f.value;
   });
+  var btn = document.getElementById('customer-profile-save-btn');
+  var oldText = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = '保存中...'; }
   fetch('/admin/api/customer_management/profile', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   })
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      if (!d.success) throw new Error(d.error || '保存失败');
+    .then(function(r) { return r.json().then(function(d){ return {ok:r.ok, status:r.status, data:d}; }); })
+    .then(function(res) {
+      var d = res.data || {};
+      if (!res.ok || !d.success) {
+        if(res.status === 409 || d.code === 'version_conflict'){
+          throw new Error(d.error || '客户资料已被其他人修改，请刷新后重试');
+        }
+        throw new Error(d.error || '保存失败');
+      }
       if (typeof showToast === 'function') showToast('保存成功', 'success');
       toggleCustomerProfileEdit(false);
-      showCustomerDetail(clientName); // 刷新
+      showCustomerDetail(clientName);
     })
     .catch(function(err) {
       if (typeof showToast === 'function') showToast(err.message || '保存失败', 'error');
-    });
+      showCustomerDetail(clientName);
+    }).finally(function(){ if(btn){ btn.disabled = false; btn.textContent = oldText || '保存'; } });
 }
 
 /* ========== 7b. 收件信息编辑/保存 ========== */
@@ -405,29 +471,44 @@ function toggleCustomerRecvEdit(editing) {
 
 function saveCustomerRecv(clientName) {
   var payload = { client_name: clientName };
+  var verEl = document.getElementById('customer-profile-version');
+  if(verEl && verEl.value) payload.version = Number(verEl.value) || 1;
   document.querySelectorAll('[data-recv-field]').forEach(function(f) {
     payload[f.getAttribute('data-recv-field')] = f.value;
   });
+  var btn = document.getElementById('customer-recv-save-btn');
+  var oldText = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = '保存中...'; }
   fetch('/admin/api/customer_management/profile', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   })
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      if (!d.success) throw new Error(d.error || '保存失败');
+    .then(function(r) { return r.json().then(function(d){ return {ok:r.ok, status:r.status, data:d}; }); })
+    .then(function(res) {
+      var d = res.data || {};
+      if (!res.ok || !d.success) {
+        if(res.status === 409 || d.code === 'version_conflict'){
+          throw new Error(d.error || '客户资料已被其他人修改，请刷新后重试');
+        }
+        throw new Error(d.error || '保存失败');
+      }
       if (typeof showToast === 'function') showToast('收件信息已保存', 'success');
       toggleCustomerRecvEdit(false);
       showCustomerDetail(clientName);
     })
     .catch(function(err) {
       if (typeof showToast === 'function') showToast(err.message || '保存失败', 'error');
-    });
+      showCustomerDetail(clientName);
+    }).finally(function(){ if(btn){ btn.disabled = false; btn.textContent = oldText || '保存'; } });
 }
 
 /* ========== 8. 清除催单 ========== */
-function clearUrge(projectId, clientName) {
+function clearUrge(projectId, clientName, btnEl) {
   if (!confirm('确认清除该项目的催单标记？')) return;
+  var btn = btnEl || null;
+  var oldText = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = '清除中...'; }
   fetch('/admin/api/customer_management/clear_urge/' + projectId, { method: 'POST' })
     .then(function(r) { return r.json(); })
     .then(function(d) {
@@ -437,28 +518,41 @@ function clearUrge(projectId, clientName) {
     })
     .catch(function(err) {
       if (typeof showToast === 'function') showToast(err.message || '操作失败', 'error');
-    });
+    }).finally(function(){ if(btn){ btn.disabled = false; btn.textContent = oldText || '🔔 有催单'; } });
 }
 
 /* ========== 9. 回复反馈 ========== */
-function replyFeedback(fbId, clientName) {
+function replyFeedback(fbId, clientName, btnEl) {
   var input = document.getElementById('fb-reply-' + fbId);
+  var verEl = document.getElementById('fb-version-' + fbId);
   var reply = input ? input.value.trim() : '';
   if (!reply) { if (typeof showToast === 'function') showToast('请输入回复内容', 'error'); return; }
+  var payload = { reply: reply, status: '已处理' };
+  if(verEl && verEl.value) payload.version = Number(verEl.value) || 1;
+  var btn = btnEl || null;
+  var oldText = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = '回复中...'; }
   fetch('/admin/api/customer_management/feedback/' + fbId + '/reply', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ reply: reply, status: '已处理' })
+    body: JSON.stringify(payload)
   })
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-      if (!d.success) throw new Error(d.error || '回复失败');
+    .then(function(r) { return r.json().then(function(d){ return {ok:r.ok, status:r.status, data:d}; }); })
+    .then(function(res) {
+      var d = res.data || {};
+      if (!res.ok || !d.success) {
+        if(res.status === 409 || d.code === 'version_conflict'){
+          throw new Error(d.error || '反馈已被其他人处理，请刷新后重试');
+        }
+        throw new Error(d.error || '回复失败');
+      }
       if (typeof showToast === 'function') showToast('已回复', 'success');
       showCustomerDetail(clientName);
     })
     .catch(function(err) {
       if (typeof showToast === 'function') showToast(err.message || '回复失败', 'error');
-    });
+      showCustomerDetail(clientName);
+    }).finally(function(){ if(btn){ btn.disabled = false; btn.textContent = oldText || '回复'; } });
 }
 
 /* ========== 10. 返回列表 ========== */
@@ -523,7 +617,10 @@ function submitCustomerCreate() {
   var payload = { client_name: name, contact_name: contact, contact_phone: phone };
   if (username) payload.username = username;
   if (password) payload.password = password;
-
+  var btn = document.querySelector('#customer-create-modal button[onclick="submitCustomerCreate()"]');
+  var oldText = btn ? btn.textContent : '';
+  if(btn && btn.disabled) return;
+  if(btn){ btn.disabled = true; btn.textContent = '创建中...'; }
   fetch('/admin/api/customer_management/create', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -538,16 +635,37 @@ function submitCustomerCreate() {
     })
     .catch(function(err) {
       if (typeof showToast === 'function') showToast(err.message || '创建失败', 'error');
-    });
+    }).finally(function(){ if(btn){ btn.disabled = false; btn.textContent = oldText || '创建'; } });
 }
 
 /* ========== 12. 删除客户 ========== */
 function deleteCustomer(clientName) {
-  if (!confirm('确认删除客户「' + clientName + '」？')) return;
-  _doDeleteCustomer(clientName, false);
+  fetch('/admin/api/customer_management/delete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ client_name: clientName, inspect_only: true })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.success) throw new Error(d.error || '获取删除影响失败');
+      var impact = d.impact || {};
+      var msg = '确认删除客户「' + clientName + '」？\n\n'
+        + '关联项目：' + (impact.project_count || 0) + ' 个\n'
+        + '客户反馈：' + (impact.feedback_count || 0) + ' 条\n'
+        + '客户账号：' + (impact.account_count || 0) + ' 个\n\n'
+        + '删除后会移除客户资料、催单记录、反馈记录；若强制删除且有关联项目，则只解除项目客户绑定。';
+      if (!confirm(msg)) return;
+      _doDeleteCustomer(clientName, false);
+    })
+    .catch(function(err) {
+      if (typeof showToast === 'function') showToast(err.message || '删除前检查失败', 'error');
+      else alert(err.message || '删除前检查失败');
+    });
 }
 
 function _doDeleteCustomer(clientName, force) {
+  var btns = [...document.querySelectorAll('button[onclick*="deleteCustomer(\\x27' + clientName.replace(/'/g, "\\'") + '\\x27)"]')];
+  btns.forEach(function(btn){ btn.disabled = true; btn.dataset.oldText = btn.textContent; btn.textContent = '删除中...'; });
   fetch('/admin/api/customer_management/delete', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -562,7 +680,6 @@ function _doDeleteCustomer(clientName, force) {
         else loadCustomerList();
         return;
       }
-      // 有关联项目：二次确认强制删除
       if (res.data.has_projects) {
         var cnt = res.data.project_count || 0;
         if (confirm('该客户关联 ' + cnt + ' 个项目。\n\n强制删除将解除项目关联（项目不会被删除，仅清空客户字段）。\n\n确认强制删除？')) {
@@ -575,5 +692,5 @@ function _doDeleteCustomer(clientName, force) {
     .catch(function(err) {
       if (typeof showToast === 'function') showToast(err.message || '删除失败', 'error');
       else alert(err.message || '删除失败');
-    });
+    }).finally(function(){ btns.forEach(function(btn){ btn.disabled = false; btn.textContent = btn.dataset.oldText || '删除'; }); });
 }
