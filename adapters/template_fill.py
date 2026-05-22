@@ -2167,6 +2167,9 @@ def _replace_table_row_cells_by_anchor_index(xml_text: str, anchor_text: str, ro
         return xml_text
 
     selected_table_index = 0 if table_match_index is None else table_match_index
+    # 支持负数索引（如 -1 表示最后一个匹配的表）
+    if selected_table_index < 0:
+        selected_table_index = len(matched_tables) + selected_table_index
     if selected_table_index < 0 or selected_table_index >= len(matched_tables):
         _append_debug_note(debug_notes, 'anchor-index-miss', {
             'anchor_text': anchor_text,
@@ -2716,15 +2719,16 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
             def _np_concl(*keys):
                 return _normalize_conclusion_text(get_param_result(_np_pm, *keys))
 
-            # ROW 0: room name + date
+            # ROW 0: room name + date — 锚点定位到包含"受检区域名称"或"房间名称"的行
             _r0 = {}
             _room_name = replacements.get('受检区域名称', '') or replacements.get('房间名称', '')
             if _room_name: _r0[1] = _room_name
             _det_date = replacements.get('检测日期', '')
             if _det_date: _r0[3] = _det_date
-            if _r0: document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 0, _r0, debug_notes=debug_notes)
+            if _r0:
+                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '受检区域名称', 0, _r0, debug_notes=debug_notes, table_match_index=-1)
 
-            # ROW 1: S/V
+            # ROW 1: S/V — 锚点定位到包含"S"或"面积"的行
             _length = str(room.get('length', '') or '')
             _width = str(room.get('width', '') or '')
             _height = str(room.get('height', '') or '')
@@ -2733,23 +2737,23 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                     _s = round(float(_length) * float(_width), 1)
                     _v = round(float(_length) * float(_width) * float(_height), 0)
                     _sv_text = f'S（m²）={_s}                 V（m³）={int(_v)}'
-                    document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 1, {1: _sv_text}, debug_notes=debug_notes)
+                    document_xml = _replace_table_row_cells_by_anchor_index(document_xml, 'S（m', 0, {1: _sv_text}, debug_notes=debug_notes, table_match_index=-1)
                 except (ValueError, TypeError):
                     pass
 
-            # ROW 3-12: all params with standard + value + conclusion
+            # 参数行: 全部用锚点定位（不依赖行号），指定 table_match_index=-1 以选中数据表（跳过仪器表）
             _np_rows = [
-                (3, '换气次数', '污染区换气次数', 'airchange', ('airchange', 'airchange_rate', 'air_change_rate')),
-                (4, '排风口风速', '排风口风速', 'exhaust_speed', ('exhaust_speed', 'exhaust_velocity')),
-                (5, '静压差', '静压差', 'pressure', ('static_pressure_diff', 'pressure_diff', 'pressure')),
-                (7, '气流流向', '气流流向', 'airflow_direction', ('airflow_direction', 'airflow_pattern')),
-                (8, '温度', '温度', 'temperature', ('temperature',)),
-                (9, '相对湿度', '相对湿度', 'humidity', ('relative_humidity', 'humidity')),
-                (10, '平均照度', '照度', 'illumination', ('illumination',)),
-                (11, '噪声', '噪声', 'noise', ('noise',)),
-                (12, '细菌浓度', '细菌浓度', 'bacteria', ('bacteria', 'settling_bacteria', 'settle_bacteria', 'settling')),
+                ('换气次数', '污染区换气次数', 'airchange', ('airchange', 'airchange_rate', 'air_change_rate')),
+                ('排风口风速', '排风口风速', 'exhaust_speed', ('exhaust_speed', 'exhaust_velocity')),
+                ('静压差', '静压差', 'pressure', ('static_pressure_diff', 'pressure_diff', 'pressure')),
+                ('气流流向', '气流流向', 'airflow_direction', ('airflow_direction', 'airflow_pattern')),
+                ('温度', '温度', 'temperature', ('temperature',)),
+                ('相对湿度', '相对湿度', 'humidity', ('relative_humidity', 'humidity')),
+                ('平均照度', '照度', 'illumination', ('illumination',)),
+                ('噪声', '噪声', 'noise', ('noise',)),
+                ('细菌浓度', '细菌浓度', 'bacteria', ('bacteria', 'settling_bacteria', 'settle_bacteria', 'settling')),
             ]
-            for _ri, _label, _repl_key, _std_key, _concl_keys in _np_rows:
+            for _label, _repl_key, _std_key, _concl_keys in _np_rows:
                 _val = replacements.get(_repl_key, '') or replacements.get(_label, '')
                 _std = _np_std(_std_key) or ''
                 _concl = _np_concl(*_concl_keys)
@@ -2757,15 +2761,15 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                 if _std: _row[2] = _std
                 if _val: _row[3] = _val
                 if _concl: _row[4] = _concl
-                if _row: document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, _ri, _row, debug_notes=debug_notes)
+                if _row: document_xml = _replace_table_row_cells_by_anchor_index(document_xml, _label, 0, _row, debug_notes=debug_notes, table_match_index=-1)
 
-            # ROW 6: 检漏
+            # 检漏: 锚点定位到包含"送风高效"或"检漏"的行
             _hl_val = replacements.get('送风高效过滤器检漏', '') or replacements.get('检漏', '')
             _hl_concl = _np_concl('hepa_leak')
             _r6 = {}
             if _hl_val: _r6[3] = _hl_val
             if _hl_concl: _r6[4] = _hl_concl
-            if _r6: document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 6, _r6, debug_notes=debug_notes)
+            if _r6: document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '送风高效', 0, _r6, debug_notes=debug_notes, table_match_index=-1)
         elif type_id == 'bsl':
             _bsl_std_ranges = {}
             try:
@@ -2995,7 +2999,7 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                     if _std_val: _fill[2] = _std_val
                 _concl = _gmp_concl(*_concl_keys)
                 if _concl: _fill[4] = _concl
-                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, _anchor, 1, _fill, debug_notes=debug_notes)
+                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, _anchor, 1, _fill, debug_notes=debug_notes, table_match_index=-1)
 
             # --- 洁净度复合行（7-8列合并结构，需专用逻辑）---
             _particle_std = _gmp_std_ranges.get('particle') or {}
@@ -3013,21 +3017,21 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                 document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '洁净度级别', 1, {
                     3: _grade_display, 5: _grade_display,
                     6: _gmp_concl('particle', '洁净度级别（悬浮粒子浓度）') or '合格',
-                }, debug_notes=debug_notes)
+                }, debug_notes=debug_notes, table_match_index=-1)
             # ≥0.5μm 子行（按文本锚点定位）
             if replacements.get('≥0.5μm') or _particle_limit_05:
                 _05_fill = {3: _grade_display, 5: replacements.get('≥0.5μm', '')}
                 if _particle_limit_05: _05_fill[2] = _particle_limit_05
-                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '≥0.5', 1, _05_fill, debug_notes=debug_notes)
+                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '≥0.5', 1, _05_fill, debug_notes=debug_notes, table_match_index=-1)
             if replacements.get('0.5μmUCL'):
-                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '95%UCL', 1, {5: replacements.get('0.5μmUCL', '')}, debug_notes=debug_notes)
+                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '95%UCL', 1, {5: replacements.get('0.5μmUCL', '')}, debug_notes=debug_notes, table_match_index=-1)
             # ≥5μm 子行
             if replacements.get('≥5μm') or _particle_limit_5:
                 _5_fill = {5: replacements.get('≥5μm', '')}
                 if _particle_limit_5: _5_fill[2] = _particle_limit_5
-                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '≥5', 1, _5_fill, debug_notes=debug_notes)
+                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '≥5', 1, _5_fill, debug_notes=debug_notes, table_match_index=-1)
             if replacements.get('5μmUCL'):
-                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '95%UCL', 2, {5: replacements.get('5μmUCL', '')}, debug_notes=debug_notes)
+                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '95%UCL', 2, {5: replacements.get('5μmUCL', '')}, debug_notes=debug_notes, table_match_index=-1)
         elif type_id == 'veterinary_gmp_workshop':
             # 兽药车间与GMP车间模板结构完全相同，共用填充逻辑
             _vgmp_std_ranges = {}
@@ -3114,7 +3118,7 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                     if _std_val: _fill[2] = _std_val
                 _concl = _vgmp_concl(*_concl_keys)
                 if _concl: _fill[4] = _concl
-                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, _anchor, 1, _fill, debug_notes=debug_notes)
+                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, _anchor, 1, _fill, debug_notes=debug_notes, table_match_index=-1)
 
             # --- 洁净度复合行 ---
             _vp_std = _vgmp_std_ranges.get('particle') or {}
@@ -3131,19 +3135,19 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                 document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '洁净度级别', 1, {
                     3: _vgrade_display, 5: _vgrade_display,
                     6: _vgmp_concl('particle', '洁净度级别（悬浮粒子浓度）') or '合格',
-                }, debug_notes=debug_notes)
+                }, debug_notes=debug_notes, table_match_index=-1)
             if replacements.get('≥0.5μm') or _vp_limit_05:
                 _05_fill = {3: _vgrade_display, 5: replacements.get('≥0.5μm', '')}
                 if _vp_limit_05: _05_fill[2] = _vp_limit_05
-                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '≥0.5', 1, _05_fill, debug_notes=debug_notes)
+                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '≥0.5', 1, _05_fill, debug_notes=debug_notes, table_match_index=-1)
             if replacements.get('0.5μmUCL'):
-                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '95%UCL', 1, {5: replacements.get('0.5μmUCL', '')}, debug_notes=debug_notes)
+                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '95%UCL', 1, {5: replacements.get('0.5μmUCL', '')}, debug_notes=debug_notes, table_match_index=-1)
             if replacements.get('≥5μm') or _vp_limit_5:
                 _5_fill = {5: replacements.get('≥5μm', '')}
                 if _vp_limit_5: _5_fill[2] = _vp_limit_5
-                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '≥5', 1, _5_fill, debug_notes=debug_notes)
+                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '≥5', 1, _5_fill, debug_notes=debug_notes, table_match_index=-1)
             if replacements.get('5μmUCL'):
-                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '95%UCL', 2, {5: replacements.get('5μmUCL', '')}, debug_notes=debug_notes)
+                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '95%UCL', 2, {5: replacements.get('5μmUCL', '')}, debug_notes=debug_notes, table_match_index=-1)
 
             food_grade = str(replacements.get('食品等级', '') or replacements.get('洁净等级', '') or replacements.get('洁净级别', '') or replacements.get('洁净度设计级别', '') or replacements.get('洁净度', '') or replacements.get('洁净度级别', '') or '')
             food_grade_short = food_grade
@@ -5280,7 +5284,9 @@ def _fill_data_table_xml(table_xml: str, room_export: dict, export_payload: dict
         'illumination_uniformity': '照度均匀度',
         'temp_diff': '温差',
         'airflow_pattern': '气流流型',
+        'airflow_direction': '气流流向',
         'tightness': '严密性',
+        'bacteria': '细菌浓度',
         'appearance': '外观检验',
         'door_interlock': '门互锁功能',
     }
@@ -5292,7 +5298,7 @@ def _fill_data_table_xml(table_xml: str, room_export: dict, export_payload: dict
             _conclusion = '合格' if _jv.get('passed') else '不合格'
             _anchor_judgement[_anc] = {'range': _jv['range'], 'conclusion': _conclusion}
     # 锚点别名扩展：模板标签变体也能命中判定结果
-    _ANCHOR_ALIASES = {'相对湿度': '湿度', '平均照度': '照度'}
+    _ANCHOR_ALIASES = {'相对湿度': '湿度', '平均照度': '照度', '沉降菌': '细菌浓度', '细菌浓度': '沉降菌'}
     for _src, _dst in _ANCHOR_ALIASES.items():
         if _src in _anchor_judgement and _dst not in _anchor_judgement:
             _anchor_judgement[_dst] = _anchor_judgement[_src]
@@ -5320,9 +5326,12 @@ def _fill_data_table_xml(table_xml: str, room_export: dict, export_payload: dict
         '温差': replacements.get('温差', ''),
         '紫外线': replacements.get('紫外线', ''),
         '气流流型': replacements.get('气流流型', ''),
+        '气流流向': replacements.get('气流流向', ''),
         '严密性': replacements.get('严密性', ''),
         '外观检验': replacements.get('外观检验', ''),
         '门互锁功能': replacements.get('门互锁功能', ''),
+        '细菌浓度': replacements.get('细菌浓度', '') or replacements.get('沉降菌', ''),
+        '洁净区换气次数': replacements.get('洁净区换气次数', ''),
     }
 
     # === 辅助函数：向指定 tc 写入文本值 ===
