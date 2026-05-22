@@ -1012,7 +1012,9 @@ def _build_placeholder_fill_plan(export_payload: Dict[str, Any]) -> List[Tuple[s
 
         gmp_grade = context.get('gmp_grade', '') or room.get('clean_class', '') or room.get('level_name', '')
         detection_environment = ' / '.join([v for v in [gmp_grade, room_display_name] if str(v).strip()])
-        airchange_rate = _gmp_value('wind_speed', 'airchange_rate', 'air_change_rate', 'airchange', '换气次数', '截面风速') or _gmp_result('wind_speed', 'airchange_rate', 'air_change_rate', 'airchange', '换气次数', '截面风速')
+        airchange_rate = _gmp_value('airchange_rate', 'air_change_rate', 'airchange', '换气次数')
+        wind_speed = _gmp_value('wind_speed', 'air_velocity', 'sectional_air_velocity', '截面风速')
+        wind_uniformity = _gmp_value('wind_uniformity', 'speed_uniformity', '风速不均匀度')
         pressure_diff = _gmp_value('static_pressure_diff', 'pressure_diff', 'pressure', '静压差')
         temperature = _gmp_value('temperature', '温度')
         humidity = _gmp_value('relative_humidity', 'humidity', '相对湿度')
@@ -1082,6 +1084,8 @@ def _build_placeholder_fill_plan(export_payload: Dict[str, Any]) -> List[Tuple[s
             ('检测环境', detection_environment),
             ('参数摘要', parameter_summary_text),
             ('换气次数', airchange_rate),
+            ('截面风速', wind_speed),
+            ('风速不均匀度', wind_uniformity),
             ('静压差', pressure_diff),
             ('温度', temperature),
             ('相对湿度', humidity),
@@ -1109,7 +1113,8 @@ def _build_placeholder_fill_plan(export_payload: Dict[str, Any]) -> List[Tuple[s
 
         gmp_grade = context.get('gmp_grade', '') or room.get('clean_class', '') or room.get('level_name', '')
         detection_environment = ' / '.join([v for v in [gmp_grade, room_display_name] if str(v).strip()])
-        airflow_speed = _vgmp_value('sectional_air_velocity', 'air_velocity', 'wind_speed', 'airchange', '截面风速')
+        airflow_speed = _vgmp_value('sectional_air_velocity', 'air_velocity', 'wind_speed', '截面风速')
+        airchange_rate = _vgmp_value('airchange_rate', 'air_change_rate', 'airchange', '换气次数')
         speed_uniformity = _vgmp_value('speed_uniformity', 'wind_uniformity', '风速不均匀度')
         pressure_diff = _vgmp_value('static_pressure_diff', 'pressure_diff', 'pressure', '静压差')
         hepa_leak = _vgmp_value('hepa_leak', '送风高效过滤器检漏')
@@ -1192,7 +1197,7 @@ def _build_placeholder_fill_plan(export_payload: Dict[str, Any]) -> List[Tuple[s
             ('检测环境', detection_environment),
             ('参数摘要', parameter_summary_text),
             ('截面风速', airflow_speed),
-            ('换气次数', airflow_speed),
+            ('换气次数', airchange_rate),
             ('风速不均匀度', speed_uniformity),
             ('静压差', pressure_diff),
             ('送风高效过滤器检漏', hepa_leak),
@@ -2903,6 +2908,7 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                     4: _normalize_conclusion_text(get_param_result(build_param_map(room.get('params')), 'floating_bacteria', 'floating', '浮游菌')),
                 }, debug_notes=debug_notes, allow_blank=True)
         elif type_id == 'gmp_workshop':
+            # --- 标准范围加载 ---
             _gmp_std_ranges = {}
             try:
                 _std_path = os.path.join(os.path.dirname(__file__), '..', 'static', 'standards_ranges.json')
@@ -2924,23 +2930,21 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                         break
             except Exception:
                 _gmp_std_ranges = {}
+
             gmp_grade = str(replacements.get('洁净度', '') or replacements.get('洁净度级别', '') or room.get('clean_class', '') or room.get('level_name', '') or '')
             _grade_display = gmp_grade.replace('GMP静态', '') if gmp_grade.startswith('GMP静态') else gmp_grade
-            _particle_std = _gmp_std_ranges.get('particle') or {}
-            _particle_all = str(_particle_std.get('range', '') or '')
-            _particle_limit_05 = str(replacements.get('≥0.5μm标准', '') or replacements.get('≥0.5μm限值', '') or replacements.get('≥0.5μm标准位', '') or '')
-            _particle_limit_5 = str(replacements.get('≥5μm标准', '') or replacements.get('≥5μm限值', '') or replacements.get('≥5μm标准位', '') or '')
-            if _particle_all and ',' in _particle_all:
-                _parts = [x.strip() for x in _particle_all.split(',') if x.strip()]
-                if len(_parts) >= 1 and not _particle_limit_05:
-                    _particle_limit_05 = _parts[0].replace('μm', '㎛').replace('≤', '：≤') if '：' not in _parts[0] else _parts[0]
-                if len(_parts) >= 2 and not _particle_limit_5:
-                    _particle_limit_5 = _parts[1].replace('μm', '㎛').replace('≤', '：≤') if '：' not in _parts[1] else _parts[1]
+            _gmp_pm = build_param_map(room.get('params'))
+            def _gmp_std(key): return str(((_gmp_std_ranges.get(key) or {}).get('range', '') or ''))
+            def _gmp_concl(*keys): return _normalize_conclusion_text(get_param_result(_gmp_pm, *keys))
+
+            # --- ROW 0: 表头（检测日期 + 洁净度级别）---
             if replacements.get('检测日期') or gmp_grade:
                 document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 0, {
                     3: replacements.get('检测日期', ''),
                     5: _grade_display,
                 }, debug_notes=debug_notes, allow_blank=True)
+
+            # --- ROW 1: S/V ---
             _room_length = str(room.get('length', '') or '').strip()
             _room_width = str(room.get('width', '') or '').strip()
             _room_height = str(room.get('height', '') or '').strip()
@@ -2956,262 +2960,191 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                 document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 1, {
                     1: f'面积S（m2）={_area_str}              体积V（m3）={_vol_str}'
                 }, debug_notes=debug_notes, allow_blank=True)
-            if replacements.get('换气次数'):
-                document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 3, {
-                    2: str(((_gmp_std_ranges.get('wind_speed') or {}).get('range', '') or ((_gmp_std_ranges.get('airchange') or {}).get('range', '') or ''))),
-                    3: replacements.get('换气次数', ''),
-                    4: _normalize_conclusion_text(get_param_result(build_param_map(room.get('params')), 'wind_speed', 'airchange', '换气次数')),
-                }, debug_notes=debug_notes, allow_blank=True)
-            if replacements.get('静压差'):
-                document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 4, {
-                    2: str(((_gmp_std_ranges.get('pressure') or {}).get('range', '') or '')),
-                    3: replacements.get('静压差', ''),
-                    4: _normalize_conclusion_text(get_param_result(build_param_map(room.get('params')), 'pressure', '静压差')),
-                }, debug_notes=debug_notes, allow_blank=True)
+
+            # --- 5列标准行：按锚点文本定位（不依赖行号，兼容A/BC/D级行差异）---
+            _gmp_anchor_fills = [
+                ('截面风速', 'wind_speed', 'wind_speed', 'air_velocity', '截面风速'),
+                ('换气次数', 'airchange', 'airchange', 'air_change_rate', '换气次数'),
+                ('风速不均匀度', 'wind_uniformity', 'wind_uniformity', 'speed_uniformity', '风速不均匀度'),
+                ('静压差', 'pressure', 'pressure', 'pressure_diff', '静压差'),
+                ('送风高效', 'hepa_leak', 'hepa_leak', '送风高效过滤器检漏'),
+                ('气流流型', None, 'airflow_pattern', '气流流型'),
+                ('温度', 'temperature', 'temperature', '温度'),
+                ('相对湿度', 'humidity', 'humidity', '相对湿度'),
+                ('平均照度', 'illumination_main_room', 'illumination', '照度', '平均照度'),
+                ('噪声', 'noise', 'noise', '噪声'),
+                ('沉降菌', 'settling', 'settle_bacteria', 'settling', '沉降菌'),
+                ('浮游菌', 'floating', 'floating_bacteria', '浮游菌'),
+                ('自净时间', 'self_purification', 'self_purification_time', '自净时间'),
+            ]
+            for _af in _gmp_anchor_fills:
+                _anchor = _af[0]
+                _std_key = _af[1]
+                _concl_keys = _af[2:]
+                _val = replacements.get(_anchor, '')
+                if not _val:
+                    # 尝试别名
+                    for _ck in _concl_keys:
+                        _val = replacements.get(_ck, '')
+                        if _val: break
+                if not _val:
+                    continue
+                _fill = {3: _val}
+                if _std_key:
+                    _std_val = _gmp_std(_std_key)
+                    if _std_val: _fill[2] = _std_val
+                _concl = _gmp_concl(*_concl_keys)
+                if _concl: _fill[4] = _concl
+                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, _anchor, 1, _fill, debug_notes=debug_notes)
+
+            # --- 洁净度复合行（7-8列合并结构，需专用逻辑）---
+            _particle_std = _gmp_std_ranges.get('particle') or {}
+            _particle_all = str(_particle_std.get('range', '') or '')
+            _particle_limit_05 = str(replacements.get('≥0.5μm标准', '') or '')
+            _particle_limit_5 = str(replacements.get('≥5μm标准', '') or '')
+            if _particle_all and ',' in _particle_all:
+                _parts = [x.strip() for x in _particle_all.split(',') if x.strip()]
+                if len(_parts) >= 1 and not _particle_limit_05:
+                    _particle_limit_05 = _parts[0].replace('μm', '㎛').replace('≤', '：≤') if '：' not in _parts[0] else _parts[0]
+                if len(_parts) >= 2 and not _particle_limit_5:
+                    _particle_limit_5 = _parts[1].replace('μm', '㎛').replace('≤', '：≤') if '：' not in _parts[1] else _parts[1]
+            # 洁净度标题行
             if replacements.get('洁净度') or replacements.get('洁净度级别'):
-                document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 6, {
-                    3: _grade_display,
-                    5: _grade_display,
-                    6: _normalize_conclusion_text(get_param_result(build_param_map(room.get('params')), 'particle', '洁净度级别（悬浮粒子浓度）')) or '合格',
-                }, debug_notes=debug_notes, allow_blank=True)
-            # GMP 粒子区块结构：row7/9 tc[5]=最大值, row8/10 tc[5]=UCL
-            document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 7, {
-                3: _grade_display,
-                5: replacements.get('≥0.5μm', ''),
-            }, debug_notes=debug_notes, allow_blank=True)
-            if _particle_limit_05:
-                document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 7, {2: _particle_limit_05}, debug_notes=debug_notes, allow_blank=True)
-            document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 8, {
-                5: replacements.get('0.5μmUCL', ''),
-            }, debug_notes=debug_notes, allow_blank=True)
-            if _particle_limit_05:
-                document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 8, {2: _particle_limit_05}, debug_notes=debug_notes, allow_blank=True)
-            document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 9, {
-                3: _grade_display if replacements.get('≥5μm', '') else '',
-                5: replacements.get('≥5μm', ''),
-            }, debug_notes=debug_notes, allow_blank=True)
-            if _particle_limit_5:
-                document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 9, {2: _particle_limit_5}, debug_notes=debug_notes, allow_blank=True)
-            document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 10, {
-                5: replacements.get('5μmUCL', ''),
-            }, debug_notes=debug_notes, allow_blank=True)
-            if _particle_limit_5:
-                document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 10, {2: _particle_limit_5}, debug_notes=debug_notes, allow_blank=True)
-            if replacements.get('温度'):
-                document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 11, {
-                    2: str(((_gmp_std_ranges.get('temperature') or {}).get('range', '') or '20～24')),
-                    3: replacements.get('温度', ''),
-                    4: _normalize_conclusion_text(get_param_result(build_param_map(room.get('params')), 'temperature', '温度')),
-                }, debug_notes=debug_notes, allow_blank=True)
-            if replacements.get('相对湿度'):
-                document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 12, {
-                    2: str(((_gmp_std_ranges.get('humidity') or {}).get('range', '') or '45～60')),
-                    3: replacements.get('相对湿度', ''),
-                    4: _normalize_conclusion_text(get_param_result(build_param_map(room.get('params')), 'humidity', '相对湿度')),
-                }, debug_notes=debug_notes, allow_blank=True)
-            if replacements.get('平均照度') or replacements.get('照度'):
-                document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 13, {
-                    2: str(((_gmp_std_ranges.get('illumination_main_room') or {}).get('range', '') or '≥300')),
-                    3: replacements.get('平均照度', '') or replacements.get('照度', ''),
-                    4: _normalize_conclusion_text(get_param_result(build_param_map(room.get('params')), 'illumination', '照度', '平均照度')),
-                }, debug_notes=debug_notes, allow_blank=True)
-            if replacements.get('噪声'):
-                document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 14, {
-                    2: str(((_gmp_std_ranges.get('noise') or {}).get('range', '') or '')),
-                    3: replacements.get('噪声', ''),
-                    4: _normalize_conclusion_text(get_param_result(build_param_map(room.get('params')), 'noise', '噪声')),
-                }, debug_notes=debug_notes, allow_blank=True)
-            if replacements.get('沉降菌') or replacements.get('沉降菌（平均菌落数）'):
-                document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 15, {
-                    2: str(((_gmp_std_ranges.get('settling') or {}).get('range', '') or '≤1')),
-                    3: replacements.get('沉降菌', '') or replacements.get('沉降菌（平均菌落数）', ''),
-                    4: _normalize_conclusion_text(get_param_result(build_param_map(room.get('params')), 'settle_bacteria', 'settling', '沉降菌')),
-                }, debug_notes=debug_notes, allow_blank=True)
-            if replacements.get('浮游菌（平均浓度）') or replacements.get('浮游菌'):
-                _floating_std_val = str(((_gmp_std_ranges.get('floating') or {}).get('range', '') or ''))
-                _floating_fill = {
-                    3: replacements.get('浮游菌（平均浓度）', '') or replacements.get('浮游菌', ''),
-                    4: _normalize_conclusion_text(get_param_result(build_param_map(room.get('params')), 'floating_bacteria', '浮游菌')),
-                }
-                if _floating_std_val:
-                    _floating_fill[2] = _floating_std_val
-                document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 16, _floating_fill, debug_notes=debug_notes, allow_blank=True)
-            if replacements.get('送风高效过滤器检漏') or replacements.get('高效过滤器检漏'):
-                _hepa_item = get_param_item(build_param_map(room.get('params')), 'hepa_leak', '送风高效过滤器检漏')
-                _hepa_objects = _hepa_item.get('objects', []) if isinstance(_hepa_item, dict) else []
-                _hepa_value = str((_hepa_objects[0] or {}).get('value', '') if _hepa_objects else '') or (replacements.get('送风高效过滤器检漏', '') or replacements.get('高效过滤器检漏', ''))
-                _hepa_result = get_param_result(build_param_map(room.get('params')), 'hepa_leak', '送风高效过滤器检漏')
-                document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 5, {
-                    3: _hepa_value,
-                    4: _normalize_conclusion_text(_hepa_result) or ('合格' if _hepa_value and float(_hepa_value) <= 0.01 else ''),
-                }, debug_notes=debug_notes, allow_blank=True)
+                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '洁净度级别', 1, {
+                    3: _grade_display, 5: _grade_display,
+                    6: _gmp_concl('particle', '洁净度级别（悬浮粒子浓度）') or '合格',
+                }, debug_notes=debug_notes)
+            # ≥0.5μm 子行（按文本锚点定位）
+            if replacements.get('≥0.5μm') or _particle_limit_05:
+                _05_fill = {3: _grade_display, 5: replacements.get('≥0.5μm', '')}
+                if _particle_limit_05: _05_fill[2] = _particle_limit_05
+                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '≥0.5', 1, _05_fill, debug_notes=debug_notes)
+            if replacements.get('0.5μmUCL'):
+                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '95%UCL', 1, {5: replacements.get('0.5μmUCL', '')}, debug_notes=debug_notes)
+            # ≥5μm 子行
+            if replacements.get('≥5μm') or _particle_limit_5:
+                _5_fill = {5: replacements.get('≥5μm', '')}
+                if _particle_limit_5: _5_fill[2] = _particle_limit_5
+                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '≥5', 1, _5_fill, debug_notes=debug_notes)
+            if replacements.get('5μmUCL'):
+                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '95%UCL', 2, {5: replacements.get('5μmUCL', '')}, debug_notes=debug_notes)
         elif type_id == 'veterinary_gmp_workshop':
-            # --- Dynamic standards from standards_ranges.json ---
+            # 兽药车间与GMP车间模板结构完全相同，共用填充逻辑
             _vgmp_std_ranges = {}
             try:
                 _std_path = os.path.join(os.path.dirname(__file__), '..', 'static', 'standards_ranges.json')
                 with open(_std_path, 'r', encoding='utf-8') as _sf:
                     _all_std = json.load(_sf)
+                _candidate_stds = []
+                for _s in room.get('judgement', []) or []:
+                    if _s and _s not in _candidate_stds:
+                        _candidate_stds.append(_s)
+                for _s in room.get('basis', []) or []:
+                    if _s and _s not in _candidate_stds:
+                        _candidate_stds.append(_s)
                 _clean_class_text = room.get('clean_class', '') or room.get('level_name', '')
-                for _s in (room.get('judgement', []) or []) + (room.get('basis', []) or []):
-                    _obj = ((_all_std.get(_s) or {}).get('veterinary_gmp_workshop') or {})
+                for _std in _candidate_stds:
+                    _obj = ((_all_std.get(_std) or {}).get('veterinary_gmp_workshop') or {})
                     _level = _obj.get(_clean_class_text) or {}
                     if isinstance(_level, dict) and _level:
-                        for _pk, _pv in _level.items():
-                            if _pk not in _vgmp_std_ranges:
-                                _vgmp_std_ranges[_pk] = _pv
+                        _vgmp_std_ranges = dict(_level)
+                        break
             except Exception:
-                pass
-            def _vgmp_std(key):
-                r = _vgmp_std_ranges.get(key, {})
-                return str(r.get('range', '') if isinstance(r, dict) else r or '')
+                _vgmp_std_ranges = {}
 
-            gmp_grade = str(replacements.get('GMP等级', '') or replacements.get('洁净等级', '') or replacements.get('洁净级别', '') or replacements.get('洁净度设计级别', '') or replacements.get('洁净度', '') or replacements.get('洁净度级别', '') or '')
-            _grade_display = gmp_grade.replace('GMP静态', '') if gmp_grade.startswith('GMP静态') else gmp_grade
-            _p_map = build_param_map(room.get('params'))
-            _vgmp_result_fn = lambda *k: get_param_result(_p_map, *k)
-            def _vgmp_concl(*keys):
-                return _normalize_conclusion_text(_vgmp_result_fn(*keys))
+            vgmp_grade = str(replacements.get('洁净度', '') or replacements.get('洁净度级别', '') or room.get('clean_class', '') or room.get('level_name', '') or '')
+            _vgrade_display = vgmp_grade.replace('GMP静态', '') if vgmp_grade.startswith('GMP静态') else vgmp_grade
+            _vgmp_pm = build_param_map(room.get('params'))
+            def _vgmp_std(key): return str(((_vgmp_std_ranges.get(key) or {}).get('range', '') or ''))
+            def _vgmp_concl(*keys): return _normalize_conclusion_text(get_param_result(_vgmp_pm, *keys))
 
-            # Particle data
-            _p_data = (_p_map.get('particle', {}) or {}).get('data', {}) or {}
-            _p05_max = str(_p_data.get('p05_max', '') or replacements.get('≥0.5μm', '') or '')
-            _p05_ucl = str(_p_data.get('p05_ucl', '') or replacements.get('0.5μmUCL', '') or '')
-            _p5_max = str(_p_data.get('p5_max', '') or replacements.get('≥5μm', '') or '')
-            _p5_ucl = str(_p_data.get('p5_ucl', '') or replacements.get('5μmUCL', '') or '')
-
-            # Particle limits
-            _particle_std = _vgmp_std_ranges.get('particle', {})
-            _particle_range = str(_particle_std.get('range', '') if isinstance(_particle_std, dict) else '')
-            _range_05 = str(replacements.get('≥0.5μm标准', '') or '')
-            _range_5 = str(replacements.get('≥5μm标准', '') or '')
-            if not _range_05 and _particle_range:
-                parts = [p.strip() for p in _particle_range.split(',')]
-                for p in parts:
-                    if '0.5' in p and not _range_05:
-                        _range_05 = p
-                    elif '5' in p and '0.5' not in p and not _range_5:
-                        _range_5 = p
-
-            # --- ROW 0: room name + date + grade ---
-            _row0 = {}
-            detection_date = replacements.get('检测日期', '')
-            if detection_date: _row0[3] = detection_date
-            if gmp_grade: _row0[5] = _grade_display
-            _room_name = replacements.get('受检区域名称', '') or replacements.get('房间名称', '')
-            if _room_name: _row0[1] = _room_name
-            if _row0:
-                document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 0, _row0, debug_notes=debug_notes)
+            # --- ROW 0: 表头 ---
+            if replacements.get('检测日期') or vgmp_grade:
+                document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 0, {
+                    3: replacements.get('检测日期', ''), 5: _vgrade_display,
+                }, debug_notes=debug_notes, allow_blank=True)
 
             # --- ROW 1: S/V ---
-            _length = str(room.get('length', '') or '')
-            _width = str(room.get('width', '') or '')
-            _height = str(room.get('height', '') or '')
-            if _length and _width and _height:
-                try:
-                    _s = round(float(_length) * float(_width), 1)
-                    _v = round(float(_length) * float(_width) * float(_height), 0)
-                    _sv_text = f'面积S（m²）={_s}              体积V（m³）={int(_v)}'
-                    document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 1, {1: _sv_text}, debug_notes=debug_notes)
-                except (ValueError, TypeError):
-                    pass
+            _room_length = str(room.get('length', '') or '').strip()
+            _room_width = str(room.get('width', '') or '').strip()
+            _room_height = str(room.get('height', '') or '').strip()
+            try:
+                _rl = float(_room_length) if _room_length else 0
+                _rw = float(_room_width) if _room_width else 0
+                _rh = float(_room_height) if _room_height else 0
+            except (ValueError, TypeError):
+                _rl = _rw = _rh = 0
+            _area_str = str(round(_rl * _rw, 2)).rstrip('0').rstrip('.') if (_rl > 0 and _rw > 0) else ''
+            _vol_str = str(round(_rl * _rw * _rh, 2)).rstrip('0').rstrip('.') if (_rl > 0 and _rw > 0 and _rh > 0) else ''
+            if _area_str or _vol_str:
+                document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 1, {
+                    1: f'面积S（m2）={_area_str}           体积V（m3）={_vol_str}'
+                }, debug_notes=debug_notes, allow_blank=True)
 
-            # --- ROW 3: 截面风速 ---
-            _ws_val = replacements.get('截面风速', '') or replacements.get('换气次数', '')
-            _ws_std = _vgmp_std('wind_speed') or _vgmp_std('airchange') or ''
-            _ws_concl = _vgmp_concl('sectional_air_velocity', 'air_velocity', 'wind_speed', 'airchange')
-            _r3 = {}
-            if _ws_std: _r3[2] = _ws_std
-            if _ws_val: _r3[3] = _ws_val
-            if _ws_concl: _r3[4] = _ws_concl
-            if _r3: document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 3, _r3, debug_notes=debug_notes)
-
-            # --- ROW 4: 风速不均匀度 ---
-            _su_val = replacements.get('风速不均匀度', '')
-            _su_std = _vgmp_std('wind_uniformity') or ''
-            _su_concl = _vgmp_concl('speed_uniformity', 'wind_uniformity')
-            _r4 = {}
-            if _su_std: _r4[2] = _su_std
-            if _su_val: _r4[3] = _su_val
-            if _su_concl: _r4[4] = _su_concl
-            if _r4: document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 4, _r4, debug_notes=debug_notes)
-
-            # --- ROW 5: 静压差 ---
-            _pr_val = replacements.get('静压差', '')
-            _pr_std = _vgmp_std('pressure') or ''
-            _pr_concl = _vgmp_concl('static_pressure_diff', 'pressure_diff', 'pressure')
-            _r5 = {}
-            if _pr_std: _r5[2] = _pr_std
-            if _pr_val: _r5[3] = _pr_val
-            if _pr_concl: _r5[4] = _pr_concl
-            if _r5: document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 5, _r5, debug_notes=debug_notes)
-
-            # --- ROW 6: 检漏 ---
-            _hl_val = replacements.get('送风高效过滤器检漏', '')
-            _hl_concl = _vgmp_concl('hepa_leak')
-            _r6 = {}
-            if _hl_val: _r6[3] = _hl_val
-            if _hl_concl: _r6[4] = _hl_concl
-            if _r6: document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 6, _r6, debug_notes=debug_notes)
-
-            # --- ROW 7: 气流流型 ---
-            _af_val = replacements.get('气流流型', '')
-            _af_concl = _vgmp_concl('airflow_pattern')
-            _r7 = {}
-            if _af_val: _r7[3] = _af_val
-            if _af_concl: _r7[4] = _af_concl
-            if _r7: document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 7, _r7, debug_notes=debug_notes)
-
-            # --- ROW 8: 洁净度级别 header ---
-            _pc = _vgmp_concl('particle')
-            if _grade_display or _pc:
-                _r8 = {}
-                if _grade_display: _r8[3] = _grade_display; _r8[5] = _grade_display
-                if _pc: _r8[6] = _pc
-                document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 8, _r8, debug_notes=debug_notes)
-
-            # --- ROW 9-12: Particle block ---
-            _r9 = {}
-            if _range_05: _r9[2] = _range_05
-            if _grade_display: _r9[3] = 'GMP静态' + _grade_display if 'GMP' not in _grade_display else _grade_display
-            if _p05_max: _r9[5] = _p05_max
-            if _r9: document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 9, _r9, debug_notes=debug_notes)
-            if _p05_ucl:
-                document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 10, {5: _p05_ucl}, debug_notes=debug_notes)
-            _r11 = {}
-            if _range_5: _r11[2] = _range_5
-            if _p5_max: _r11[5] = _p5_max
-            if _r11: document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 11, _r11, debug_notes=debug_notes)
-            if _p5_ucl:
-                document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 12, {5: _p5_ucl}, debug_notes=debug_notes)
-
-            # --- ROW 13-18: simple params ---
-            _simple_rows = [
-                (13, '温度', 'temperature', ('temperature',)),
-                (14, '相对湿度', 'humidity', ('relative_humidity', 'humidity')),
-                (15, '平均照度', 'illumination_main_room', ('illumination', 'illumination_main_room', 'illumination_aux_room')),
-                (16, '噪声', 'noise', ('noise',)),
-                (17, '沉降菌', 'settling', ('settling_bacteria', 'settle_bacteria', 'settling')),
-                (18, '浮游菌', 'floating', ('floating_bacteria', 'floating')),
+            # --- 5列标准行：按锚点定位 ---
+            _vgmp_anchor_fills = [
+                ('截面风速', 'wind_speed', 'wind_speed', 'air_velocity', '截面风速'),
+                ('换气次数', 'airchange', 'airchange', 'air_change_rate', '换气次数'),
+                ('风速不均匀度', 'wind_uniformity', 'wind_uniformity', 'speed_uniformity', '风速不均匀度'),
+                ('静压差', 'pressure', 'pressure', 'pressure_diff', '静压差'),
+                ('送风高效', 'hepa_leak', 'hepa_leak', '送风高效过滤器检漏'),
+                ('气流流型', None, 'airflow_pattern', '气流流型'),
+                ('温度', 'temperature', 'temperature', '温度'),
+                ('相对湿度', 'humidity', 'humidity', '相对湿度'),
+                ('平均照度', 'illumination_main_room', 'illumination', '照度', '平均照度'),
+                ('噪声', 'noise', 'noise', '噪声'),
+                ('沉降菌', 'settling', 'settle_bacteria', 'settling', '沉降菌'),
+                ('浮游菌', 'floating', 'floating_bacteria', '浮游菌'),
+                ('自净时间', 'self_purification', 'self_purification_time', '自净时间'),
             ]
-            for _ri, _label, _std_key, _concl_keys in _simple_rows:
-                _val = replacements.get(_label, '') or replacements.get(_label + '（平均菌落数）', '') or replacements.get(_label + '（平均浓度）', '')
-                _std = _vgmp_std(_std_key) or ''
+            for _af in _vgmp_anchor_fills:
+                _anchor = _af[0]
+                _std_key = _af[1]
+                _concl_keys = _af[2:]
+                _val = replacements.get(_anchor, '')
+                if not _val:
+                    for _ck in _concl_keys:
+                        _val = replacements.get(_ck, '')
+                        if _val: break
+                if not _val:
+                    continue
+                _fill = {3: _val}
+                if _std_key:
+                    _std_val = _vgmp_std(_std_key)
+                    if _std_val: _fill[2] = _std_val
                 _concl = _vgmp_concl(*_concl_keys)
-                _row = {}
-                if _std: _row[2] = _std
-                if _val: _row[3] = _val
-                if _concl: _row[4] = _concl
-                if _row: document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, _ri, _row, debug_notes=debug_notes)
+                if _concl: _fill[4] = _concl
+                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, _anchor, 1, _fill, debug_notes=debug_notes)
 
-            # --- ROW 19: 自净时间 ---
-            _sc_val = replacements.get('自净时间', '')
-            _sc_concl = _vgmp_concl('self_clean')
-            _r19 = {}
-            if _sc_val: _r19[3] = _sc_val
-            if _sc_concl: _r19[4] = _sc_concl
-            if _r19: document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 19, _r19, debug_notes=debug_notes)
-        elif type_id == 'food_workshop':
+            # --- 洁净度复合行 ---
+            _vp_std = _vgmp_std_ranges.get('particle') or {}
+            _vp_all = str(_vp_std.get('range', '') or '')
+            _vp_limit_05 = str(replacements.get('≥0.5μm标准', '') or '')
+            _vp_limit_5 = str(replacements.get('≥5μm标准', '') or '')
+            if _vp_all and ',' in _vp_all:
+                _parts = [x.strip() for x in _vp_all.split(',') if x.strip()]
+                if len(_parts) >= 1 and not _vp_limit_05:
+                    _vp_limit_05 = _parts[0].replace('μm', '㎛').replace('≤', '：≤') if '：' not in _parts[0] else _parts[0]
+                if len(_parts) >= 2 and not _vp_limit_5:
+                    _vp_limit_5 = _parts[1].replace('μm', '㎛').replace('≤', '：≤') if '：' not in _parts[1] else _parts[1]
+            if replacements.get('洁净度') or replacements.get('洁净度级别'):
+                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '洁净度级别', 1, {
+                    3: _vgrade_display, 5: _vgrade_display,
+                    6: _vgmp_concl('particle', '洁净度级别（悬浮粒子浓度）') or '合格',
+                }, debug_notes=debug_notes)
+            if replacements.get('≥0.5μm') or _vp_limit_05:
+                _05_fill = {3: _vgrade_display, 5: replacements.get('≥0.5μm', '')}
+                if _vp_limit_05: _05_fill[2] = _vp_limit_05
+                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '≥0.5', 1, _05_fill, debug_notes=debug_notes)
+            if replacements.get('0.5μmUCL'):
+                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '95%UCL', 1, {5: replacements.get('0.5μmUCL', '')}, debug_notes=debug_notes)
+            if replacements.get('≥5μm') or _vp_limit_5:
+                _5_fill = {5: replacements.get('≥5μm', '')}
+                if _vp_limit_5: _5_fill[2] = _vp_limit_5
+                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '≥5', 1, _5_fill, debug_notes=debug_notes)
+            if replacements.get('5μmUCL'):
+                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '95%UCL', 2, {5: replacements.get('5μmUCL', '')}, debug_notes=debug_notes)
+
             food_grade = str(replacements.get('食品等级', '') or replacements.get('洁净等级', '') or replacements.get('洁净级别', '') or replacements.get('洁净度设计级别', '') or replacements.get('洁净度', '') or replacements.get('洁净度级别', '') or '')
             food_grade_short = food_grade
             if '（' in food_grade_short:
@@ -5346,6 +5279,10 @@ def _fill_data_table_xml(table_xml: str, room_export: dict, export_payload: dict
         'work_illumination': '工作照度',
         'illumination_uniformity': '照度均匀度',
         'temp_diff': '温差',
+        'airflow_pattern': '气流流型',
+        'tightness': '严密性',
+        'appearance': '外观检验',
+        'door_interlock': '门互锁功能',
     }
     # 按锚点构建：锚点 → {range, conclusion}
     _anchor_judgement = {}
@@ -5382,6 +5319,10 @@ def _fill_data_table_xml(table_xml: str, room_export: dict, export_payload: dict
         '照度均匀度': replacements.get('照度均匀度', ''),
         '温差': replacements.get('温差', ''),
         '紫外线': replacements.get('紫外线', ''),
+        '气流流型': replacements.get('气流流型', ''),
+        '严密性': replacements.get('严密性', ''),
+        '外观检验': replacements.get('外观检验', ''),
+        '门互锁功能': replacements.get('门互锁功能', ''),
     }
 
     # === 辅助函数：向指定 tc 写入文本值 ===
