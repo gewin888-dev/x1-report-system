@@ -3934,7 +3934,7 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
         if replacements.get('洁净度结果'):
             document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '洁净度级别', 1, {
                 6: replacements.get('洁净度结果', ''),
-            }, debug_notes=debug_notes)
+            }, debug_notes=debug_notes, table_match_index=-1)
         if replacements.get('细菌浓度（沉降法）手术区'):
             document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '手术区', 2, {
                 4: replacements.get('细菌浓度（沉降法）手术区', ''),
