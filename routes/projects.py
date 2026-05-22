@@ -268,15 +268,27 @@ def admin_api_download_file():
     file_path = request.args.get('path', '')
     if not file_path:
         return jsonify({'success': False, 'error': '缺少path参数'}), 400
-    p = Path(file_path)
-    # 安全限制：只允许下载正式目录和 reports_x1 目录下的文件
-    allowed_prefixes = [
-        str(FORMAL_REPORTS_BASE), str(FORMAL_RECORDS_BASE), str(REPORTS_DIR)
+    try:
+        p = Path(file_path).expanduser().resolve(strict=False)
+    except Exception:
+        return jsonify({'success': False, 'error': '路径非法'}), 400
+    # 安全限制：仅允许正式目录和 reports_x1 目录下的真实文件，使用 canonical containment 校验
+    allowed_roots = [
+        FORMAL_REPORTS_BASE.resolve(),
+        FORMAL_RECORDS_BASE.resolve(),
+        REPORTS_DIR.resolve(),
     ]
-    resolved = str(p.resolve())
-    if not any(resolved.startswith(pfx) for pfx in allowed_prefixes):
+    allowed = False
+    for root in allowed_roots:
+        try:
+            p.relative_to(root)
+            allowed = True
+            break
+        except Exception:
+            continue
+    if not allowed:
         return jsonify({'success': False, 'error': '无权访问该路径'}), 403
-    if not p.exists():
+    if not p.exists() or not p.is_file():
         return jsonify({'success': False, 'error': '文件不存在'}), 404
     return send_file(str(p), as_attachment=True, download_name=p.name)
 
@@ -305,8 +317,13 @@ def admin_api_download_report_feedback_attachment(attachment_id):
             return jsonify({'success': False, 'error': '附件不存在或关联反馈已失效'}), 404
         if not row['project_id']:
             return jsonify({'success': False, 'error': '附件关联项目无效'}), 404
-        file_path = BASE_DIR / 'uploads_x1' / (row['relative_path'] or '')
-        if not file_path.exists():
+        uploads_root = (BASE_DIR / 'uploads_x1').resolve()
+        try:
+            file_path = (uploads_root / (row['relative_path'] or '')).resolve(strict=False)
+            file_path.relative_to(uploads_root)
+        except Exception:
+            return jsonify({'success': False, 'error': '附件路径非法'}), 400
+        if not file_path.exists() or not file_path.is_file():
             return jsonify({'success': False, 'error': '附件文件不存在'}), 404
         return send_file(str(file_path), as_attachment=True, download_name=row['original_name'] or row['stored_name'])
     finally:
@@ -817,8 +834,23 @@ def admin_api_download_report(project_id):
         idx = request.args.get('idx', 0, type=int)
         if idx < 0 or idx >= len(paths):
             return jsonify({'success': False, 'error': f'附件索引无效(0~{len(paths)-1})'}), 400
-        file_path = Path(paths[idx])
-        if not file_path.exists():
+        file_path = Path(paths[idx]).expanduser().resolve(strict=False)
+        allowed_roots = [
+            (BASE_DIR / 'uploaded_reports').resolve(),
+            REPORTS_DIR.resolve(),
+            FORMAL_REPORTS_BASE.resolve(),
+        ]
+        allowed = False
+        for root in allowed_roots:
+            try:
+                file_path.relative_to(root)
+                allowed = True
+                break
+            except Exception:
+                continue
+        if not allowed:
+            return jsonify({'success': False, 'error': '文件路径非法'}), 400
+        if not file_path.exists() or not file_path.is_file():
             return jsonify({'success': False, 'error': '文件已被移除'}), 404
         return send_file(str(file_path), as_attachment=True, download_name=file_path.name)
     finally:
@@ -843,9 +875,25 @@ def admin_api_delete_report_file(project_id):
             return jsonify({'success': False, 'error': '附件索引无效'}), 400
 
         removed_item = items.pop(idx)
-        removed_path = Path(removed_item.get('path') or '') if isinstance(removed_item, dict) else None
-        if removed_path and removed_path.exists():
-            removed_path.unlink()
+        removed_path = Path(removed_item.get('path') or '').expanduser().resolve(strict=False) if isinstance(removed_item, dict) and (removed_item.get('path') or '').strip() else None
+        if removed_path is not None:
+            allowed_roots = [
+                (BASE_DIR / 'uploaded_reports').resolve(),
+                REPORTS_DIR.resolve(),
+                FORMAL_REPORTS_BASE.resolve(),
+            ]
+            allowed = False
+            for root in allowed_roots:
+                try:
+                    removed_path.relative_to(root)
+                    allowed = True
+                    break
+                except Exception:
+                    continue
+            if not allowed:
+                return jsonify({'success': False, 'error': '附件路径非法'}), 400
+            if removed_path.exists() and removed_path.is_file():
+                removed_path.unlink()
 
         now = datetime.now().isoformat(timespec='seconds')
         current_version = int(project['version']) if 'version' in project.keys() and project['version'] else 1

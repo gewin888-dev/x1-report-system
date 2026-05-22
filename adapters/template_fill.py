@@ -2719,16 +2719,16 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
             def _np_concl(*keys):
                 return _normalize_conclusion_text(get_param_result(_np_pm, *keys))
 
-            # ROW 0: room name + date — 锚点定位到包含"受检区域名称"或"房间名称"的行
+            # ROW 0: room name + date（负压病房仅1套模板，直接按固定行列写入更稳）
             _r0 = {}
             _room_name = replacements.get('受检区域名称', '') or replacements.get('房间名称', '')
             if _room_name: _r0[1] = _room_name
             _det_date = replacements.get('检测日期', '')
             if _det_date: _r0[3] = _det_date
             if _r0:
-                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '受检区域名称', 0, _r0, debug_notes=debug_notes, table_match_index=-1)
+                document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 0, _r0, debug_notes=debug_notes)
 
-            # ROW 1: S/V — 锚点定位到包含"S"或"面积"的行
+            # ROW 1: S/V（负压病房仅1套模板，固定写入）
             _length = str(room.get('length', '') or '')
             _width = str(room.get('width', '') or '')
             _height = str(room.get('height', '') or '')
@@ -2737,7 +2737,7 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                     _s = round(float(_length) * float(_width), 1)
                     _v = round(float(_length) * float(_width) * float(_height), 0)
                     _sv_text = f'S（m²）={_s}                 V（m³）={int(_v)}'
-                    document_xml = _replace_table_row_cells_by_anchor_index(document_xml, 'S（m', 0, {1: _sv_text}, debug_notes=debug_notes, table_match_index=-1)
+                    document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 1, {1: _sv_text}, debug_notes=debug_notes)
                 except (ValueError, TypeError):
                     pass
 
@@ -2999,7 +2999,7 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                     if _std_val: _fill[2] = _std_val
                 _concl = _gmp_concl(*_concl_keys)
                 if _concl: _fill[4] = _concl
-                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, _anchor, 1, _fill, debug_notes=debug_notes, table_match_index=-1)
+                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, _anchor, 0, _fill, debug_notes=debug_notes, table_match_index=-1)
 
             # --- 洁净度复合行（7-8列合并结构，需专用逻辑）---
             _particle_std = _gmp_std_ranges.get('particle') or {}
@@ -3012,26 +3012,48 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                     _particle_limit_05 = _parts[0].replace('μm', '㎛').replace('≤', '：≤') if '：' not in _parts[0] else _parts[0]
                 if len(_parts) >= 2 and not _particle_limit_5:
                     _particle_limit_5 = _parts[1].replace('μm', '㎛').replace('≤', '：≤') if '：' not in _parts[1] else _parts[1]
-            # 洁净度标题行
-            if replacements.get('洁净度') or replacements.get('洁净度级别'):
-                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '洁净度级别', 1, {
-                    3: _grade_display, 5: _grade_display,
-                    6: _gmp_concl('particle', '洁净度级别（悬浮粒子浓度）') or '合格',
-                }, debug_notes=debug_notes, table_match_index=-1)
-            # ≥0.5μm 子行（按文本锚点定位）
-            if replacements.get('≥0.5μm') or _particle_limit_05:
-                _05_fill = {3: _grade_display, 5: replacements.get('≥0.5μm', '')}
-                if _particle_limit_05: _05_fill[2] = _particle_limit_05
-                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '≥0.5', 1, _05_fill, debug_notes=debug_notes, table_match_index=-1)
-            if replacements.get('0.5μmUCL'):
-                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '95%UCL', 1, {5: replacements.get('0.5μmUCL', '')}, debug_notes=debug_notes, table_match_index=-1)
-            # ≥5μm 子行
-            if replacements.get('≥5μm') or _particle_limit_5:
-                _5_fill = {5: replacements.get('≥5μm', '')}
-                if _particle_limit_5: _5_fill[2] = _particle_limit_5
-                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '≥5', 1, _5_fill, debug_notes=debug_notes, table_match_index=-1)
-            if replacements.get('5μmUCL'):
-                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '95%UCL', 2, {5: replacements.get('5μmUCL', '')}, debug_notes=debug_notes, table_match_index=-1)
+            _gmp_grade_norm = str(room.get('clean_class', '') or room.get('level_name', '') or replacements.get('洁净度级别', '') or '').strip()
+            _is_gmp_a_grade = _gmp_grade_norm == 'A级'
+            # GMP A级模板粒子块结构稳定：表3行6-10，直接定点，避免锚点序号串写
+            if _is_gmp_a_grade:
+                if replacements.get('洁净度') or replacements.get('洁净度级别'):
+                    document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 6, {
+                        3: _grade_display, 5: _grade_display,
+                        6: _gmp_concl('particle', '洁净度级别（悬浮粒子浓度）') or '合格',
+                    }, debug_notes=debug_notes, allow_blank=True)
+                if replacements.get('≥0.5μm') or _particle_limit_05:
+                    # A级模板该范围文本在合并单元格中结构脆弱；模板原值正确时不重写，只写等级/检测值
+                    _05_fill = {3: _grade_display, 5: replacements.get('≥0.5μm', '')}
+                    document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 7, _05_fill, debug_notes=debug_notes, allow_blank=True)
+                if replacements.get('0.5μmUCL'):
+                    document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 8, {5: replacements.get('0.5μmUCL', '')}, debug_notes=debug_notes, allow_blank=True)
+                if replacements.get('≥5μm') or _particle_limit_5:
+                    # A级模板范围格保持模板原文，避免破坏合并单元格 XML
+                    _5_fill = {5: replacements.get('≥5μm', '')}
+                    document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 9, _5_fill, debug_notes=debug_notes, allow_blank=True)
+                if replacements.get('5μmUCL'):
+                    document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 10, {5: replacements.get('5μmUCL', '')}, debug_notes=debug_notes, allow_blank=True)
+            else:
+                # 洁净度标题行
+                if replacements.get('洁净度') or replacements.get('洁净度级别'):
+                    document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '洁净度级别', 1, {
+                        3: _grade_display, 5: _grade_display,
+                        6: _gmp_concl('particle', '洁净度级别（悬浮粒子浓度）') or '合格',
+                    }, debug_notes=debug_notes, table_match_index=-1)
+                # ≥0.5μm 子行（按文本锚点定位）
+                if replacements.get('≥0.5μm') or _particle_limit_05:
+                    _05_fill = {3: _grade_display, 5: replacements.get('≥0.5μm', '')}
+                    if _particle_limit_05: _05_fill[2] = _particle_limit_05
+                    document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '≥0.5', 1, _05_fill, debug_notes=debug_notes, table_match_index=-1)
+                if replacements.get('0.5μmUCL'):
+                    document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '95%UCL', 1, {5: replacements.get('0.5μmUCL', '')}, debug_notes=debug_notes, table_match_index=-1)
+                # ≥5μm 子行
+                if replacements.get('≥5μm') or _particle_limit_5:
+                    _5_fill = {5: replacements.get('≥5μm', '')}
+                    if _particle_limit_5: _5_fill[2] = _particle_limit_5
+                    document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '≥5', 1, _5_fill, debug_notes=debug_notes, table_match_index=-1)
+                if replacements.get('5μmUCL'):
+                    document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '95%UCL', 2, {5: replacements.get('5μmUCL', '')}, debug_notes=debug_notes, table_match_index=-1)
         elif type_id == 'veterinary_gmp_workshop':
             # 兽药车间与GMP车间模板结构完全相同，共用填充逻辑
             _vgmp_std_ranges = {}
@@ -3118,7 +3140,7 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                     if _std_val: _fill[2] = _std_val
                 _concl = _vgmp_concl(*_concl_keys)
                 if _concl: _fill[4] = _concl
-                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, _anchor, 1, _fill, debug_notes=debug_notes, table_match_index=-1)
+                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, _anchor, 0, _fill, debug_notes=debug_notes, table_match_index=-1)
 
             # --- 洁净度复合行 ---
             _vp_std = _vgmp_std_ranges.get('particle') or {}
@@ -3131,23 +3153,45 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                     _vp_limit_05 = _parts[0].replace('μm', '㎛').replace('≤', '：≤') if '：' not in _parts[0] else _parts[0]
                 if len(_parts) >= 2 and not _vp_limit_5:
                     _vp_limit_5 = _parts[1].replace('μm', '㎛').replace('≤', '：≤') if '：' not in _parts[1] else _parts[1]
-            if replacements.get('洁净度') or replacements.get('洁净度级别'):
-                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '洁净度级别', 1, {
-                    3: _vgrade_display, 5: _vgrade_display,
-                    6: _vgmp_concl('particle', '洁净度级别（悬浮粒子浓度）') or '合格',
-                }, debug_notes=debug_notes, table_match_index=-1)
-            if replacements.get('≥0.5μm') or _vp_limit_05:
-                _05_fill = {3: _vgrade_display, 5: replacements.get('≥0.5μm', '')}
-                if _vp_limit_05: _05_fill[2] = _vp_limit_05
-                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '≥0.5', 1, _05_fill, debug_notes=debug_notes, table_match_index=-1)
-            if replacements.get('0.5μmUCL'):
-                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '95%UCL', 1, {5: replacements.get('0.5μmUCL', '')}, debug_notes=debug_notes, table_match_index=-1)
-            if replacements.get('≥5μm') or _vp_limit_5:
-                _5_fill = {5: replacements.get('≥5μm', '')}
-                if _vp_limit_5: _5_fill[2] = _vp_limit_5
-                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '≥5', 1, _5_fill, debug_notes=debug_notes, table_match_index=-1)
-            if replacements.get('5μmUCL'):
-                document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '95%UCL', 2, {5: replacements.get('5μmUCL', '')}, debug_notes=debug_notes, table_match_index=-1)
+            _vgmp_grade_norm = str(room.get('clean_class', '') or room.get('level_name', '') or replacements.get('洁净度级别', '') or '').strip()
+            _is_vgmp_a_grade = _vgmp_grade_norm == 'A级'
+            # 兽药A级模板比GMP A级多一行“气流流型”，粒子块固定在表3行8-12
+            if _is_vgmp_a_grade:
+                if replacements.get('洁净度') or replacements.get('洁净度级别'):
+                    document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 8, {
+                        3: _vgrade_display, 5: _vgrade_display,
+                        6: _vgmp_concl('particle', '洁净度级别（悬浮粒子浓度）') or '合格',
+                    }, debug_notes=debug_notes, allow_blank=True)
+                if replacements.get('≥0.5μm') or _vp_limit_05:
+                    # A级模板范围文本优先保留模板原文，仅填等级/检测值
+                    _05_fill = {3: _vgrade_display, 5: replacements.get('≥0.5μm', '')}
+                    document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 9, _05_fill, debug_notes=debug_notes, allow_blank=True)
+                if replacements.get('0.5μmUCL'):
+                    document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 10, {5: replacements.get('0.5μmUCL', '')}, debug_notes=debug_notes, allow_blank=True)
+                if replacements.get('≥5μm') or _vp_limit_5:
+                    # A级模板范围格保持模板原值，避免合并单元格结构受损
+                    _5_fill = {5: replacements.get('≥5μm', '')}
+                    document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 11, _5_fill, debug_notes=debug_notes, allow_blank=True)
+                if replacements.get('5μmUCL'):
+                    document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 12, {5: replacements.get('5μmUCL', '')}, debug_notes=debug_notes, allow_blank=True)
+            else:
+                if replacements.get('洁净度') or replacements.get('洁净度级别'):
+                    document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '洁净度级别', 1, {
+                        3: _vgrade_display, 5: _vgrade_display,
+                        6: _vgmp_concl('particle', '洁净度级别（悬浮粒子浓度）') or '合格',
+                    }, debug_notes=debug_notes, table_match_index=-1)
+                if replacements.get('≥0.5μm') or _vp_limit_05:
+                    _05_fill = {3: _vgrade_display, 5: replacements.get('≥0.5μm', '')}
+                    if _vp_limit_05: _05_fill[2] = _vp_limit_05
+                    document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '≥0.5', 1, _05_fill, debug_notes=debug_notes, table_match_index=-1)
+                if replacements.get('0.5μmUCL'):
+                    document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '95%UCL', 1, {5: replacements.get('0.5μmUCL', '')}, debug_notes=debug_notes, table_match_index=-1)
+                if replacements.get('≥5μm') or _vp_limit_5:
+                    _5_fill = {5: replacements.get('≥5μm', '')}
+                    if _vp_limit_5: _5_fill[2] = _vp_limit_5
+                    document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '≥5', 1, _5_fill, debug_notes=debug_notes, table_match_index=-1)
+                if replacements.get('5μmUCL'):
+                    document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '95%UCL', 2, {5: replacements.get('5μmUCL', '')}, debug_notes=debug_notes, table_match_index=-1)
 
             food_grade = str(replacements.get('食品等级', '') or replacements.get('洁净等级', '') or replacements.get('洁净级别', '') or replacements.get('洁净度设计级别', '') or replacements.get('洁净度', '') or replacements.get('洁净度级别', '') or '')
             food_grade_short = food_grade

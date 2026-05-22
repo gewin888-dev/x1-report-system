@@ -2449,21 +2449,48 @@ function showVersions(id){
 }
 function previewFile(filename){
   var overlay=document.createElement('div');
-  overlay.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:1001';
-  overlay.innerHTML='<div style="background:#fff;border-radius:8px;padding:24px;width:90%;max-width:1200px;max-height:90vh;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.15);display:flex;flex-direction:column"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #f0f0f0;flex-shrink:0"><div><h3 style="margin:0">加载中...</h3></div><div style="display:flex;gap:8px"><a id="preview-dl-btn" class="btn" style="display:none" target="_blank">下载文件</a><button class="btn" onclick="this.closest(\'.preview-overlay\').remove()">关闭</button></div></div><div id="preview-body" style="border:1px solid #d9d9d9;border-radius:4px;padding:40px 60px;background:#fff;flex:1;overflow-y:auto;font-family:SimSun,serif;font-size:14px;line-height:1.8;color:#000"><div class="empty">加载中...</div></div></div>';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:flex-start;justify-content:center;z-index:1001;padding:12px;padding-top:20px';
+  overlay.innerHTML='<div style="background:#fff;border-radius:12px;padding:12px;width:min(1200px,100%);max-width:100%;max-height:92vh;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.15);display:flex;flex-direction:column"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #f0f0f0;flex-shrink:0"><div style="min-width:0;flex:1"><h3 style="margin:0;font-size:15px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">加载中...</h3></div><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:58%"><button type="button" data-zoom-out class="btn">A-</button><button type="button" data-zoom-reset class="btn">100%</button><button type="button" data-zoom-in class="btn">A+</button><a id="preview-dl-btn" class="btn" style="display:none" target="_blank">下载文件</a><button class="btn" onclick="this.closest(\'.preview-overlay\').remove()">关闭</button></div></div><div id="preview-body" style="border:1px solid #d9d9d9;border-radius:8px;padding:12px;background:#f8fafc;flex:1;overflow:auto;-webkit-overflow-scrolling:touch;text-align:center"><div id="preview-stage" style="transform-origin:top center;transition:transform .15s ease;display:inline-block;margin:0 auto;text-align:left"><div class="empty">加载中...</div></div></div></div>';
   overlay.className='preview-overlay';
   overlay.addEventListener('click',function(e){if(e.target===overlay)overlay.remove();});
   document.body.appendChild(overlay);
+  var previewStage=overlay.querySelector('#preview-stage');
+  var zoomResetBtn=overlay.querySelector('[data-zoom-reset]');
+  var initialZoom=(window.innerWidth<=768?0.6:1);
+  var zoom=initialZoom;
+  function applyZoom(){
+    if(zoom<0.5) zoom=0.5;
+    if(zoom>2) zoom=2;
+    previewStage.style.transform='scale('+zoom+')';
+    zoomResetBtn.textContent=Math.round(zoom*100)+'%';
+  }
+  overlay.querySelector('[data-zoom-in]').onclick=function(){ zoom=Math.min(2, zoom+0.1); applyZoom(); };
+  overlay.querySelector('[data-zoom-out]').onclick=function(){ zoom=Math.max(0.5, zoom-0.1); applyZoom(); };
+  overlay.querySelector('[data-zoom-reset]').onclick=function(){ zoom=initialZoom; applyZoom(); };
   fetch('/api/preview/'+encodeURIComponent(filename)).then(function(r){return r.json()}).then(function(d){
-    if(!d.success){overlay.querySelector('#preview-body').innerHTML='<div class="empty" style="color:#ff4d4f">预览失败: '+(d.error||'未知错误')+'</div>';return;}
+    if(!d.success){previewStage.innerHTML='<div class="empty" style="color:#ff4d4f">预览失败: '+(d.error||'未知错误')+'</div>';return;}
     overlay.querySelector('h3').textContent=filename+' ('+((d.file_size||0)/1024).toFixed(1)+' KB)';
     var dlBtn=overlay.querySelector('#preview-dl-btn');
     dlBtn.href='/download/'+encodeURIComponent(filename);
     dlBtn.style.display='inline-flex';
-    var style='<style>.preview-content table{border-collapse:collapse;width:100%;margin:16px 0}.preview-content td,.preview-content th{border:1px solid #000;padding:8px;text-align:center}.preview-content p{margin:8px 0}.preview-content img{max-width:100%;height:auto}</style>';
-    overlay.querySelector('#preview-body').innerHTML=style+'<div class="preview-content">'+d.html+'</div>';
+    var style='<style>'+
+      '.preview-content{max-width:100%;overflow-wrap:anywhere;word-break:break-word;background:#fff;padding:16px 18px;font-family:SimSun,serif;font-size:14px;line-height:1.8;color:#000}' +
+      '.preview-content .table-scroll{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;margin:12px 0}' +
+      '.preview-content table{border-collapse:collapse;width:max-content;min-width:100%;margin:0;background:#fff}' +
+      '.preview-content td,.preview-content th{border:1px solid #000;padding:8px;text-align:center;vertical-align:top;white-space:pre-wrap;word-break:break-word}' +
+      '.preview-content p{margin:8px 0;overflow-wrap:anywhere;word-break:break-word}' +
+      '.preview-content img{max-width:100%;height:auto}' +
+      '.preview-content h1,.preview-content h2,.preview-content h3,.preview-content h4{line-height:1.5;overflow-wrap:anywhere}' +
+      '@media (max-width: 768px){' +
+      ' .preview-content{font-size:13px;line-height:1.7;padding:12px}' +
+      ' .preview-content td,.preview-content th{padding:6px;font-size:12px}' +
+      '}' +
+      '</style>';
+    var wrapped=(d.html||'').replace(/<table\b/gi,'<div class="table-scroll"><table').replace(/<\/table>/gi,'</table></div>');
+    previewStage.innerHTML=style+'<div class="preview-content">'+wrapped+'</div>';
+    applyZoom();
   }).catch(function(e){
-    overlay.querySelector('#preview-body').innerHTML='<div class="empty" style="color:#ff4d4f">网络错误: '+e.message+'</div>';
+    previewStage.innerHTML='<div class="empty" style="color:#ff4d4f">网络错误: '+e.message+'</div>';
   });
 }
 function previewTemplate(id,fname){
@@ -2642,7 +2669,7 @@ function viewStandard(code){
 }
 function loadMonitor(){
   Promise.all([
-    fetch('/api/x/health').then(r=>r.json()),
+    fetch('/admin/api/system_monitor', {credentials:'same-origin'}).then(r=>r.json()),
     fetch('/admin/api/stats').then(r=>r.json())
   ]).then(([health,stats])=>{
     document.getElementById('sys-version').textContent=health.version||'-';
@@ -2659,21 +2686,29 @@ function loadMonitor(){
     document.getElementById('mon-os').textContent=navigator.platform||'-';
     document.getElementById('mon-python').textContent='Python 3.9+';
     document.getElementById('mon-flask').textContent='Flask 2.x';
-    var sys=health.system||{};
+    var sys=(health&&health.system)||{};
     if(sys.cpu_percent!==undefined){
       document.getElementById('mon-cpu-text').textContent=sys.cpu_percent+'%';
       document.getElementById('mon-cpu-bar').style.width=sys.cpu_percent+'%';
+    }else{
+      document.getElementById('mon-cpu-text').textContent='未提供监控数据';
+      document.getElementById('mon-cpu-bar').style.width='0%';
     }
     if(sys.memory_percent!==undefined){
       document.getElementById('mon-mem-text').textContent=sys.memory_percent+'% ('+sys.memory_used_gb+' / '+sys.memory_total_gb+' GB)';
       document.getElementById('mon-mem-bar').style.width=sys.memory_percent+'%';
+    }else{
+      document.getElementById('mon-mem-text').textContent='未提供监控数据';
+      document.getElementById('mon-mem-bar').style.width='0%';
     }
     if(sys.disk_percent!==undefined){
       document.getElementById('mon-disk-text').textContent=sys.disk_percent+'% ('+sys.disk_used_gb+' / '+sys.disk_total_gb+' GB)';
       document.getElementById('mon-disk-bar').style.width=sys.disk_percent+'%';
+    }else{
+      document.getElementById('mon-disk-text').textContent='未提供监控数据';
+      document.getElementById('mon-disk-bar').style.width='0%';
     }
   }).catch(e=>console.error('加载监控数据失败:',e));
-  // 加载备份记录表格
   fetch('/admin/api/backups',{credentials:'same-origin'}).then(r=>r.json()).then(function(d){
     var tbody=document.getElementById('mon-backup-tbody');
     if(!tbody) return;

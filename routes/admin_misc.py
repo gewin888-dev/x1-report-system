@@ -421,17 +421,29 @@ def admin_api_users_update(username):
 def admin_api_users_delete(username):
     """删除用户（从数据库删除）"""
     from auth import delete_user
+    inspect_only = request.args.get('inspect_only', '').strip() in ('1', 'true', 'yes')
     with get_db() as conn:
         cursor = conn.cursor()
-        cursor.execute('SELECT display_name FROM users WHERE user_id = ?', (username,))
-        row = cursor.fetchone()
-        display_name = row['display_name'] if row else username
+        user_row = cursor.execute('SELECT user_id, display_name, role, department, is_active FROM users WHERE user_id = ?', (username,)).fetchone()
+        if not user_row:
+            return jsonify({'success': False, 'error': '用户不存在'}), 404
+        display_name = user_row['display_name'] if user_row else username
+        impact = {
+            'user_id': user_row['user_id'],
+            'display_name': user_row['display_name'] or '',
+            'role': user_row['role'] or '',
+            'department': user_row['department'] or '',
+            'is_active': bool(user_row['is_active']) if 'is_active' in user_row.keys() else True,
+            'protected_admin': username == 'admin',
+        }
+    if inspect_only:
+        return jsonify({'success': True, 'impact': impact})
     ok, msg = delete_user(username)
     if not ok:
         status = 400 if username == 'admin' else 404
         return jsonify({'success': False, 'error': msg}), status
     log_action(current_user.id if current_user.is_authenticated else 'unknown', '删除用户', username, f'姓名: {display_name}')
-    return jsonify({'success': True, 'message': f'用户 {display_name} 已删除'})
+    return jsonify({'success': True, 'message': f'用户 {display_name} 已删除', 'impact': impact})
 
 
 @admin_misc_bp.route('/admin/api/users/<username>/toggle_active', methods=['POST'])
@@ -550,6 +562,7 @@ def admin_api_logs_batch_delete():
     """批量删除操作日志"""
     data = request.get_json(silent=True) or {}
     log_ids = data.get('log_ids', [])
+    inspect_only = bool(data.get('inspect_only', False))
     if not isinstance(log_ids, list) or not log_ids:
         return jsonify({'success': False, 'error': '请选择要删除的日志'}), 400
     ids = [int(x) for x in log_ids if str(x).isdigit()]
@@ -558,11 +571,20 @@ def admin_api_logs_batch_delete():
     placeholders = ','.join('?' for _ in ids)
     with get_db() as conn:
         cursor = conn.cursor()
+        rows = cursor.execute(f'SELECT id, time, user, action, target FROM action_logs WHERE id IN ({placeholders}) ORDER BY id DESC', ids).fetchall()
+        impact = {
+            'requested_count': len(ids),
+            'matched_count': len(rows),
+            'missing_count': max(0, len(ids) - len(rows)),
+            'sample': [dict(r) for r in rows[:10]],
+        }
+        if inspect_only:
+            return jsonify({'success': True, 'impact': impact})
         cursor.execute(f'DELETE FROM action_logs WHERE id IN ({placeholders})', ids)
         deleted_count = cursor.rowcount
         conn.commit()
     log_action(current_user.id if current_user.is_authenticated else 'unknown', '批量删除操作日志', '', f'删除 {deleted_count} 条日志')
-    return jsonify({'success': True, 'deleted_count': deleted_count})
+    return jsonify({'success': True, 'deleted_count': deleted_count, 'impact': impact})
 
 
 @admin_misc_bp.route('/admin/api/logs/months')

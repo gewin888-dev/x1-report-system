@@ -20,6 +20,8 @@ DEFAULT_ROLE_PERMISSIONS = {
         'admin.settings.view', 'admin.records.export',
         'admin.records.open_local', 'admin.records.open_feishu',
         'admin.records.scope.self', 'admin.records.scope.department',
+        'admin.records.delete', 'admin.records.batch_delete', 'admin.trash.cleanup',
+        'admin.monitor.view', 'admin.maintenance.run',
         'tasks.execute',
         # 模板管理（细粒度）
         'admin.templates.registry.create', 'admin.templates.registry.update', 'admin.templates.registry.delete',
@@ -49,6 +51,7 @@ DEFAULT_ROLE_PERMISSIONS = {
         'admin.standards.view', 'admin.templates.view', 'admin.templates.preview',
         'admin.templates.variables', 'admin.docs.view', 'admin.users.view', 'record.scope.company',
         'admin.records.scope.company', 'admin.records.open_local', 'admin.records.open_feishu',
+        'admin.monitor.view',
         'tasks.execute',
         # 项目管理（只读）
         'admin.projects.view',

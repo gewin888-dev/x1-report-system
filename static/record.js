@@ -6185,11 +6185,24 @@ function fuzzyKeywordsMatch(fields, keyword){
 function previewReportFile(feishuUrl, localFilename, label){
     // 统一预览入口：优先飞书 → 失败回退本地（带来源提示）
     var overlay=document.createElement('div');
-    overlay.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10001';
-    overlay.innerHTML='<div style="background:#fff;border-radius:8px;padding:24px;width:92%;max-width:1200px;max-height:90vh;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.15);display:flex;flex-direction:column"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #f0f0f0;flex-shrink:0"><h3 style="margin:0">加载中...</h3><div style="display:flex;gap:8px"><span id="pv-source" style="display:none;padding:4px 10px;border-radius:4px;font-size:12px;align-self:center"></span><button onclick="this.closest(\'.pv-overlay\').remove()" style="padding:6px 14px;border:1px solid #d9d9d9;border-radius:4px;background:#fff;cursor:pointer;font-size:13px">关闭</button></div></div><div id="pv-body" style="border:1px solid #d9d9d9;border-radius:4px;padding:40px 60px;background:#fff;flex:1;overflow-y:auto;font-family:SimSun,serif;font-size:14px;line-height:1.8;color:#000"><p style="text-align:center;color:#999">加载中...</p></div></div>';
+    overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:flex-start;justify-content:center;z-index:10001;padding:12px;padding-top:20px';
+    overlay.innerHTML='<div style="background:#fff;border-radius:12px;padding:12px;width:min(1200px,100%);max-width:100%;max-height:92vh;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.15);display:flex;flex-direction:column"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #f0f0f0;flex-shrink:0"><h3 style="margin:0;font-size:15px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1">加载中...</h3><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:58%"><button type="button" data-zoom-out style="padding:6px 10px;border:1px solid #d9d9d9;border-radius:4px;background:#fff;cursor:pointer;font-size:12px">A-</button><button type="button" data-zoom-reset style="padding:6px 10px;border:1px solid #d9d9d9;border-radius:4px;background:#fff;cursor:pointer;font-size:12px">100%</button><button type="button" data-zoom-in style="padding:6px 10px;border:1px solid #d9d9d9;border-radius:4px;background:#fff;cursor:pointer;font-size:12px">A+</button><span id="pv-source" style="display:none;padding:4px 8px;border-radius:4px;font-size:11px;align-self:center"></span><button onclick="this.closest(\'.pv-overlay\').remove()" style="padding:6px 12px;border:1px solid #d9d9d9;border-radius:4px;background:#fff;cursor:pointer;font-size:12px">关闭</button></div></div><div id="pv-body" style="border:1px solid #d9d9d9;border-radius:8px;padding:12px;background:#f8fafc;flex:1;overflow:auto;-webkit-overflow-scrolling:touch"><div id="pv-stage" style="transform-origin:top center;transition:transform .15s ease;width:max-content;min-width:100%;margin:0 auto"><p style="text-align:center;color:#999">加载中...</p></div></div></div>';
     overlay.className='pv-overlay';
     overlay.addEventListener('click',function(e){if(e.target===overlay)overlay.remove();});
     document.body.appendChild(overlay);
+    var pvStage=overlay.querySelector('#pv-stage');
+    var zoomResetBtn=overlay.querySelector('[data-zoom-reset]');
+    var initialZoom=(window.innerWidth<=768?0.6:1);
+    var zoom=initialZoom;
+    function applyZoom(){
+        if(zoom<0.5) zoom=0.5;
+        if(zoom>2) zoom=2;
+        pvStage.style.transform='scale('+zoom+')';
+        zoomResetBtn.textContent=Math.round(zoom*100)+'%';
+    }
+    overlay.querySelector('[data-zoom-in]').onclick=function(){ zoom=Math.min(2, zoom+0.1); applyZoom(); };
+    overlay.querySelector('[data-zoom-out]').onclick=function(){ zoom=Math.max(0.5, zoom-0.1); applyZoom(); };
+    overlay.querySelector('[data-zoom-reset]').onclick=function(){ zoom=initialZoom; applyZoom(); };
 
     function renderPreview(d, source){
         overlay.querySelector('h3').textContent=(label||d.filename||'预览')+' ('+((d.file_size||0)/1024).toFixed(1)+' KB)';
@@ -6201,19 +6214,30 @@ function previewReportFile(feishuUrl, localFilename, label){
             srcEl.textContent='💾 来源：本地文件';
             srcEl.style.cssText='display:inline-block;padding:4px 10px;border-radius:4px;font-size:12px;background:#fff7e6;color:#d46b08;border:1px solid #ffd591;';
         }
-        overlay.querySelector('#pv-body').innerHTML='<style>.pv-c table{border-collapse:collapse;width:100%;margin:16px 0}.pv-c td,.pv-c th{border:1px solid #000;padding:8px;text-align:center}.pv-c p{margin:8px 0}</style><div class="pv-c">'+d.html+'</div>';
+        var style='<style>'+
+            '.pv-c{max-width:100%;overflow-wrap:anywhere;word-break:break-word;background:#fff;padding:16px 18px;font-family:SimSun,serif;font-size:14px;line-height:1.8;color:#000}' +
+            '.pv-c .table-scroll{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;margin:12px 0}' +
+            '.pv-c table{border-collapse:collapse;width:max-content;min-width:100%;margin:0;background:#fff}' +
+            '.pv-c td,.pv-c th{border:1px solid #000;padding:8px;text-align:center;vertical-align:top;white-space:pre-wrap;word-break:break-word}' +
+            '.pv-c p{margin:8px 0;overflow-wrap:anywhere;word-break:break-word}' +
+            '.pv-c img{max-width:100%;height:auto}' +
+            '@media (max-width:768px){.pv-c{font-size:13px;line-height:1.7;padding:12px}.pv-c td,.pv-c th{padding:6px;font-size:12px}}' +
+            '</style>';
+        var wrapped=(d.html||'').replace(/<table\b/gi,'<div class="table-scroll"><table').replace(/<\/table>/gi,'</table></div>');
+        pvStage.innerHTML=style+'<div class="pv-c">'+wrapped+'</div>';
+        applyZoom();
     }
 
     function fallbackToLocal(){
         if(!localFilename){
-            overlay.querySelector('#pv-body').innerHTML='<p style="text-align:center;color:#ff4d4f">飞书预览失败且本地文件不可用</p>';
+            pvStage.innerHTML='<p style="text-align:center;color:#ff4d4f">飞书预览失败且本地文件不可用</p>';
             return;
         }
         fetch('/api/preview/'+encodeURIComponent(localFilename),{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){
-            if(!d.success){overlay.querySelector('#pv-body').innerHTML='<p style="text-align:center;color:#ff4d4f">预览失败: '+(d.error||'未知错误')+'</p>';return;}
+            if(!d.success){pvStage.innerHTML='<p style="text-align:center;color:#ff4d4f">预览失败: '+(d.error||'未知错误')+'</p>';return;}
             renderPreview(d, 'local');
         }).catch(function(e){
-            overlay.querySelector('#pv-body').innerHTML='<p style="text-align:center;color:#ff4d4f">本地预览失败: '+e.message+'</p>';
+            pvStage.innerHTML='<p style="text-align:center;color:#ff4d4f">本地预览失败: '+e.message+'</p>';
         });
     }
 
@@ -6243,19 +6267,44 @@ function previewReportFile(feishuUrl, localFilename, label){
 
 function previewFile(filename){
     var overlay=document.createElement('div');
-    overlay.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:10001';
-    overlay.innerHTML='<div style="background:#fff;border-radius:8px;padding:24px;width:92%;max-width:1200px;max-height:90vh;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.15);display:flex;flex-direction:column"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #f0f0f0;flex-shrink:0"><h3 style="margin:0">加载中...</h3><div style="display:flex;gap:8px"><a id="pv-dl" style="display:none;padding:6px 14px;background:#1890ff;color:white;border-radius:4px;font-size:13px;text-decoration:none" target="_blank">下载</a><button onclick="this.closest(\'.pv-overlay\').remove()" style="padding:6px 14px;border:1px solid #d9d9d9;border-radius:4px;background:#fff;cursor:pointer;font-size:13px">关闭</button></div></div><div id="pv-body" style="border:1px solid #d9d9d9;border-radius:4px;padding:40px 60px;background:#fff;flex:1;overflow-y:auto;font-family:SimSun,serif;font-size:14px;line-height:1.8;color:#000"><p style="text-align:center;color:#999">加载中...</p></div></div>';
+    overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.5);display:flex;align-items:flex-start;justify-content:center;z-index:10001;padding:12px;padding-top:20px';
+    overlay.innerHTML='<div style="background:#fff;border-radius:12px;padding:12px;width:min(1200px,100%);max-width:100%;max-height:92vh;overflow:hidden;box-shadow:0 4px 12px rgba(0,0,0,0.15);display:flex;flex-direction:column"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #f0f0f0;flex-shrink:0"><h3 style="margin:0;font-size:15px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1">加载中...</h3><div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:58%"><button type="button" data-zoom-out style="padding:6px 10px;border:1px solid #d9d9d9;border-radius:4px;background:#fff;cursor:pointer;font-size:12px">A-</button><button type="button" data-zoom-reset style="padding:6px 10px;border:1px solid #d9d9d9;border-radius:4px;background:#fff;cursor:pointer;font-size:12px">100%</button><button type="button" data-zoom-in style="padding:6px 10px;border:1px solid #d9d9d9;border-radius:4px;background:#fff;cursor:pointer;font-size:12px">A+</button><a id="pv-dl" style="display:none;padding:6px 12px;background:#1890ff;color:white;border-radius:4px;font-size:12px;text-decoration:none" target="_blank">下载</a><button onclick="this.closest(\'.pv-overlay\').remove()" style="padding:6px 12px;border:1px solid #d9d9d9;border-radius:4px;background:#fff;cursor:pointer;font-size:12px">关闭</button></div></div><div id="pv-body" style="border:1px solid #d9d9d9;border-radius:8px;padding:12px;background:#f8fafc;flex:1;overflow:auto;-webkit-overflow-scrolling:touch;text-align:center"><div id="pv-stage" style="transform-origin:top center;transition:transform .15s ease;display:inline-block;margin:0 auto;text-align:left"><p style="text-align:center;color:#999">加载中...</p></div></div></div>';
     overlay.className='pv-overlay';
     overlay.addEventListener('click',function(e){if(e.target===overlay)overlay.remove();});
     document.body.appendChild(overlay);
+    var pvStage=overlay.querySelector('#pv-stage');
+    var zoomResetBtn=overlay.querySelector('[data-zoom-reset]');
+    var initialZoom=(window.innerWidth<=768?0.6:1);
+    var zoom=initialZoom;
+    function applyZoom(){
+        if(zoom<0.5) zoom=0.5;
+        if(zoom>2) zoom=2;
+        pvStage.style.transform='scale('+zoom+')';
+        zoomResetBtn.textContent=Math.round(zoom*100)+'%';
+    }
+    overlay.querySelector('[data-zoom-in]').onclick=function(){ zoom=Math.min(2, zoom+0.1); applyZoom(); };
+    overlay.querySelector('[data-zoom-out]').onclick=function(){ zoom=Math.max(0.5, zoom-0.1); applyZoom(); };
+    overlay.querySelector('[data-zoom-reset]').onclick=function(){ zoom=initialZoom; applyZoom(); };
     fetch('/api/preview/'+encodeURIComponent(filename),{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){
-        if(!d.success){overlay.querySelector('#pv-body').innerHTML='<p style="text-align:center;color:#ff4d4f">预览失败: '+(d.error||'未知错误')+'</p>';return;}
+        if(!d.success){pvStage.innerHTML='<p style="text-align:center;color:#ff4d4f">预览失败: '+(d.error||'未知错误')+'</p>';return;}
         overlay.querySelector('h3').textContent=filename+' ('+((d.file_size||0)/1024).toFixed(1)+' KB)';
         var dl=overlay.querySelector('#pv-dl');dl.href='/download/'+encodeURIComponent(filename);dl.style.display='inline-block';
-        overlay.querySelector('#pv-body').innerHTML='<style>.pv-c table{border-collapse:collapse;width:100%;margin:16px 0}.pv-c td,.pv-c th{border:1px solid #000;padding:8px;text-align:center}.pv-c p{margin:8px 0}</style><div class="pv-c">'+d.html+'</div>';
+        var style='<style>'+
+            '.pv-c{max-width:100%;overflow-wrap:anywhere;word-break:break-word;background:#fff;padding:16px 18px;font-family:SimSun,serif;font-size:14px;line-height:1.8;color:#000}' +
+            '.pv-c .table-scroll{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;margin:12px 0}' +
+            '.pv-c table{border-collapse:collapse;width:max-content;min-width:100%;margin:0;background:#fff}' +
+            '.pv-c td,.pv-c th{border:1px solid #000;padding:8px;text-align:center;vertical-align:top;white-space:pre-wrap;word-break:break-word}' +
+            '.pv-c p{margin:8px 0;overflow-wrap:anywhere;word-break:break-word}' +
+            '.pv-c img{max-width:100%;height:auto}' +
+            '@media (max-width:768px){.pv-c{font-size:13px;line-height:1.7;padding:12px}.pv-c td,.pv-c th{padding:6px;font-size:12px}}' +
+            '</style>';
+        var wrapped=(d.html||'').replace(/<table\b/gi,'<div class="table-scroll"><table').replace(/<\/table>/gi,'</table></div>');
+        pvStage.innerHTML=style+'<div class="pv-c">'+wrapped+'</div>';
+        applyZoom();
     }).catch(function(e){
-        overlay.querySelector('#pv-body').innerHTML='<p style="text-align:center;color:#ff4d4f">网络错误: '+e.message+'</p>';
+        pvStage.innerHTML='<p style="text-align:center;color:#ff4d4f">网络错误: '+e.message+'</p>';
     });
+    applyZoom();
 }
 
 function buildRoomHierarchySummary(room){

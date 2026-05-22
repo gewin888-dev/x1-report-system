@@ -1347,6 +1347,7 @@ def api_x_passbox_sample():
 
 @app.route('/download/<filename>')
 @login_required
+@require_permission('admin.files.download')
 def download_file(filename):
     """下载导出的报告文件"""
     if not _setting_enabled('security.allow_file_download', True):
@@ -1645,24 +1646,27 @@ def admin_api_backups():
 @require_permission('admin.maintenance.run')
 def admin_api_delete_backup(filename):
     """物理删除指定备份文件"""
-    import os
     if '..' in filename or '/' in filename or '\\' in filename:
         return jsonify({'success': False, 'error': '非法文件名'}), 400
     from helpers.settings_utils import _load_system_settings
     settings_values = _load_system_settings()
-    backup_dir = str(Path(str(settings_values.get('paths.backup_dir', {}).get('value', BASE_DIR / 'backups'))).expanduser())
-    # 在根目录和子目录中查找
+    backup_root = Path(str(settings_values.get('paths.backup_dir', {}).get('value', BASE_DIR / 'backups'))).expanduser().resolve()
+    search_roots = [backup_root] + [(backup_root / s).resolve() for s in ('code', 'data', 'full')]
     target_path = None
-    for scan in [backup_dir] + [os.path.join(backup_dir, s) for s in ('code', 'data', 'full')]:
-        candidate = os.path.join(scan, filename)
-        if os.path.isfile(candidate):
+    for root in search_roots:
+        try:
+            candidate = (root / filename).resolve(strict=False)
+            candidate.relative_to(root)
+        except Exception:
+            continue
+        if candidate.exists() and candidate.is_file():
             target_path = candidate
             break
     if not target_path:
         return jsonify({'success': False, 'error': '文件不存在'}), 404
     try:
-        os.remove(target_path)
-        log_action(current_user.id, '删除备份文件', 'system_settings', json.dumps({'filename': filename, 'path': target_path}, ensure_ascii=False))
+        target_path.unlink()
+        log_action(current_user.id, '删除备份文件', 'system_settings', json.dumps({'filename': filename, 'path': str(target_path)}, ensure_ascii=False))
         return jsonify({'success': True, 'filename': filename})
     except Exception as e:
         return jsonify({'success': False, 'error': f'删除失败: {e}'}), 500
@@ -1671,9 +1675,19 @@ def admin_api_delete_backup(filename):
 # ==================== /api/x/health 健康检查 ====================
 @app.route('/api/x/health')
 def api_x_health():
-    remote = (request.headers.get('X-Forwarded-For') or request.remote_addr or '').split(',')[0].strip()
-    if remote not in {'127.0.0.1', '::1', 'localhost'} and not current_user.is_authenticated:
-        return redirect(url_for('login_page', next=request.url))
+    # 兼顾运维探活与安全：匿名仅返回极简健康状态，避免泄露运行路径与备份信息。
+    return jsonify({
+        'success': True,
+        'app': 'X1',
+        'version': APP_VERSION,
+        'status': 'ok',
+    })
+
+
+@app.route('/admin/api/system_monitor')
+@login_required
+@require_permission('admin.stats.view')
+def admin_api_system_monitor():
     try:
         cpu_percent = psutil.cpu_percent(interval=0.1)
         memory = psutil.virtual_memory()
@@ -1687,7 +1701,7 @@ def api_x_health():
             'disk_used_gb': round(disk.used / (1024**3), 2),
             'disk_total_gb': round(disk.total / (1024**3), 2),
         }
-    except:
+    except Exception:
         system_info = {}
     from helpers.settings_utils import _load_system_settings, _get_latest_backup
     settings_values = _load_system_settings()
@@ -1710,11 +1724,6 @@ def api_x_health():
         'backup_dir': str(backup_dir_path),
         'backup_latest': _get_latest_backup(backup_dir_path),
         'system': system_info,
-        'isolation': {
-            'shares_v_runtime': False,
-            'shares_t_runtime': False,
-            'api_prefix': '/api/x/*',
-        },
     })
 
 
@@ -1769,6 +1778,7 @@ def admin_api_workspace_doc():
 
 @app.route('/admin/api/records/<record_id>', methods=['DELETE'])
 @login_required
+@require_permission('admin.records.delete')
 def admin_api_delete_record(record_id):
     if not _setting_enabled('security.allow_delete_record', True):
         return jsonify({'success': False, 'error': '系统设置已禁止删除记录'}), 403
@@ -1781,6 +1791,7 @@ def admin_api_delete_record(record_id):
 
 @app.route('/admin/api/cleanup_trash', methods=['POST'])
 @login_required
+@require_permission('admin.logs.delete')
 def admin_api_cleanup_trash():
     if not _setting_enabled('security.allow_cleanup_trash', True):
         return jsonify({'success': False, 'error': '系统设置已禁止清空回收站'}), 403

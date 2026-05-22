@@ -72,7 +72,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-
 <script>
 async function loadMonitor(){
   try{
-    const health = await fetch('/api/x/health').then(r => r.json());
+    const health = await fetch('/admin/api/system_monitor', {credentials:'same-origin'}).then(r => r.json());
     const stats = await fetch('/admin/api/stats').then(r => r.json());
     const users = await fetch('/admin/api/users').then(r => r.json());
     
