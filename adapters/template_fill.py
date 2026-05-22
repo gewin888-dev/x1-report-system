@@ -5194,12 +5194,12 @@ def _fill_data_table_xml(table_xml: str, room_export: dict, export_payload: dict
     """
     # 构建虚拟 payload
     virtual_payload = dict(export_payload)
-    virtual_payload['room'] = room_export['room']
-    virtual_payload['template_rule'] = room_export['template_rule']
-    virtual_payload['template_resource'] = room_export['template_resource']
-    virtual_payload['report_context'] = room_export['report_context']
-    virtual_payload['clean_class_semantics'] = room_export['clean_class_semantics']
-    virtual_payload['judgement_result'] = room_export['judgement_result']
+    virtual_payload['room'] = room_export.get('room') or {}
+    virtual_payload['template_rule'] = room_export.get('template_rule') or {}
+    virtual_payload['template_resource'] = room_export.get('template_resource') or {}
+    virtual_payload['report_context'] = room_export.get('report_context') or {}
+    virtual_payload['clean_class_semantics'] = room_export.get('clean_class_semantics') or {}
+    virtual_payload['judgement_result'] = room_export.get('judgement_result') or {}
 
     fill_plan = _build_placeholder_fill_plan(virtual_payload)
     replacements = {k: v for k, v in fill_plan}
