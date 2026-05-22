@@ -478,17 +478,24 @@ def admin_api_business_project_delete(project_id):
             return jsonify({'success': False, 'error': '项目不存在'}), 404
         task_row = conn.execute('SELECT COUNT(*) AS cnt FROM project_tasks WHERE project_id=?', [project_id]).fetchone()
         feedback_row = conn.execute('SELECT COUNT(*) AS cnt FROM report_feedback WHERE project_id=?', [project_id]).fetchone()
+        urge_row = conn.execute('SELECT COUNT(*) AS cnt FROM project_urge_logs WHERE project_id=?', [project_id]).fetchone()
+        cfb_row = conn.execute('SELECT COUNT(*) AS cnt FROM client_feedback WHERE project_id=?', [project_id]).fetchone()
         attachment_count = len(_parse_report_file_list((project['report_file_path'] if 'report_file_path' in project.keys() else '') or ''))
         impact = {
             'project_name': project['project_name'] or '',
             'client_name': project['client_name'] or '',
             'task_count': task_row['cnt'] if task_row else 0,
             'feedback_count': feedback_row['cnt'] if feedback_row else 0,
+            'urge_count': urge_row['cnt'] if urge_row else 0,
+            'client_feedback_count': cfb_row['cnt'] if cfb_row else 0,
             'attachment_count': attachment_count,
         }
         if inspect_only:
             return jsonify({'success': True, 'impact': impact})
         conn.execute('DELETE FROM project_tasks WHERE project_id=?', [project_id])
+        conn.execute('DELETE FROM project_urge_logs WHERE project_id=?', [project_id])
+        conn.execute('DELETE FROM report_feedback WHERE project_id=?', [project_id])
+        conn.execute('DELETE FROM client_feedback WHERE project_id=?', [project_id])
         conn.execute('DELETE FROM business_projects WHERE id=?', [project_id])
         conn.commit()
         try:

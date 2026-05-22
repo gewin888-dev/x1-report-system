@@ -67,7 +67,8 @@ def init_database():
         except sqlite3.OperationalError:
             pass
 
-        # 角色权限表
+        # [已废弃] 角色权限旧表 — 运行时权限已完全由 role_permission_final 驱动
+        # 保留 CREATE 语句仅防止旧代码引用时报错，新逻辑不写入此表
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS role_permissions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -137,7 +138,8 @@ def init_database():
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_perf_time ON performance_logs(time)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_perf_op ON performance_logs(operation)')
         
-        # 检测记录表
+        # [已废弃] 检测记录表 — 业务数据已迁移到 data/x1_data.db 的 business 表
+        # 此表无运行时写入，保留仅防止旧代码引用时报错
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS inspection_records (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
