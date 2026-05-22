@@ -1,6 +1,6 @@
 # X1 检测报告生成系统 - 架构文档
 
-版本：X4.8  
+版本：X4.8.2  
 更新时间：2026-05-22
 
 ---
@@ -41,7 +41,7 @@ X1 是面向洁净检测业务的生产系统，当前运行核心覆盖：
 - 脚本：`static/customer.js`
 - 主要职责：客户资料、项目进度、历史记录、反馈
 
-> 说明：项目中存在历史构建链（`static/src/record/*` → `static/dist/record.bundle.js`），但当前员工端运行真入口仍应以 `record_index.html` 实际加载内容为准。
+> 说明：项目中曾存在历史构建链（`src/record/*` → `dist/record.bundle.js`），该构建链已被清理（`src/record/` 目录不存在），当前员工端运行入口以 `record_index.html` 实际加载的 `static/record.js` 为准。
 
 ---
 
@@ -104,7 +104,17 @@ X1 是面向洁净检测业务的生产系统，当前运行核心覆盖：
 读取草稿 → 载荷归一化 → 页面回填
 
 ### 3. 导出链
-提交导出 → 构建导出上下文 → 生成 Word/Excel → 落盘
+提交导出 → 构建导出上下文 → 模板填充引擎 → 生成 Word → 落盘
+
+导出引擎核心：
+- `adapters/template_fill.py` — 填充引擎主模块
+  - `build_template_filled_docx()` — 单房间模板填充
+  - `build_mixed_report_docx()` — 混合报告装配（统一路径，所有领域）
+  - `_fill_data_table_xml()` — 数据表二次填充（锚点定位）
+  - `_replace_table_row_cells_by_anchor_index()` — 按文本锚点定位行写值
+- `routes/export.py` — 导出入口、混报校验
+- `template_bundles/` — 34 个模板文件（按领域/等级分组）
+- `template_rules.py` — 模板规则映射
 
 ### 4. 项目任务链
 项目创建/维护 → 派单 → 员工进入录入 → 检测中 → 完成任务 → 检测完成 → 报告编制推进

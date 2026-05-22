@@ -43,7 +43,7 @@
 - 以后台守护进程方式启动 X1 服务
 - 自动创建日志目录 `logs/`（守护脚本日志）和 `logs_x1/`（应用日志）
 - 守护脚本日志按日期命名：`logs/x1_YYYYMMDD.log`
-- 应用日志：`logs_x1/app.log`
+- 应用日志：`logs_x1/app_YYYYMMDD.log`（按天分卷）
 - 人工运维日志：`logs_x1/manual_restart_YYYYMMDD_HHMMSS.log`
 - PID 文件：`x1.pid`
 - 启动前会检查 8082 端口是否已被其他进程占用
@@ -200,7 +200,7 @@ launchctl load ~/Library/LaunchAgents/com.x1.daemon.plist
 2. 执行标准重启：`./restart_x1_daemon.sh`
 3. 检查端口占用：`lsof -nP -iTCP:8082 -sTCP:LISTEN`
 4. 检查守护脚本日志：`tail -50 logs/x1_$(date +%Y%m%d).log`
-5. 检查应用日志：`tail -50 logs_x1/app.log`
+5. 检查应用日志：`tail -50 logs_x1/app_$(date +%Y%m%d).log`
 6. 检查最近诊断日志：`ls -t logs_x1/manual_restart_*.log | head -1 | xargs tail -80`
 7. 必要时前台启动测试：`python3 app_x1.py`
 
