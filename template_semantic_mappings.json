@@ -84,8 +84,8 @@
       "food/food_workshop/grade/1-2"
     ],
     "default_template_key": "food/food_workshop/grade/1-2",
-    "updated_at": "2026-05-18 10:31:27",
-    "updated_by": "slx"
+    "updated_at": "2026-05-22 11:37:20",
+    "updated_by": "admin"
   },
   "food.food_workshop.grade.2": {
     "semantic_key": "food.food_workshop.grade.2",
@@ -94,8 +94,8 @@
       "food/food_workshop/grade/2-2"
     ],
     "default_template_key": "food/food_workshop/grade/2-2",
-    "updated_at": "2026-05-18 10:31:33",
-    "updated_by": "slx"
+    "updated_at": "2026-05-22 11:37:17",
+    "updated_by": "admin"
   },
   "food.food_workshop.grade.3": {
     "semantic_key": "food.food_workshop.grade.3",
@@ -103,8 +103,8 @@
       "food/food_workshop/grade/3"
     ],
     "default_template_key": "food/food_workshop/grade/3",
-    "updated_at": "2026-05-18 10:31:40",
-    "updated_by": "slx"
+    "updated_at": "2026-05-22 11:37:15",
+    "updated_by": "admin"
   },
   "food.food_workshop.grade.4": {
     "semantic_key": "food.food_workshop.grade.4",
@@ -112,8 +112,8 @@
       "food/food_workshop/grade/4"
     ],
     "default_template_key": "food/food_workshop/grade/4",
-    "updated_at": "2026-05-18 10:31:46",
-    "updated_by": "slx"
+    "updated_at": "2026-05-22 11:37:10",
+    "updated_by": "admin"
   },
   "electronics.electronics_workshop.iso.5": {
     "semantic_key": "electronics.electronics_workshop.iso.5",

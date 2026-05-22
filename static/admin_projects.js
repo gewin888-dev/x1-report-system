@@ -425,8 +425,17 @@ function uploadReport() {
     if (d.success) {
       if (statusEl) { statusEl.textContent = '✅ ' + d.message; statusEl.style.color = '#389e0d'; }
       fileInput.value = '';
-      loadReportFileList(projectId);
-      loadProjects();
+      return fetch('/admin/api/business_projects/' + projectId, { credentials: 'same-origin' })
+        .then(function(r){ return r.json(); })
+        .then(function(detail){
+          if (detail && detail.success && detail.item) {
+            fillProjectForm(detail.item || {});
+            showProjectMeta(detail.item || {});
+          }
+          loadReportFileList(projectId);
+          loadProjectTasks(projectId);
+          loadProjects();
+        });
     } else {
       if (statusEl) { statusEl.textContent = '❌ ' + (d.error || '上传失败'); statusEl.style.color = '#cf1322'; }
     }

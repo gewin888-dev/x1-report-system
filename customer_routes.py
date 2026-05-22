@@ -535,6 +535,18 @@ def customer_get_projects():
                 continue
             feedback_info = feedback_stats.get(pid, {})
             latest_feedback = latest_feedback_map.get(pid)
+            report_file_raw = (row['report_file_path'] if 'report_file_path' in row.keys() else '') or ''
+            customer_visible_files = _parse_customer_report_files(report_file_raw, rs)
+            visible_type = 'none'
+            visible_label = ''
+            if customer_visible_files:
+                first_type = (customer_visible_files[0].get('file_type') or '').strip()
+                if first_type == 'final':
+                    visible_type = 'final'
+                    visible_label = '正式报告'
+                else:
+                    visible_type = 'draft'
+                    visible_label = '审核稿'
             projects.append({
                 'id': pid,
                 'project_no': row['project_no'] or '',
@@ -557,6 +569,10 @@ def customer_get_projects():
                 'feedback_count': feedback_info.get('count', 0),
                 'latest_feedback': latest_feedback,
                 'feedback_has_attachments': bool(latest_feedback and (latest_feedback.get('attachment_count') or 0) > 0),
+                'has_customer_visible_report': bool(customer_visible_files),
+                'customer_visible_report_type': visible_type,
+                'customer_visible_report_label': visible_label,
+                'report_files_total': len(customer_visible_files),
                 'created_at': row['created_at'] or '',
                 'updated_at': row['updated_at'] or '',
             })

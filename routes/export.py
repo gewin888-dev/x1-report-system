@@ -175,6 +175,19 @@ def api_x_submit_export():
     if validation_error:
         return jsonify({'success': False, 'error': validation_error}), 400
     export_payload = _build_export_payload(project)
+    rooms = project.get('rooms') or []
+    if rooms:
+        domains = {str(project.get('domain', '') or '').strip()}
+        type_ids = set()
+        for room in rooms:
+            if isinstance(room, dict):
+                type_ids.add(str(room.get('type_id', '') or '').strip())
+        domains.discard('')
+        type_ids.discard('')
+        if len(domains) > 1:
+            return jsonify({'success': False, 'error': '不允许跨领域混合导出报告'}), 400
+        if len(type_ids) > 1:
+            return jsonify({'success': False, 'error': '不允许跨检测类型混合导出报告'}), 400
     if export_payload.get('export_type') != (project.get('rooms') or [{}])[0].get('type_id'):
         return jsonify({'success': False, 'error': 'export_type 与 room.type_id 不一致'}), 400
     export_id = f"X1EXPORT_{datetime.now().strftime('%Y%m%d%H%M%S')}"

@@ -532,14 +532,33 @@ def admin_api_upload_report(project_id):
 
         # 根据当前状态判断附件类型和目标状态
         current_rs = (project['report_status'] or '').strip()
-        # 允许前端显式指定 file_type（可选）
+        # 允许前端显式指定 file_type（可选），但必须受业务状态约束
         explicit_type = ''
         if request.content_type and 'multipart' in request.content_type:
             explicit_type = (request.form.get('file_type') or '').strip()
 
-        if explicit_type in ('draft', 'final'):
-            file_type = explicit_type
-        elif current_rs in ('客户已确认',):
+        # 严格业务规则：
+        # 1) 只有“客户已确认”后，才允许上传最终稿(final)
+        # 2) 客户未确认前（包括反馈打回后再次上传），一律只能上传审核稿(draft)
+        if explicit_type == 'final' and current_rs != '客户已确认':
+            try:
+                log_action(
+                    getattr(current_user, 'id', 'system'),
+                    '上传项目报告-非法最终稿尝试',
+                    f'business_project:{project_id}',
+                    json.dumps({
+                        'project_id': project_id,
+                        'project_name': project['project_name'],
+                        'client_name': project['client_name'],
+                        'current_report_status': current_rs,
+                        'explicit_type': explicit_type,
+                    }, ensure_ascii=False)
+                )
+            except Exception:
+                pass
+            return jsonify({'success': False, 'error': '客户未确认前只能上传审核稿，不能上传最终稿'}), 400
+
+        if current_rs == '客户已确认':
             file_type = 'final'
         else:
             file_type = 'draft'
@@ -803,7 +822,7 @@ def admin_api_download_report(project_id):
 @login_required
 @require_permission('admin.projects.update')
 def admin_api_delete_report_file(project_id):
-    """删除项目的某个报告附件"""
+    """删除项目的某个报告附件，保持新格式对象数组，不回退成旧路径数组。"""
     conn = get_x1_data_conn()
     try:
         project = conn.execute('SELECT * FROM business_projects WHERE id=?', [project_id]).fetchone()
@@ -812,21 +831,24 @@ def admin_api_delete_report_file(project_id):
         data = request.get_json(silent=True) or {}
         idx = data.get('index', -1)
         raw = (project['report_file_path'] if 'report_file_path' in project.keys() else '') or ''
-        paths = _parse_report_file_paths(raw)
-        if idx < 0 or idx >= len(paths):
+        items = _parse_report_file_list(raw)
+        if idx < 0 or idx >= len(items):
             return jsonify({'success': False, 'error': '附件索引无效'}), 400
-        # 删除文件
-        removed_path = Path(paths[idx])
-        if removed_path.exists():
+
+        removed_item = items.pop(idx)
+        removed_path = Path(removed_item.get('path') or '') if isinstance(removed_item, dict) else None
+        if removed_path and removed_path.exists():
             removed_path.unlink()
-        paths.pop(idx)
-        # 更新数据库
+
         now = datetime.now().isoformat(timespec='seconds')
-        new_json = json.dumps(paths, ensure_ascii=False) if paths else ''
-        conn.execute('UPDATE business_projects SET report_file_path=?, updated_at=? WHERE id=?',
-                     [new_json, now, project_id])
+        current_version = int(project['version']) if 'version' in project.keys() and project['version'] else 1
+        new_json = json.dumps(items, ensure_ascii=False) if items else ''
+        conn.execute(
+            'UPDATE business_projects SET report_file_path=?, updated_at=?, updated_by=?, version=? WHERE id=?',
+            [new_json, now, getattr(current_user, 'id', None), current_version + 1, project_id]
+        )
         conn.commit()
-        return jsonify({'success': True, 'remaining': len(paths), 'message': '附件已删除'})
+        return jsonify({'success': True, 'remaining': len([x for x in items if not x.get("hidden")]), 'message': '附件已删除'})
     finally:
         conn.close()
 

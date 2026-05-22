@@ -1,245 +1,133 @@
 # X1 检测报告生成系统 - 架构文档
 
-> 版本：X4.8
-> 更新时间：2026-05-16
-> 文档类型：B类说明书（低频更新）
-> 用途：说明 X1 当前系统结构、核心模块分工与运行边界。
+版本：X4.8  
+更新时间：2026-05-22
 
 ---
 
-## 一、系统定位
+## 一、文档目的
 
-X1 是一套面向洁净室检测领域的全流程业务系统，覆盖：
-- 前台录入与草稿管理
-- 后端业务判定
-- Word / Excel 模板导出（含多房间混合报告）
-- 飞书上传与失败治理
-- 项目全生命周期管理
-- 任务派单与检测员执行
-- 客户自助服务门户
-- 后台管理与运维
+本文件只描述 X1 **当前运行形态** 的核心结构，不承担历史方案、旧计划、阶段性重构蓝图的说明职责。
 
 ---
 
-## 二、整体架构
+## 二、系统定位
 
-```text
-┌──────────────────────────────────────────────────────────────────────────┐
-│                              使用者层                                    │
-│  检测员（录入/执行）  管理员/主管（后台）  客户（自助门户）  访客（只读后台） │
-└──────────────────────────────────────────────────────────────────────────┘
-                                │
-                                ▼
-┌──────────────────────────────────────────────────────────────────────────┐
-│                          表现层（HTML / JS）                             │
-│  record_index.html + record.js        检测员：录入/恢复/导出/我的任务     │
-│  admin.html + admin_projects.js       后台：12个管理面板                  │
-│           + admin_customers.js        客户管理面板                        │
-│  customer.html + customer.js          客户：自助门户（4个功能tab）         │
-│  login.html                           统一登录                           │
-└──────────────────────────────────────────────────────────────────────────┘
-                                │ HTTP / JSON
-                                ▼
-┌──────────────────────────────────────────────────────────────────────────┐
-│                       应用层（Flask）                                     │
-│  app_x1.py            主应用：认证/草稿/导出/后台/项目/任务/统计          │
-│  customer_routes.py    客户界面路由（9个API）                             │
-│  customer_admin_routes.py  客户管理后台路由（6个API）                     │
-│  auth.py               5角色权限体系（admin/supervisor/viewer/inspector/  │
-│                        customer）+ 精细权限key                           │
-│  database.py           SQLite 初始化与访问                               │
-│  monitor.py            操作日志、健康监控                                │
-└──────────────────────────────────────────────────────────────────────────┘
-                                │
-                                ▼
-┌──────────────────────────────────────────────────────────────────────────┐
-│                           核心业务层                                     │
-│  judgement_engine.py         后端业务判定（14个对象）                     │
-│  report_context_builder.py   导出上下文构建                              │
-│  clean_class_semantics.py    等级/上下文语义归一                         │
-│  payload_normalizer.py       前后台载荷兼容与归一化                      │
-│  template_rules.py           对象级模板填充规则                          │
-│  template_resources.py       模板资源与映射管理                          │
-│  adapters/export_docx.py     DOCX 导出（含混合报告）                     │
-│  adapters/export_excel.py    Excel 导出                                 │
-│  adapters/template_fill.py   模板绑定/填充/XML级精确写入                  │
-│  feishu_utils.py             飞书文件夹与文件上传                        │
-└──────────────────────────────────────────────────────────────────────────┘
-                                │
-          ┌─────────────────────┼──────────────────────┐
-          ▼                     ▼                      ▼
-┌──────────────────┐  ┌──────────────────┐  ┌──────────────────────┐
-│ x1_data.db（根）  │  │ data/x1_data.db  │  │ 文件系统              │
-│ - users           │  │ - business_      │  │ - records_x1/ 草稿    │
-│ - role_permissions │  │   projects       │  │ - reports_x1/ 导出    │
-│                   │  │ - project_tasks  │  │ - logs_x1/ 业务日志   │
-│                   │  │ - client_profiles│  │ - docs/ 系统文档      │
-│                   │  │ - project_urge_  │  │ - 模板基目录          │
-│                   │  │   logs           │  │                      │
-│                   │  │ - client_feedback│  │                      │
-│                   │  │ - exports/drafts │  │                      │
-└──────────────────┘  └──────────────────┘  └──────────────────────┘
-```
+X1 是面向洁净检测业务的生产系统，当前运行核心覆盖：
+
+- 员工端录入、恢复、导出
+- 项目与任务联动
+- 客户门户
+- 后台管理
+- 权限治理
+- 运维、日志、备份恢复
 
 ---
 
-## 三、角色与权限体系
+## 三、当前三端结构
 
-### 5个角色
+### 1. 员工端
+- 页面：`templates/record_index.html`
+- 真实运行脚本：`static/record.js`
+- 主要职责：录入、恢复、导出、我的任务
 
-| 角色 | 说明 | 主入口 |
-|------|------|--------|
-| admin | 系统管理员，全权限（`*`通配） | /admin |
-| supervisor | 主管，项目/任务/客户/报告管理 | /admin |
-| viewer | 访客，只读后台 | /admin |
-| inspector | 检测员，录入/导出/接单执行 | / |
-| customer | 客户，自助门户 | /customer |
+### 2. 管理端
+- 页面：`templates/admin.html`
+- 真实运行脚本：`static/admin.js`
+- 主要职责：项目、任务、客户、记录、模板、权限、设置、监控
 
-### 权限 key 体系
+### 3. 客户端
+- 页面：`templates/customer.html`
+- 脚本：`static/customer.js`
+- 主要职责：客户资料、项目进度、历史记录、反馈
 
-| 分组 | 权限 key | admin | supervisor | viewer | inspector | customer |
-|------|----------|:-----:|:----------:|:------:|:---------:|:--------:|
-| 项目管理 | admin.projects.view / .manage | ✅ | ✅读写 | ✅只读 | - | - |
-| 任务派单 | admin.tasks.view / .manage | ✅ | ✅读写 | ✅只读 | - | - |
-| 任务执行 | tasks.execute | ✅ | - | - | ✅ | - |
-| 客户管理 | admin.customers.view / .manage | ✅ | ✅读写 | - | - | - |
-| 客户界面 | customer.* | ✅预览 | - | - | - | ✅ |
-| 报告管理 | admin.records.* | ✅ | ✅ | ✅只读 | - | - |
-| 模板管理 | admin.templates.* | ✅ | ✅ | ✅只读 | - | - |
-| 用户管理 | admin.users.* | ✅ | - | ✅只读 | - | - |
-| 文件下载 | admin.files.download | ✅ | ✅ | ✅ | - | - |
+> 说明：项目中存在历史构建链（`static/src/record/*` → `static/dist/record.bundle.js`），但当前员工端运行真入口仍应以 `record_index.html` 实际加载内容为准。
 
 ---
 
-## 四、核心业务主链
+## 四、后端结构
+
+### 1. 主入口
+- `app_x1.py`
+
+### 2. 主要路由模块
+- `routes/projects.py` — 项目管理
+- `routes/tasks.py` — 任务管理与员工任务链
+- `routes/records.py` — 后台记录管理
+- `routes/export.py` — 导出主链
+- `routes/drafts.py` — 草稿链
+- `routes/settings.py` — 设置、备份恢复、健康检查
+- `routes/template_mgmt.py` — 模板治理
+- `routes/admin_misc.py` — 用户、权限、日志、统计、文档等
+- `customer_routes.py` — 客户门户接口
+- `customer_admin_routes.py` — 客户管理后台接口
+
+---
+
+## 五、双数据库结构
+
+### 1. 根库：`x1_data.db`
+主要承载：
+- users
+- 权限相关数据
+- 日志
+- 记录索引类数据
+
+### 2. 业务库：`data/x1_data.db`
+主要承载：
+- business_projects
+- project_tasks
+- client_profiles
+- client_feedback
+- report_feedback
+- 其他业务过程数据
+
+### 3. 当前权限真相
+权限运行真相以：
+- `role_permission_final`
+
+为准。
+
+旧表：
+- `role_permissions`
+
+仅作为遗留参考，不应再作为当前权限真相说明。
+
+---
+
+## 六、当前核心业务链
 
 ### 1. 录入链
-前台填写项目与房间信息 → 保存草稿 → 生成草稿 JSON
+录入页面填写数据 → 保存草稿 → 生成草稿 JSON
 
 ### 2. 恢复链
-读取草稿 JSON → 归一化 payload → 页面回填项目、房间、参数、判定摘要
+读取草稿 → 载荷归一化 → 页面回填
 
-### 3. 判定链
-前端提交房间信息 → 后端按对象类型分发（14个对象） → 生成统一判定结果
+### 3. 导出链
+提交导出 → 构建导出上下文 → 生成 Word/Excel → 落盘
 
-### 4. 导出链
-项目数据归一化 → 构建导出上下文 → 生成 Word/Excel → 落盘到 reports_x1/
-- 支持单房间导出和多房间混合报告导出
+### 4. 项目任务链
+项目创建/维护 → 派单 → 员工进入录入 → 检测中 → 完成任务 → 检测完成 → 报告编制推进
 
-### 5. 外部链路
-导出成功后上传飞书 → 失败状态落账 → 后台可见 → 支持后台重试
+### 5. 客户链
+客户登录 → 查看项目/历史 → 反馈 → 后台处理
 
-### 6. 项目管理链
-项目创建（手动/自动同步） → 项目编号分配（PJ-YYYY-NNNN） → 派单给检测员 → 检测员接单/执行/完成 → 项目状态自动更新 → 报告数据关联
-
-### 7. 客户服务链
-客户登录 → 维护资料 → 下单需求 → 查看项目进度 → 催单（24h冷却） → 反馈建议 → 管理员后台处理
-
-### 8. 后台治理链
-后台查看记录 → 搜索/筛选/分页 → 批量删除/回收站 → 查看日志与系统信息
+### 6. 运维链
+标准启停脚本 → 健康检查 → 日志 → 备份恢复
 
 ---
 
-## 五、后台管理面板（12个）
+## 七、当前业务口径提醒
 
-按导航栏顺序：
+### 任务状态对外口径
+当前员工端主口径应理解为：
+- 待检测
+- 检测中
+- 检测完成
 
-| 分区 | 面板 | 说明 |
-|------|------|------|
-| 经营概览 | 📊 数据统计 | 累计产出、月度趋势、领域分布、检测员工作量 |
-| | 📁 项目管理 | 项目CRUD、8卡摘要、分组列表、项目信息卡（派单+报告关联） |
-| | 🏢 客户管理 | 聚合视图（6源数据）、详情、编辑、反馈回复、催单处理 |
-| 检测业务 | 📋 报告管理 | 记录列表、批量操作、飞书重试、回收站 |
-| | 📄 模板管理 | 模板注册/上传/验证、类型映射、语义映射 |
-| | 📖 标准数据库 | 标准查看/搜索 |
-| 系统管理 | 👤 用户管理 | 用户CRUD、角色权限配置（按角色分组显示） |
-| | 📝 操作日志 | 按月归档、搜索、批量删除 |
-| | ⚙️ 系统设置 | 路径配置、飞书配置、备份/恢复 |
-| | 🖥️ 系统监控 | 系统信息、CPU/内存/磁盘 |
-| | 📚 系统文档 | 架构文档、API文档 |
-| 客户视角 | 🔍 客户界面预览 | iframe预览客户门户 |
+员工端主动作只保留：
+- 进入录入
+- 完成任务
 
----
-
-## 六、数据库结构
-
-### x1_data.db（根目录，用户库）
-- `users` — 用户账号（含 client_name 绑定）
-- `role_permissions` — 角色权限覆盖
-- `operation_logs` — 操作日志
-
-### data/x1_data.db（业务库）
-- `business_projects` — 项目管理主表（含 project_no、source、has_urge）
-- `project_tasks` — 任务/派单表
-- `client_profiles` — 客户资料（开票/收件信息）
-- `project_urge_logs` — 催单记录
-- `client_feedback` — 客户反馈
-
----
-
-## 七、文件结构
-
-```text
-检测报告生成系统_X1/
-├── app_x1.py                 主应用（~1600行）
-├── auth.py                   认证与权限
-├── database.py               数据库初始化
-├── monitor.py                监控与日志
-├── customer_routes.py        客户界面路由
-├── customer_admin_routes.py  客户管理路由
-├── judgement_engine.py       后端判定引擎
-├── report_context_builder.py 导出上下文
-├── clean_class_semantics.py  语义归一
-├── payload_normalizer.py     载荷归一
-├── template_rules.py         模板规则
-├── template_resources.py     模板资源
-├── feishu_utils.py           飞书工具
-├── x1_config.json            系统配置
-├── adapters/
-│   ├── export_docx.py        Word导出（含混合报告）
-│   ├── export_excel.py       Excel导出
-│   └── template_fill.py      模板填充（XML级）
-├── templates/
-│   ├── admin.html            后台管理页
-│   ├── record_index.html     前台录入页
-│   ├── customer.html         客户自助门户
-│   └── login.html            登录页
-├── static/
-│   ├── record.js             前台交互
-│   ├── admin_projects.js     项目管理
-│   ├── admin_customers.js    客户管理
-│   ├── customer.js           客户门户
-│   ├── standards_db.js       标准数据库
-│   └── standards_*.json      标准数据
-├── data/x1_data.db           业务数据库
-├── records_x1/               草稿目录
-├── reports_x1/               导出产物
-├── logs_x1/                  业务日志
-├── docs/                     系统文档
-└── *.sh                      守护脚本
-```
-
----
-
-## 八、配置与运行
-
-### 配置入口
-- `x1_config.json`：host、port、paths、template_base
-
-### 启停脚本（V2.1）
-- `start_x1_daemon.sh` — 启动（自动诊断+留痕）
-- `stop_x1_daemon.sh` — 停止（自动清PID+留痕）
-- `restart_x1_daemon.sh` — 标准重启+摘要输出
-- `status_x1_daemon.sh` — 状态与诊断
-- `doctor_x1_daemon.sh` — 健康体检（只读，4项评分）
-
-### 运行方式
-- Flask 单体应用，端口 8082
-- SQLite 双库（用户库+业务库）
-- Bash 守护脚本做启停和验活
-
----
-
-## 九、一句话架构判断
-
-> X1 采用「Flask 单体 + SQLite 双库 + 模板导出 + 飞书链路 + 5角色权限 + 客户门户」架构，已覆盖检测业务全流程（录入→判定→导出→项目管理→客户服务→后台治理）。
+### 文档维护原则
+如果文档内容与当前运行事实冲突，应以运行事实为准，并优先更新文档，而不是继续沿用旧阶段说法。

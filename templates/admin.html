@@ -672,43 +672,36 @@ input[type="text"]:focus,input[type="password"]:focus,input[type="number"]:focus
     </div>
   </div>
   <div class="stat-cards" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:0;">
-    <div class="stat-card blue"><div class="label">正式文档</div><div class="value">6</div></div>
-    <div class="stat-card green"><div class="label">运维手册</div><div class="value">4</div></div>
+    <div class="stat-card blue"><div class="label">正式文档</div><div class="value">5</div></div>
+    <div class="stat-card green"><div class="label">运维手册</div><div class="value">3</div></div>
     <div class="stat-card orange"><div class="label">已归档过程文档</div><div class="value">84</div></div>
-    <div class="stat-card purple"><div class="label">当前入口组</div><div class="value">2</div></div>
+    <div class="stat-card purple"><div class="label">当前入口组</div><div class="value">1</div></div>
   </div>
 </div>
 <div class="card page-shell section-card docs-layout">
   <div class="docs-sidebar">
     <div class="docs-section">
       <div class="docs-section-title">📚 系统文档</div>
-      <div class="docs-section-desc">左侧选文档，右侧看正文。正式系统文档与模板管理专题统一在这里查看。</div>
+      <div class="docs-section-desc">左侧选文档，右侧看正文。这里只保留当前主层仍有效的系统文档入口。</div>
       <div class="docs-nav">
         <div class="docs-group-title">正式系统文档</div>
         <button class="docs-nav-btn active" data-doc-btn="VERSION_NOTE" onclick="loadWorkspaceDoc('VERSION_NOTE')">📋 系统当前版本说明</button>
-        <button class="docs-nav-btn" data-doc-btn="VERSION_RULES" onclick="loadWorkspaceDoc('VERSION_RULES')">🧭 版本号管理规则</button>
         <button class="docs-nav-btn" data-doc-btn="ARCHITECTURE" onclick="loadWorkspaceDoc('ARCHITECTURE')">📐 系统架构说明</button>
         <button class="docs-nav-btn" data-doc-btn="API" onclick="loadWorkspaceDoc('API')">🔌 系统接口说明</button>
-        <button class="docs-nav-btn" data-doc-btn="MAIN_CHAIN_DESIGN" onclick="loadWorkspaceDoc('MAIN_CHAIN_DESIGN')">🔗 生产主链设计说明</button>
-        <button class="docs-nav-btn" data-doc-btn="CODE_STATS" onclick="loadWorkspaceDoc('CODE_STATS')">📊 代码统计</button>
+        <button class="docs-nav-btn" data-doc-btn="TASK_RULES" onclick="loadWorkspaceDoc('TASK_RULES')">🔗 任务链规则文档</button>
+        <button class="docs-nav-btn" data-doc-btn="PERMISSION_MODEL" onclick="loadWorkspaceDoc('PERMISSION_MODEL')">🛡️ 权限系统说明</button>
 
         <div class="docs-group-title">运维手册</div>
         <button class="docs-nav-btn" data-doc-btn="OPS_FAQ" onclick="loadWorkspaceDoc('OPS_FAQ')">🔧 常见问题排障手册</button>
         <button class="docs-nav-btn" data-doc-btn="OPS_DAEMON" onclick="loadWorkspaceDoc('OPS_DAEMON')">⚙️ 启动-停止-验活说明</button>
         <button class="docs-nav-btn" data-doc-btn="OPS_DEPLOY" onclick="loadWorkspaceDoc('OPS_DEPLOY')">📦 部署与迁移说明</button>
-        <button class="docs-nav-btn" data-doc-btn="OPS_FEISHU_SOP" onclick="loadWorkspaceDoc('OPS_FEISHU_SOP')">☁️ 飞书上传失败治理 SOP</button>
-        <button class="docs-nav-btn" data-doc-btn="OPS_BACKUP_POLICY" onclick="loadWorkspaceDoc('OPS_BACKUP_POLICY')">🗂️ 备份恢复规范</button>
-        <button class="docs-nav-btn" data-doc-btn="OPS_RESTORE_PLAYBOOK" onclick="loadWorkspaceDoc('OPS_RESTORE_PLAYBOOK')">♻️ 恢复操作说明</button>
-        <button class="docs-nav-btn" data-doc-btn="OPS_ADMIN_RUNBOOK" onclick="loadWorkspaceDoc('OPS_ADMIN_RUNBOOK')">📘 后台备份恢复手册</button>
-        <button class="docs-nav-btn" data-doc-btn="X1_SYSTEM_UNDERSTANDING" onclick="loadWorkspaceDoc('X1_SYSTEM_UNDERSTANDING')">🧠 X1 系统认知报告</button>
-        <button class="docs-nav-btn" data-doc-btn="X1_FULL_AUDIT_PLAN" onclick="loadWorkspaceDoc('X1_FULL_AUDIT_PLAN')">🗺️ X1 全链路巡检与修复总计划</button>
       </div>
     </div>
   </div>
   <div class="docs-view">
     <div class="docs-view-head">
       <h4 id="doc-view-title">系统当前版本说明</h4>
-      <div class="docs-view-meta" id="doc-view-meta">当前版本定位、能力范围、对象覆盖、已知边界</div>
+      <div class="docs-view-meta" id="doc-view-meta">当前部署形态、运行事实、任务口径与维护边界</div>
     </div>
     <div id="doc-content" class="docs-content">正在加载系统当前版本说明...</div>
   </div>
@@ -990,10 +983,10 @@ input[type="text"]:focus,input[type="password"]:focus,input[type="number"]:focus
 </div>
 
 <script src="/static/admin.js?v=20260521_v5"></script>
-<script src="/static/docs_ui.js?v=20260512a"></script>
+<script src="/static/docs_ui.js?v=20260522b"></script>
 <script src="/static/admin_stats.js?v=20260509c"></script>
 
-<script src="/static/admin_projects.js?v=20260518v4"></script>
+<script src="/static/admin_projects.js?v=20260522v5"></script>
 <style>details[open]>.fold-arrow,details[open] summary .fold-arrow{transform:rotate(90deg)}</style>
 <script src="/static/admin_customers.js?v=20260521_paged"></script>
 <style>

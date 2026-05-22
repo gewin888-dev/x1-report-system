@@ -2248,6 +2248,16 @@ def _replace_table_cell_by_table_and_row(xml_text: str, table_index: int, row_in
     cell_pattern = re.compile(r'<w:tc\b.*?</w:tc>', re.S)
     text_pattern = re.compile(r'<w:t[^>]*>(.*?)</w:t>', re.S)
 
+
+
+def _replace_table_cell_by_table_and_row(xml_text: str, table_index: int, row_index: int, replacements_by_index: Dict[int, str], debug_notes: List[Dict[str, Any]] = None, allow_blank: bool = False) -> str:
+    if not replacements_by_index:
+        return xml_text
+    tbl_pattern = re.compile(r'<w:tbl\b.*?</w:tbl>', re.S)
+    row_pattern = re.compile(r'<w:tr\b.*?</w:tr>', re.S)
+    cell_pattern = re.compile(r'<w:tc\b.*?</w:tc>', re.S)
+    text_pattern = re.compile(r'<w:t[^>]*>(.*?)</w:t>', re.S)
+
     def _cell_plain(cell_xml: str) -> str:
         texts = text_pattern.findall(cell_xml)
         return ''.join(
@@ -2256,13 +2266,18 @@ def _replace_table_cell_by_table_and_row(xml_text: str, table_index: int, row_in
         ).strip()
 
     def _force_set_cell_content(cell_xml: str, new_text: str) -> str:
+        # 最小改写：优先只替换现有文本节点，保留原有段落/run/合并结构
+        text_matches = list(re.finditer(r'(<w:t[^>]*>)(.*?)(</w:t>)', cell_xml, re.S))
+        if text_matches:
+            last = text_matches[-1]
+            return cell_xml[:last.start()] + last.group(1) + escape(str(new_text)) + last.group(3) + cell_xml[last.end():]
         tcpr = re.search(r'(<w:tcPr\b.*?</w:tcPr>)', cell_xml, re.S)
         if tcpr:
             inner = cell_xml[tcpr.end():]
-            return cell_xml[:tcpr.end()] + _para_xml(new_text) + re.sub(r'<w:p\b.*?</w:p>', '', inner, flags=re.S)
+            return cell_xml[:tcpr.end()] + _para_xml(new_text) + inner
         inner = re.match(r'(<w:tc\b[^>]*>)(.*?)(</w:tc>)', cell_xml, re.S)
         if inner:
-            return inner.group(1) + _para_xml(new_text) + inner.group(3)
+            return inner.group(1) + _para_xml(new_text) + inner.group(2) + inner.group(3)
         return cell_xml
 
     tables = tbl_pattern.findall(xml_text)
@@ -2334,6 +2349,43 @@ def _replace_table_cell_by_table_and_row(xml_text: str, table_index: int, row_in
     return xml_text.replace(table_xml, new_table, 1)
 
 
+def _normalize_slot_text(text: str) -> str:
+    value = str(text or '').strip()
+    if not value:
+        return ''
+    return (value
+            .replace('（', '(').replace('）', ')')
+            .replace('㎛', 'μm').replace('um', 'μm')
+            .replace('m2', 'm²').replace('m3', 'm³')
+            .replace('：', ':').replace('≤', '<=').replace('≥', '>=')
+            .replace(' ', '').replace('\u00a0', '').replace('\u3000', ''))
+
+
+def _should_replace_range(existing_text: str, expected_text: str) -> bool:
+    expected_norm = _normalize_slot_text(expected_text)
+    if not expected_norm:
+        return False
+    existing_norm = _normalize_slot_text(existing_text)
+    if not existing_norm:
+        return True
+    return existing_norm != expected_norm
+
+
+def _put_slot_if_needed(slot_map: Dict[int, str], cell_index: int, new_value: str, existing_text: str = '', mode: str = 'fill_blank') -> None:
+    if new_value is None:
+        return
+    new_value = str(new_value)
+    if mode == 'range':
+        if _should_replace_range(existing_text, new_value):
+            slot_map[cell_index] = new_value
+        return
+    if str(existing_text or '').strip():
+        return
+    if str(new_value).strip() == '':
+        return
+    slot_map[cell_index] = new_value
+
+
 def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str) -> str:
     template_resource = export_payload.get('template_resource', {}) or {}
     template_path = template_resource.get('template_path', '') or ''
@@ -2361,6 +2413,36 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
     with ZipFile(template_path, 'r') as src:
         members = src.namelist()
         document_xml = src.read('word/document.xml').decode('utf-8', errors='ignore')
+
+        # ============================================================
+        # 冻结页保护：识别第 2 页（声明页）和第 4 页（检测仪器页）的 XML 范围
+        # 后续所有填充动作必须避开这些区域
+        # ============================================================
+        _frozen_page_numbers = {2, 4}
+        _page_breaks = [m.start() for m in re.finditer(r'<w:br\s+w:type="page"\s*/>', document_xml)]
+        # sectPr with page break also counts as page boundary
+        _page_breaks += [m.start() for m in re.finditer(r'<w:sectPr\b', document_xml)]
+        _page_breaks = sorted(set(_page_breaks))
+
+        # Build frozen ranges: approximate XML offset ranges for frozen pages
+        _frozen_ranges = []
+        if _page_breaks:
+            # Page 1: start -> first break
+            # Page 2: first break -> second break
+            # Page 3: second break -> third break
+            # Page 4: third break -> fourth break
+            _boundaries = [0] + _page_breaks + [len(document_xml)]
+            for _pg_num in _frozen_page_numbers:
+                if _pg_num < len(_boundaries):
+                    _frozen_ranges.append((_boundaries[_pg_num - 1], _boundaries[_pg_num]))
+
+        def _is_in_frozen_range(xml_offset: int) -> bool:
+            """Check if an XML offset falls within a frozen page range."""
+            for _start, _end in _frozen_ranges:
+                if _start <= xml_offset < _end:
+                    return True
+            return False
+
         single_replace_labels = []
         multi_replace_labels = [] if type_id in {'operating_room', 'bsl', 'gmp_workshop', 'veterinary_gmp_workshop', 'food_workshop', 'electronics_workshop', 'negative_pressure', 'animal_room'} else ['检测区域', '受检区域']
         table_cell_replace_map = {
@@ -2407,6 +2489,10 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
             if label in {'设备状态', '产品内尺寸'}:
                 continue
             if type_id in ('gmp_workshop', 'veterinary_gmp_workshop', 'food_workshop', 'electronics_workshop') and label in {'洁净度级别', '级别', '洁净度'}:
+                continue
+            # 冻结页保护：检查标签在文档中的位置，如果落在冻结页则跳过
+            _label_pos = document_xml.find(label)
+            if _label_pos >= 0 and _is_in_frozen_range(_label_pos):
                 continue
             document_xml = _replace_table_value_by_left_label(document_xml, label, replacements.get(label, ''), value_cell_offset=offset, table_must_contain='委托单位')
         document_xml = _replace_table_value_by_left_label(document_xml, '设备状态', replacements.get('设备状态', ''), value_cell_offset=1)
@@ -3194,7 +3280,8 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                     pass
 
             # --- ROW 3: 截面风速 / 换气次数 ---
-            _airflow_val = replacements.get('换气次数', '') or replacements.get('截面风速', '')
+            # 百级模板 row3=截面风速，万级模板 row3=换气次数（无截面风速行）
+            _airflow_val = replacements.get('截面风速', '') or replacements.get('换气次数', '')
             _airflow_std = _food_std('wind_speed') or _food_std('airchange') or ''
             _airflow_concl = _food_conclusion_from('wind_speed', 'air_velocity', 'sectional_air_velocity', 'airchange_rate', 'air_change_rate', 'airchange')
             _row3 = {}
@@ -5107,13 +5194,51 @@ def build_template_bound_docx(export_payload: Dict[str, Any], output_path: str) 
 # ---------------------------------------------------------------------------
 
 def _extract_last_table_xml(template_path: str) -> str:
-    """从模板 docx 中提取最后一个 <w:tbl>...</w:tbl>（数据表）的原始 XML。"""
+    """从模板 docx 中提取最后一个 <w:tbl>...</w:tbl>（数据表）的原始 XML。
+    注意：此函数仅保留向后兼容，新逻辑应使用 _extract_data_tables_xml()。
+    """
     with ZipFile(template_path, 'r') as z:
         xml = z.read('word/document.xml').decode('utf-8', errors='ignore')
     matches = list(re.finditer(r'<w:tbl\b.*?</w:tbl>', xml, re.S))
     if not matches:
         return ''
     return matches[-1].group()
+
+
+# 骨架表识别标签：前四页通用信息表通常包含这些标签
+_SKELETON_TABLE_LABELS = {'委托单位', '项目名称', '项目地址', '联系方式',
+                          '判定依据', '检测依据', '检测结论', '样品名称', '检测类型',
+                          '仪器名称', '仪器编号', '证书编号', '有效期', '不确定度',
+                          '校准日期', '检定日期', '检测方法',
+                          '业务电话', '投诉电话', 'E-mail', '网    址', '地    址'}
+
+
+def _is_skeleton_table(table_xml: str) -> bool:
+    """判断一张表是否属于前四页骨架信息表（封面/声明/信息/仪器页）。
+    规则：如果表中包含 2 个以上骨架标签，则认定为骨架表。
+    """
+    text_pattern = re.compile(r'<w:t[^>]*>(.*?)</w:t>', re.S)
+    texts = text_pattern.findall(table_xml)
+    plain = ''.join(t.replace('&lt;', '<').replace('&gt;', '>').replace('&amp;', '&') for t in texts)
+    hit_count = sum(1 for label in _SKELETON_TABLE_LABELS if label in plain)
+    return hit_count >= 2
+
+
+def _extract_data_tables_xml(template_path: str) -> list:
+    """从模板 docx 中提取所有参数数据表的原始 XML 列表。
+    规则：排除前四页骨架信息表，剩下的全部作为参数数据表，不管有几张。
+    """
+    with ZipFile(template_path, 'r') as z:
+        xml = z.read('word/document.xml').decode('utf-8', errors='ignore')
+    all_tables = list(re.finditer(r'<w:tbl\b.*?</w:tbl>', xml, re.S))
+    if not all_tables:
+        return []
+    data_tables = []
+    for m in all_tables:
+        tbl_xml = m.group()
+        if not _is_skeleton_table(tbl_xml):
+            data_tables.append(tbl_xml)
+    return data_tables
 
 
 def _page_break_para_xml() -> str:
@@ -5229,6 +5354,11 @@ def _fill_data_table_xml(table_xml: str, room_export: dict, export_payload: dict
         if _anc and _anc not in _anchor_judgement:
             _conclusion = '合格' if _jv.get('passed') else '不合格'
             _anchor_judgement[_anc] = {'range': _jv['range'], 'conclusion': _conclusion}
+    # 锚点别名扩展：模板标签变体也能命中判定结果
+    _ANCHOR_ALIASES = {'相对湿度': '湿度', '平均照度': '照度'}
+    for _src, _dst in _ANCHOR_ALIASES.items():
+        if _src in _anchor_judgement and _dst not in _anchor_judgement:
+            _anchor_judgement[_dst] = _anchor_judgement[_src]
 
     # === 参数检测结果映射 ===
     param_fill_map = {
@@ -5238,7 +5368,9 @@ def _fill_data_table_xml(table_xml: str, room_export: dict, export_payload: dict
         '送风高效': replacements.get('送风高效过滤器检漏', '') or replacements.get('高效过滤器检漏', ''),
         '温度': replacements.get('温度', ''),
         '相对湿度': replacements.get('相对湿度', ''),
+        '湿度': replacements.get('相对湿度', '') or replacements.get('湿度', ''),
         '平均照度': replacements.get('照度', '') or replacements.get('平均照度', ''),
+        '照度': replacements.get('照度', '') or replacements.get('平均照度', ''),
         '噪声': replacements.get('噪声', ''),
         '沉降菌': replacements.get('沉降菌', ''),
         '浮游菌': replacements.get('浮游菌', ''),
@@ -5275,7 +5407,7 @@ def _fill_data_table_xml(table_xml: str, room_export: dict, export_payload: dict
                 return tc_xml[:_insert_pos] + _run_xml + tc_xml[_insert_pos:]
             return tc_xml
 
-    # === 按行遍历填充：cell2(标准范围) + cell3(检测结果) + cell4(单项结论) ===
+    # === 按行遍历填充：cell2(标准范围) + cell3(检测值) + cell4(单项结论) ===
     _row_pat = re.compile(r'<w:tr\b.*?</w:tr>', re.S)
     _tc_pat = re.compile(r'<w:tc\b.*?</w:tc>', re.S)
     for _rm in _row_pat.finditer(table_xml):
@@ -5288,33 +5420,31 @@ def _fill_data_table_xml(table_xml: str, room_export: dict, export_payload: dict
         _tc0_texts = _wt_pat.findall(_tc0)
         _tc0_plain = ''.join(_tc0_texts).strip().replace(' ', '').replace('\u3000', '').replace('\n', '')
         for _anchor, _value in param_fill_map.items():
-            if not _value:
-                continue
-            if _anchor not in _tc0_plain:
+            if not _anchor or _anchor not in _tc0_plain:
                 continue
 
             _new_row = _row_xml
 
-            # --- cell2: 标准范围（以标准数据库为准：相同作罢，不同替换）---
+            # --- cell2: 判定范围（以标准数据库/判定引擎为准：相同不动，不同替换）---
             _aj = _anchor_judgement.get(_anchor)
             if _aj and _aj.get('range') and len(_tcs) > 2:
                 _old_tc2 = _tcs[2].group()
                 _tc2_texts = _wt_pat.findall(_old_tc2)
                 _tc2_plain = ''.join(_tc2_texts).strip()
                 _db_range = _aj['range']
-                # 标准化比较（去空格、全角半角统一）
                 _tc2_norm = _tc2_plain.replace(' ', '').replace('\u3000', '')
                 _db_norm = _db_range.replace(' ', '').replace('\u3000', '')
-                if _tc2_norm != _db_norm:  # 不同则替换（包括空值情况）
+                if _tc2_norm != _db_norm:
                     _new_tc2 = _write_tc_value(_old_tc2, _db_range)
                     _new_row = _new_row.replace(_old_tc2, _new_tc2, 1)
 
-            # --- cell3: 检测结果 ---
-            _old_tc3 = _tcs[3].group()
-            _new_tc3 = _write_tc_value(_old_tc3, _value)
-            _new_row = _new_row.replace(_old_tc3, _new_tc3, 1)
+            # --- cell3: 检测值（唯一来源=检测录入值；按语义强制写入）---
+            if len(_tcs) > 3:
+                _old_tc3 = _tcs[3].group()
+                _new_tc3 = _write_tc_value(_old_tc3, _value or '')
+                _new_row = _new_row.replace(_old_tc3, _new_tc3, 1)
 
-            # --- cell4: 单项结论 ---
+            # --- cell4: 单项结论（唯一来源=判定结果；按语义强制写入）---
             if _aj and _aj.get('conclusion') and len(_tcs) > 4:
                 _old_tc4 = _tcs[4].group()
                 _new_tc4 = _write_tc_value(_old_tc4, _aj['conclusion'])
@@ -5335,69 +5465,45 @@ def _fill_data_table_xml(table_xml: str, room_export: dict, export_payload: dict
     return table_xml
 
 
-def _extract_operating_room_page_fragment(room_doc_xml: str, report_number: str = '') -> str:
-    """从单房间 operating_room 完整文档中提取干净的房间参数页 fragment。
 
-    原则：
-    - 丢弃封面/声明/公共信息/仪器页等骨架内容
-    - 仅保留最后一个房间参数表所在页的标题+编号+数据表
-    - 清掉“本页以下无正文”等模板尾迹
-    - 房间页编号按传入 report_number 统一填充
-    """
-    _m = re.search(r'<w:body[^>]*>([\s\S]*?)</w:body>', room_doc_xml)
-    if not _m:
-        return ''
-    _inner = _m.group(1)
-    _sect_idx = _inner.rfind('<w:sectPr')
-    if _sect_idx >= 0:
-        _inner = _inner[:_sect_idx]
 
-    _tbl_matches = list(re.finditer(r'<w:tbl\b.*?</w:tbl>', _inner, re.S))
-    if not _tbl_matches:
-        return ''
-    _last_tbl = _tbl_matches[-1]
 
-    _paras = list(re.finditer(r'<w:p\b[\s\S]*?</w:p>', _inner, re.S))
-    _titles = [pm for pm in _paras if re.search(r'<w:t[^>]*>检\s*测\s*报\s*告</w:t>', pm.group(0), re.S)]
-    _reports = [pm for pm in _paras if '报告编号：' in pm.group(0)]
+def _split_body_page_fragments(document_xml: str) -> List[str]:
+    """按显式分页符粗略切分 body，返回各页片段（用于运行时冻结页保护）。"""
+    m = re.search(r'<w:body[^>]*>([\s\S]*?)</w:body>', document_xml)
+    if not m:
+        return []
+    inner = m.group(1)
+    sect_idx = inner.rfind('<w:sectPr')
+    if sect_idx >= 0:
+        inner = inner[:sect_idx]
+    break_pat = re.compile(r'<w:br[^>]*w:type="page"[^>]*/>|<w:lastRenderedPageBreak\s*/>', re.S)
+    parts = []
+    last = 0
+    for bm in break_pat.finditer(inner):
+        parts.append(inner[last:bm.end()])
+        last = bm.end()
+    parts.append(inner[last:])
+    return [p for p in parts if p and p.strip()]
 
-    _page_start = _last_tbl.start()
-    _report_before_tbl = [pm for pm in _reports if pm.end() <= _last_tbl.start()]
-    if _report_before_tbl:
-        _last_report = _report_before_tbl[-1]
-        _title_before_report = [pm for pm in _titles if pm.end() <= _last_report.start()]
-        if _title_before_report:
-            _page_start = _title_before_report[-1].start()
-        else:
-            _page_start = _last_report.start()
-    elif _titles:
-        _titles_before_tbl = [pm for pm in _titles if pm.start() < _last_tbl.start()]
-        if _titles_before_tbl:
-            _page_start = _titles_before_tbl[-1].start()
 
-    _fragment = _inner[_page_start:_last_tbl.end()]
+def _iter_page_fragments_with_numbers(document_xml: str) -> List[Tuple[int, str]]:
+    return list(enumerate(_split_body_page_fragments(document_xml), start=1))
 
-    # 若仍混入多组标题/编号，只保留最后一组（最接近数据表的那组）
-    _header_pair_matches = list(re.finditer(
-        r'(<w:p[\s\S]*?<w:t[^>]*>检\s*测\s*报\s*告</w:t>[\s\S]*?</w:p>\s*<w:p[\s\S]*?报告编号：[\s\S]*?</w:p>)',
-        _fragment, re.S
-    ))
-    if len(_header_pair_matches) > 1:
-        _fragment = _fragment[_header_pair_matches[-1].start():]
 
-    # 清掉“本页以下无正文”之类尾迹段落
-    _tail_markers = ['本页以下无正文']
-    for _marker in _tail_markers:
-        _tail_idx = _fragment.find(_marker)
-        if _tail_idx >= 0:
-            _tail_para_start = _fragment.rfind('<w:p', 0, _tail_idx)
-            if _tail_para_start >= 0:
-                _fragment = _fragment[:_tail_para_start]
+def _is_frozen_page_number(page_number_1based: int) -> bool:
+    return page_number_1based in (2, 4)
 
-    if report_number:
-        _fragment = _replace_all_plain_text(_fragment, '报告编号：', report_number, max_count=3)
 
-    return _fragment
+def _detect_last_writable_data_table(document_xml: str) -> Tuple[int, str]:
+    """从完整文档中寻找最后一个不在冻结页中的表格，返回 (页码, table_xml)。"""
+    for page_no, frag in reversed(_iter_page_fragments_with_numbers(document_xml)):
+        if _is_frozen_page_number(page_no):
+            continue
+        tbls = list(re.finditer(r'<w:tbl\b.*?</w:tbl>', frag, re.S))
+        if tbls:
+            return page_no, tbls[-1].group(0)
+    return 0, ''
 
 
 def build_mixed_report_docx(export_payload: Dict[str, Any], output_path: str) -> str:
@@ -5414,34 +5520,37 @@ def build_mixed_report_docx(export_payload: Dict[str, Any], output_path: str) ->
         base_path = build_template_filled_docx(export_payload, output_path)
         if not base_path or not Path(base_path).exists() or not rooms_export:
             return base_path
-        # 对数据表做标准范围校验 + 结论填充
+        # 对所有数据表做标准范围校验 + 结论填充
         with ZipFile(base_path, 'r') as z:
             _s_members = z.namelist()
             _s_doc_xml = z.read('word/document.xml').decode('utf-8', errors='ignore')
             _s_others = {n: z.read(n) for n in _s_members if n != 'word/document.xml' and not n.endswith('/')}
-        _s_tbl_matches = list(re.finditer(r'<w:tbl\b.*?</w:tbl>', _s_doc_xml, re.S))
-        if _s_tbl_matches:
-            _s_last = _s_tbl_matches[-1]
-            _s_orig = _s_last.group()
-            _s_filled = _fill_data_table_xml(_s_orig, rooms_export[0], export_payload)
-            if _s_filled != _s_orig:
-                _s_doc_xml = _s_doc_xml[:_s_last.start()] + _s_filled + _s_doc_xml[_s_last.end():]
-                # 同时设置 updateFields
-                _s_settings = _s_others.get('word/settings.xml', b'')
-                if isinstance(_s_settings, bytes):
-                    _s_settings = _s_settings.decode('utf-8', errors='ignore')
-                if '<w:updateFields' not in _s_settings:
-                    _s_settings = _s_settings.replace('</w:settings>', '<w:updateFields w:val="true"/></w:settings>')
-                with ZipFile(base_path, 'w', ZIP_DEFLATED) as dst:
-                    for n in _s_members:
-                        if n.endswith('/'):
-                            continue
-                        if n == 'word/document.xml':
-                            dst.writestr(n, _s_doc_xml)
-                        elif n == 'word/settings.xml':
-                            dst.writestr(n, _s_settings)
-                        else:
-                            dst.writestr(n, _s_others.get(n, b''))
+        _s_changed = False
+        _s_all_tbls = list(re.finditer(r'<w:tbl\b.*?</w:tbl>', _s_doc_xml, re.S))
+        for _s_tbl_m in _s_all_tbls:
+            _s_tbl_xml = _s_tbl_m.group(0)
+            if _is_skeleton_table(_s_tbl_xml):
+                continue
+            _s_filled = _fill_data_table_xml(_s_tbl_xml, rooms_export[0], export_payload)
+            if _s_filled != _s_tbl_xml:
+                _s_doc_xml = _s_doc_xml.replace(_s_tbl_xml, _s_filled, 1)
+                _s_changed = True
+        if _s_changed:
+            _s_settings = _s_others.get('word/settings.xml', b'')
+            if isinstance(_s_settings, bytes):
+                _s_settings = _s_settings.decode('utf-8', errors='ignore')
+            if '<w:updateFields' not in _s_settings:
+                _s_settings = _s_settings.replace('</w:settings>', '<w:updateFields w:val="true"/></w:settings>')
+            with ZipFile(base_path, 'w', ZIP_DEFLATED) as dst:
+                for n in _s_members:
+                    if n.endswith('/'):
+                        continue
+                    if n == 'word/document.xml':
+                        dst.writestr(n, _s_doc_xml)
+                    elif n == 'word/settings.xml':
+                        dst.writestr(n, _s_settings)
+                    else:
+                        dst.writestr(n, _s_others.get(n, b''))
         return base_path
 
     # 步骤1：用第一个房间生成基础文档
@@ -5458,117 +5567,25 @@ def build_mixed_report_docx(export_payload: Dict[str, Any], output_path: str) ->
             if name != 'word/document.xml' and not name.endswith('/'):
                 other_files[name] = z.read(name)
 
-    # 步骤2.5：对骨架页（房间1）的数据表做标准范围校验 + 结论填充
+    # 步骤2.5：对房间1的所有数据表做标准范围校验 + 结论填充
     if rooms_export:
-        # 先清理通用替换对标签的污染：“受检区域+房间名”→“房间名称”
+        # 先清理通用替换对标签的污染："受检区域+房间名"→"房间名称"
         _r1_name = (rooms_export[0].get('room', {}).get('room_name') or '').strip()
         if _r1_name:
             document_xml = document_xml.replace(f'受检区域{_r1_name}', '房间名称')
-        _tbl_matches = list(re.finditer(r'<w:tbl\b.*?</w:tbl>', document_xml, re.S))
-        if _tbl_matches:
-            _last_tbl = _tbl_matches[-1]
-            _orig_tbl_xml = _last_tbl.group()
-            _filled_tbl_xml = _fill_data_table_xml(_orig_tbl_xml, rooms_export[0], export_payload)
-            if _filled_tbl_xml != _orig_tbl_xml:
-                document_xml = document_xml[:_last_tbl.start()] + _filled_tbl_xml + document_xml[_last_tbl.end():]
+        # 找到文档中所有非骨架数据表并逐张填充（骨架表识别已覆盖冻结页保护）
+        _all_tbls = list(re.finditer(r'<w:tbl\b.*?</w:tbl>', document_xml, re.S))
+        _filled_count = 0
+        for _tbl_m in _all_tbls:
+            _tbl_xml = _tbl_m.group(0)
+            if _is_skeleton_table(_tbl_xml):
+                continue
+            _filled_tbl = _fill_data_table_xml(_tbl_xml, rooms_export[0], export_payload)
+            if _filled_tbl != _tbl_xml:
+                document_xml = document_xml.replace(_tbl_xml, _filled_tbl, 1)
+                _filled_count += 1
 
-    # operating_room mixed report：前四页骨架只保留一次，后续仅追加干净的房间页 fragment。
-    if rooms_export and all(str((re.get('room') or {}).get('type_id', '') or '') == 'operating_room' for re in rooms_export):
-        _tbl_matches = list(re.finditer(r'<w:tbl\b.*?</w:tbl>', document_xml, re.S))
-        if _tbl_matches:
-            _last_tbl = _tbl_matches[-1]
-            _base_before_tbl = document_xml[:_last_tbl.start()]
-            _base_after_tbl = document_xml[_last_tbl.end():]
-
-            _base_report_number = str((((export_payload.get('report_context') or {}).get('project_context') or {}).get('report_number', '')) or '')
-            if _base_report_number:
-                _first_room_header_pat = re.compile(
-                    r'(<w:p[^>]*>[\s\S]*?<w:t[^>]*>检\s*测\s*报\s*告</w:t>[\s\S]*?</w:p>\s*'
-                    r'<w:p[^>]*>[\s\S]*?报告编号：</w:t>[\s\S]*?</w:p>\s*)'
-                    r'(<w:tbl\b[\s\S]*?房间名称[\s\S]*?</w:tbl>)',
-                    re.S
-                )
-                _hm = _first_room_header_pat.search(document_xml)
-                if _hm:
-                    _header_block = _hm.group(1)
-                    _filled_header_block = _replace_all_plain_text(_header_block, '报告编号：', _base_report_number, max_count=1)
-                    if _filled_header_block != _header_block:
-                        document_xml = document_xml[:_hm.start(1)] + _filled_header_block + document_xml[_hm.end(1):]
-                        _tbl_matches = list(re.finditer(r'<w:tbl\b.*?</w:tbl>', document_xml, re.S))
-                        if _tbl_matches:
-                            _last_tbl = _tbl_matches[-1]
-                            _base_before_tbl = document_xml[:_last_tbl.start()]
-                            _base_after_tbl = document_xml[_last_tbl.end():]
-            _first_fragment = _extract_operating_room_page_fragment(document_xml, _base_report_number)
-            _base_tail_markers = list(re.finditer(
-                r'<w:p[\s\S]*?<w:t[^>]*>检\s*测\s*报\s*告</w:t>[\s\S]*?</w:p>\s*<w:p[\s\S]*?报告编号：[\s\S]*?</w:p>',
-                _base_before_tbl, re.S
-            ))
-            if _base_tail_markers:
-                _last_base_header_start = _base_tail_markers[-1].start()
-                _base_tail_text = re.sub(r'<[^>]+>', '', _base_before_tbl[_last_base_header_start:])
-                _base_tail_text = re.sub(r'\s+', ' ', _base_tail_text)
-                if '房间名称' not in _base_tail_text:
-                    # 确保不截断到仪器表之前：在 _base_before_tbl 中找所有表格，截断点不能早于倒数第一个表格的结束位
-                    _pre_tbls = list(re.finditer(r'<w:tbl\b.*?</w:tbl>', _base_before_tbl, re.S))
-                    _min_cut = _pre_tbls[-1].end() if _pre_tbls else 0
-                    if _last_base_header_start >= _min_cut:
-                        _base_before_tbl = _base_before_tbl[:_last_base_header_start]
-
-            _room_pages_xml = _first_fragment or _last_tbl.group(0)
-            for _idx, room_export in enumerate(rooms_export[1:], start=2):
-                _virtual_payload = dict(export_payload)
-                _virtual_payload['room'] = room_export['room']
-                _virtual_payload['template_rule'] = room_export['template_rule']
-                _virtual_payload['template_resource'] = room_export['template_resource']
-                _virtual_payload['report_context'] = room_export['report_context']
-                _virtual_payload['clean_class_semantics'] = room_export['clean_class_semantics']
-                _virtual_payload['judgement_result'] = room_export['judgement_result']
-                _virtual_payload['rooms_export'] = [room_export]
-                _tmp_path = str(Path(output_path).with_name(f".{Path(output_path).stem}.room{_idx}.docx"))
-                _built_path = build_template_filled_docx(_virtual_payload, _tmp_path)
-                if not _built_path or not Path(_built_path).exists():
-                    continue
-                with ZipFile(_built_path, 'r') as _rz:
-                    _room_doc_xml = _rz.read('word/document.xml').decode('utf-8', errors='ignore')
-                # 对房间2~N的数据表做表头填充（房间名称/检测日期/洁净度/S/V）
-                _room_tbl_matches = list(re.finditer(r'<w:tbl\b.*?</w:tbl>', _room_doc_xml, re.S))
-                if _room_tbl_matches:
-                    _room_last_tbl = _room_tbl_matches[-1]
-                    _room_orig_tbl = _room_last_tbl.group()
-                    _room_filled_tbl = _fill_data_table_xml(_room_orig_tbl, room_export, export_payload)
-                    if _room_filled_tbl != _room_orig_tbl:
-                        _room_doc_xml = _room_doc_xml[:_room_last_tbl.start()] + _room_filled_tbl + _room_doc_xml[_room_last_tbl.end():]
-                # 辅房模板标签清理：通用替换可能把“受检区域名称”改成了“受检区域+房间名”，还原为“房间名称”
-                _rn = (room_export.get('room', {}).get('room_name') or '').strip()
-                if _rn:
-                    _room_doc_xml = _room_doc_xml.replace(f'受检区域{_rn}', '房间名称')
-                _room_report_number = str((((room_export.get('report_context') or {}).get('project_context') or {}).get('report_number', '')) or _base_report_number)
-                _room_fragment = _extract_operating_room_page_fragment(_room_doc_xml, _room_report_number)
-                if not _room_fragment:
-                    continue
-                _room_pages_xml += _page_break_para_xml() + _room_fragment
-
-            if _room_pages_xml:
-                document_xml = _base_before_tbl + _room_pages_xml + _base_after_tbl
-
-        output = Path(output_path)
-        with ZipFile(str(output), 'w', ZIP_DEFLATED) as dst:
-            for name in members:
-                if name.endswith('/'):
-                    continue
-                if name == 'word/document.xml':
-                    dst.writestr(name, document_xml)
-                elif name == 'word/settings.xml':
-                    settings_xml = other_files.get(name, b'').decode('utf-8', errors='ignore') if isinstance(other_files.get(name, b''), bytes) else other_files.get(name, '')
-                    if '<w:updateFields' not in settings_xml:
-                        settings_xml = settings_xml.replace('</w:settings>', '<w:updateFields w:val="true"/></w:settings>')
-                    dst.writestr(name, settings_xml)
-                else:
-                    dst.writestr(name, other_files.get(name, b''))
-        return str(output)
-
-    # 步骤3：对房间2~N，提取数据表并追加
+    # 步骤3：对房间2~N，提取数据表并追加（所有领域统一路径）
     insert_before = '</w:body>'
     insert_pos = document_xml.rfind(insert_before)
     if insert_pos < 0:
@@ -5581,24 +5598,31 @@ def build_mixed_report_docx(export_payload: Dict[str, Any], output_path: str) ->
         if not tpl_path or not Path(tpl_path).exists():
             continue
 
-        # 从该房间等级的模板提取数据表
-        data_table_xml = _extract_last_table_xml(tpl_path)
-        if not data_table_xml:
-            continue
+        # 从该房间等级的模板提取所有参数数据表（排除前四页骨架表）
+        data_tables = _extract_data_tables_xml(tpl_path)
+        if not data_tables:
+            # 兼容回退：如果新函数未识别到数据表，尝试旧逻辑取最后一张
+            fallback = _extract_last_table_xml(tpl_path)
+            if fallback:
+                data_tables = [fallback]
+            else:
+                continue
 
-        # 填充数据
-        filled_table = _fill_data_table_xml(data_table_xml, room_export, export_payload)
+        # 对每张数据表分别填充并追加
+        for dt_idx, data_table_xml in enumerate(data_tables):
+            filled_table = _fill_data_table_xml(data_table_xml, room_export, export_payload)
 
-        # 追加分页符 + 标题段落 + 数据表
-        # 注意：房间页片段/模板自身已带原生报告编号位，这里不要再手工补 report_num_xml，避免第二房间起重复编号
-        header_xml = (
-            '<w:p><w:pPr><w:jc w:val="center"/></w:pPr>'
-            '<w:r><w:rPr><w:rFonts w:ascii="\u5b8b\u4f53" w:hAnsi="\u5b8b\u4f53" w:eastAsia="\u5b8b\u4f53"/>'
-            '<w:b/><w:sz w:val="28"/></w:rPr>'
-            f'<w:t xml:space="preserve">\u68c0 \u6d4b \u62a5 \u544a</w:t></w:r></w:p>'
-        )
-
-        additional_xml += _page_break_para_xml() + header_xml + filled_table
+            # 追加分页符 + 标题段落 + 数据表（仅第一张表前加标题）
+            if dt_idx == 0:
+                header_xml = (
+                    '<w:p><w:pPr><w:jc w:val="center"/></w:pPr>'
+                    '<w:r><w:rPr><w:rFonts w:ascii="\u5b8b\u4f53" w:hAnsi="\u5b8b\u4f53" w:eastAsia="\u5b8b\u4f53"/>'
+                    '<w:b/><w:sz w:val="28"/></w:rPr>'
+                    f'<w:t xml:space="preserve">\u68c0 \u6d4b \u62a5 \u544a</w:t></w:r></w:p>'
+                )
+                additional_xml += _page_break_para_xml() + header_xml + filled_table
+            else:
+                additional_xml += filled_table
 
     if additional_xml:
         document_xml = document_xml[:insert_pos] + additional_xml + document_xml[insert_pos:]

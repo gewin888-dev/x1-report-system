@@ -3304,9 +3304,10 @@ function renderHepaLeakMulti(rid,p){
     h+=`</div>`;
     h+=`<div style="display:flex;align-items:center;gap:8px;">`;
     h+=`<span style="color:#666;font-size:13px;">检测值：</span>`;
-    h+=`<input type="number" step="any" min="0" placeholder="输入检测值" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:4px;" oninput="calc_hepa_single('${rid}','${p.key}',0)">`;
+    h+=`<input type="number" step="any" min="0" placeholder="输入检测值" data-hepa-value="${p.key}-0" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:4px;" oninput="calc_hepa_multi('${rid}','${p.key}')">`;
     h+=`<span style="color:#666;font-size:13px;">${displayUnit}</span>`;
     h+=`</div>`;
+    h+=`<div class="cr" style="margin-top:8px;"><span>结果:</span><span class="cv" data-hepa-res="${p.key}-0">-</span></div>`;
     h+=`</div>`;
     h+=`<button class="add-pt" style="margin-top:6px;width:100%;" onclick="addHepaObj('${rid}','${p.key}')">＋ 添加检测对象</button>`;
     h+=`</div>`;
@@ -3641,7 +3642,7 @@ function addHepaObj(rid,pk){
     h+=`</div>`;
     h+=`<div style="display:flex;align-items:center;gap:8px;">`;
     h+=`<span style="color:#666;font-size:13px;">检测值:</span>`;
-    h+=`<input type="number" step="any" min="0" placeholder="输入检测值" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:4px;" oninput="calc_hepa_single('${rid}','${pk}',${newIdx})">`;
+    h+=`<input type="number" step="any" min="0" placeholder="输入检测值" data-hepa-value="${pk}-${newIdx}" style="flex:1;padding:6px;border:1px solid #ddd;border-radius:4px;" oninput="calc_hepa_multi('${rid}','${pk}')">`;
     h+=`<span style="color:#666;font-size:13px;">%</span>`;
     h+=`</div>`;
     h+=`<div class="cr" style="margin-top:8px;"><span>结果:</span><span class="cv" data-hepa-res="${pk}-${newIdx}">-</span></div>`;
@@ -3688,12 +3689,12 @@ function calc_hepa_single(rid,pk,idx){
 
     if(!obj || !resSpan) return;
 
-    const inputs=obj.querySelectorAll('input[type="number"]');
-    const input=inputs[inputs.length-1];
+    const input = obj.querySelector(`[data-hepa-value="${pk}-${idx}"]`) || obj.querySelector('input[type="number"]');
     if(!input) return;
-    const val=parseFloat(input.value);
+    const rawVal = (input.value || '').trim();
+    const val=parseFloat(rawVal);
 
-    if(isNaN(val) || val === ''){
+    if(rawVal === '' || isNaN(val)){
         resSpan.textContent='-';
         resSpan.style.color='#999';
         resSpan.style.background='';
@@ -3746,7 +3747,7 @@ function calc_hepa_single(rid,pk,idx){
         const standard = getParamRange(rid,pk).standard || 'GB 50591-2010';
         room.dataset.hepaLeakSummary = `${firstName}:${range||''}[${standard}]`;
         room.dataset.hepaLeakSummarySource = standard;
-        room.dataset.hepaLeakSourceState = val.toString().trim() ? 'live' : '';
+        room.dataset.hepaLeakSourceState = rawVal ? 'live' : '';
         updateRoomSummary(rid);
     }
 }
@@ -7337,6 +7338,7 @@ function fillRoomParams(rid, card, params){
                     if(numInput) numInput.value = item.value || '';
                     calc_hepa_single(rid, key, idx);
                 });
+                calc_hepa_multi(rid, key);
             }
             const savedSummary = param.primarySummary || param.summary || card.dataset.hepaLeakSummary || '';
             const savedStandard = param.standard || 'GB 50591-2010';

@@ -330,17 +330,19 @@
           urgeBtns += ' <button class="btn btn-warn btn-sm" onclick="urgeProject(' + p.id + ',\'invoice\')">🧾 催发票</button>';
         }
 
-        // === 报告操作按钮（状态驱动高亮/灰色） ===
-        var canPreview = (rptStatus === '待客户确认' || rptStatus === '客户已确认' || rptStatus === '已出报告' || rptStatus === '已出具' || rptStatus === '已发送客户');
+        // === 报告操作按钮（按客户可见报告类型精确显示） ===
+        var reportType = (p.customer_visible_report_type || 'none').trim();
+        var reportLabel = p.customer_visible_report_label || (reportType === 'final' ? '正式报告' : (reportType === 'draft' ? '审核稿' : '报告'));
+        var canPreview = !!p.has_customer_visible_report;
         var canFeedback = (rptStatus === '待客户确认');
         var canConfirm = (rptStatus === '待客户确认');
         var reportBtns = '';
         if (canPreview) {
-          reportBtns += '<button class="btn btn-sm btn-preview" onclick="previewReport(' + p.id + ')">🔍 预览</button>';
-          reportBtns += '<button class="btn btn-sm" onclick="downloadReport(' + p.id + ')" style="background:#f0f5ff;color:#1677ff;border:1px solid #91caff;">⬇️ 下载</button>';
+          reportBtns += '<button class="btn btn-sm btn-preview" onclick="previewReport(' + p.id + ')">🔍 预览' + escapeHtml(reportLabel) + '</button>';
+          reportBtns += '<button class="btn btn-sm" onclick="downloadReport(' + p.id + ')" style="background:#f0f5ff;color:#1677ff;border:1px solid #91caff;">⬇️ 下载' + escapeHtml(reportLabel) + '</button>';
         } else {
-          reportBtns += '<button class="btn btn-sm btn-disabled" disabled>🔍 预览</button>';
-          reportBtns += '<button class="btn btn-sm btn-disabled" disabled>⬇️ 下载</button>';
+          reportBtns += '<button class="btn btn-sm btn-disabled" disabled>🔍 暂无可预览报告</button>';
+          reportBtns += '<button class="btn btn-sm btn-disabled" disabled>⬇️ 暂无可下载报告</button>';
         }
         if (canFeedback) {
           reportBtns += '<button class="btn btn-sm btn-feedback" onclick="openReportFeedback(' + p.id + ')">✍️ 反馈</button>';

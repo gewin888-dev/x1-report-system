@@ -1747,15 +1747,14 @@ def admin_api_docs(doc_name):
 @login_required
 def admin_api_workspace_doc():
     allowed = {
-        'X1_系统当前版本说明.md', 'X1_版本号管理规则.md',
-        'ARCHITECTURE.md', 'API.md', 'HOST_MODE.md',
-        'X1 常见问题排障手册.md', 'X1 运维启动-停止-验活说明.md',
-        'X1 部署与迁移说明.md', 'X1 飞书上传失败治理 SOP.md',
-        'X1_全量代码审计报告_2026-05-16_v2.md',
-        'X1_架构重构计划_2026-05-16.md',
-        'X1_飞书月目录自动切换运维说明_2026-05-12.md',
-        'X1_SYSTEM_UNDERSTANDING_REPORT.md',
-        'X1_FULL_AUDIT_AND_REPAIR_PLAN.md',
+        'X1_系统当前版本说明.md',
+        'ARCHITECTURE.md',
+        'API.md',
+        'X1_任务链规则文档_v1.md',
+        'X1_权限系统新模型说明_v2.md',
+        'X1 常见问题排障手册.md',
+        'X1 运维启动-停止-验活说明.md',
+        'X1 部署与迁移说明.md',
     }
     requested = request.args.get('path', '').strip()
     if not requested:

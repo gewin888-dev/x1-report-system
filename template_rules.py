@@ -171,43 +171,43 @@ TEMPLATE_RULE_REGISTRY = {
     'food.food_workshop': {
         'grade-default': {
             'Ⅰ级（百级）': {
-                'template_key': 'food/food_workshop/default/1',
+                'template_key': 'food/food_workshop/grade/1',
                 'template_name': '食品加工洁净车间百级',
             },
             'Ⅰ级': {
-                'template_key': 'food/food_workshop/default/1',
+                'template_key': 'food/food_workshop/grade/1',
                 'template_name': '食品加工洁净车间百级',
             },
             'Ⅱ级（千级）': {
-                'template_key': 'food/food_workshop/default/234',
+                'template_key': 'food/food_workshop/grade/2',
                 'template_name': '食品加工洁净车间万级十万级三十万级',
             },
             'Ⅱ级（万级）': {
-                'template_key': 'food/food_workshop/default/234',
+                'template_key': 'food/food_workshop/grade/2',
                 'template_name': '食品加工洁净车间万级十万级三十万级',
             },
             'Ⅱ级': {
-                'template_key': 'food/food_workshop/default/234',
+                'template_key': 'food/food_workshop/grade/2',
                 'template_name': '食品加工洁净车间万级十万级三十万级',
             },
             'Ⅲ级（万级）': {
-                'template_key': 'food/food_workshop/default/234',
+                'template_key': 'food/food_workshop/grade/3',
                 'template_name': '食品加工洁净车间万级十万级三十万级',
             },
             'Ⅲ级（十万级）': {
-                'template_key': 'food/food_workshop/default/234',
+                'template_key': 'food/food_workshop/grade/3',
                 'template_name': '食品加工洁净车间万级十万级三十万级',
             },
             'Ⅲ级': {
-                'template_key': 'food/food_workshop/default/234',
+                'template_key': 'food/food_workshop/grade/3',
                 'template_name': '食品加工洁净车间万级十万级三十万级',
             },
             'Ⅳ级（三十万级）': {
-                'template_key': 'food/food_workshop/default/234',
+                'template_key': 'food/food_workshop/grade/4',
                 'template_name': '食品加工洁净车间万级十万级三十万级',
             },
             'Ⅳ级': {
-                'template_key': 'food/food_workshop/default/234',
+                'template_key': 'food/food_workshop/grade/4',
                 'template_name': '食品加工洁净车间万级十万级三十万级',
             },
         },
@@ -528,7 +528,20 @@ def resolve_template_rule(project: Dict[str, Any]) -> Dict[str, Any]:
         rule['report_context_mode'] = 'food-workshop-grade'
         matched = (TEMPLATE_RULE_REGISTRY.get(family, {}).get(variant, {})
                    .get(food_grade, {}))
-        rule['template_key'] = matched.get('template_key', f"food/food_workshop/default/{food_grade or 'unknown'}")
+        grade_fallback_map = {
+            'Ⅰ级（百级）': '1',
+            'Ⅰ级': '1',
+            'Ⅱ级（千级）': '2',
+            'Ⅱ级（万级）': '2',
+            'Ⅱ级': '2',
+            'Ⅲ级（万级）': '3',
+            'Ⅲ级（十万级）': '3',
+            'Ⅲ级': '3',
+            'Ⅳ级（三十万级）': '4',
+            'Ⅳ级': '4',
+        }
+        fallback_suffix = grade_fallback_map.get(food_grade, str(food_grade or 'unknown'))
+        rule['template_key'] = matched.get('template_key', f"food/food_workshop/grade/{fallback_suffix}")
         rule['template_name'] = matched.get('template_name', '')
         rule['facts']['food_grade'] = food_grade
 
