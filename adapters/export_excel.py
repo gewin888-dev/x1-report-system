@@ -65,8 +65,21 @@ def _clean_text(v):
 
 
 def _judge_from_result(v):
-    txt = str(v or '')
-    return '不合格' if ('\u274c' in txt or '\u26a0' in txt) else '合格'
+    txt = str(v or '').strip()
+    if not txt:
+        return ''
+    if any(flag in txt for flag in ('❌', '✗', '☒')):
+        return '不合格'
+    if any(flag in txt for flag in ('✅', '✓', '☑')):
+        return '合格'
+    normalized = txt.replace('（', '(').replace('）', ')').replace(' ', '')
+    fail_markers = ['不合格', '不符合要求', '未通过', '超标', '异常']
+    pass_markers = ['合格', '符合要求', '通过']
+    if any(marker in normalized for marker in fail_markers):
+        return '不合格'
+    if any(marker in normalized for marker in pass_markers):
+        return '合格'
+    return ''
 
 
 def _normalize_param_item(item):
@@ -114,7 +127,28 @@ def _get_param(room, *keys):
 
 def _result(room, *keys, default=''):
     p = _get_param(room, *keys)
-    return _clean_text(p.get('result', default))
+    raw = _clean_text(p.get('result', default))
+    if raw and not _judge_from_result(raw):
+        values = p.get('values')
+        if isinstance(values, list) and values:
+            joined = ','.join(str(v) for v in values if str(v).strip())
+            if joined and raw in joined:
+                raw = ''
+    return raw
+
+
+def _judge_text(room, *keys, default=''):
+    p = _get_param(room, *keys)
+    result_text = _clean_text(p.get('result', default))
+    judged = _judge_from_result(result_text)
+    if judged:
+        return judged
+    passed = p.get('passed')
+    if passed is True:
+        return '合格'
+    if passed is False:
+        return '不合格'
+    return ''
 
 
 def _values(room, *keys):
@@ -364,9 +398,9 @@ def _build_hospital_record(export_payload, output_path):
                 volume = round(area * speed * 3600, 1)
             headers = ['风口面积(m²)', '风速(m/s)', '风量(m³/h)', '房间体积(m³)', '换气次数', '', '', '']
             data = [str(area), str(speed), str(volume), str(room_volume), _result(room, 'airchange'), '', '', '']
-            row = _write_section(ws, row, title, headers, [data], _result(room, 'airchange'), _judge_from_result(_result(room, 'airchange')))
+            row = _write_section(ws, row, title, headers, [data], _result(room, 'airchange'), _judge_text(room, 'airchange'))
         else:
-            row = _write_section_simple(ws, row, title, airchange_vals, _result(room, 'airchange'), _judge_from_result(_result(room, 'airchange')))
+            row = _write_section_simple(ws, row, title, airchange_vals, _result(room, 'airchange'), _judge_text(room, 'airchange'))
 
     # --- 截面平均风速 ---
     wind_vals = _values(room, 'wind_speed', 'air_velocity')
@@ -491,7 +525,7 @@ def _build_hospital_record(export_payload, output_path):
         judge_range = _get_judge_range(export_payload, 'temperature')
         title_suffix = f' 判定范围：{judge_range}' if judge_range else ''
         title = f'温度（℃）{title_suffix}'
-        row = _write_section_simple(ws, row, title, temp_vals, _result(room, 'temperature'), _judge_from_result(_result(room, 'temperature')))
+        row = _write_section_simple(ws, row, title, temp_vals, _result(room, 'temperature'), _judge_text(room, 'temperature'))
 
     # --- 相对湿度 ---
     humid_vals = _values(room, 'humidity')
@@ -499,7 +533,7 @@ def _build_hospital_record(export_payload, output_path):
         judge_range = _get_judge_range(export_payload, 'humidity')
         title_suffix = f' 判定范围：{judge_range}' if judge_range else ''
         title = f'相对湿度（%）{title_suffix}'
-        row = _write_section_simple(ws, row, title, humid_vals, _result(room, 'humidity'), _judge_from_result(_result(room, 'humidity')))
+        row = _write_section_simple(ws, row, title, humid_vals, _result(room, 'humidity'), _judge_text(room, 'humidity'))
 
     # --- 噪声 ---
     noise_vals = _values(room, 'noise')
@@ -507,7 +541,7 @@ def _build_hospital_record(export_payload, output_path):
         judge_range = _get_judge_range(export_payload, 'noise')
         title_suffix = f' 判定范围：{judge_range}' if judge_range else ''
         title = f'噪声（dB(A)）{title_suffix}'
-        row = _write_section_simple(ws, row, title, noise_vals, _result(room, 'noise'), _judge_from_result(_result(room, 'noise')))
+        row = _write_section_simple(ws, row, title, noise_vals, _result(room, 'noise'), _judge_text(room, 'noise'))
 
     # --- 照度（最低照度） ---
     illum_vals = _values(room, 'illumination', 'illumination_main_room', 'illumination_min')
@@ -515,7 +549,7 @@ def _build_hospital_record(export_payload, output_path):
         judge_range = _get_judge_range(export_payload, 'illumination')
         title_suffix = f' 判定范围：{judge_range}' if judge_range else ''
         title = f'照度（最低照度）（lx）{title_suffix}'
-        row = _write_section_simple(ws, row, title, illum_vals, _result(room, 'illumination', 'illumination_main_room', 'illumination_min'), _judge_from_result(_result(room, 'illumination', 'illumination_main_room', 'illumination_min')))
+        row = _write_section_simple(ws, row, title, illum_vals, _result(room, 'illumination', 'illumination_main_room', 'illumination_min'), _judge_text(room, 'illumination', 'illumination_main_room', 'illumination_min'))
 
     # --- 照度均匀度 ---
     illum_uni_vals = _values(room, 'illumination_uniformity')
@@ -604,9 +638,9 @@ def _build_pharma_cleanroom_record(export_payload, output_path):
                 volume = round(area * speed * 3600, 1)
             headers = ['风口面积(m²)', '风速(m/s)', '风量(m³/h)', '房间体积(m³)', '换气次数', '', '', '']
             data = [str(area), str(speed), str(volume), str(room_volume), _result(room, 'airchange'), '', '', '']
-            row = _write_section(ws, row, title, headers, [data], _result(room, 'airchange'), _judge_from_result(_result(room, 'airchange')))
+            row = _write_section(ws, row, title, headers, [data], _result(room, 'airchange'), _judge_text(room, 'airchange'))
         else:
-            row = _write_section_simple(ws, row, title, airchange_vals, _result(room, 'airchange'), _judge_from_result(_result(room, 'airchange')))
+            row = _write_section_simple(ws, row, title, airchange_vals, _result(room, 'airchange'), _judge_text(room, 'airchange'))
 
     # --- 静压差 ---
     prs = _pairs(room, 'pressure')
@@ -668,7 +702,7 @@ def _build_pharma_cleanroom_record(export_payload, output_path):
         judge_range = _get_judge_range(export_payload, 'temperature')
         title_suffix = f' 判定范围：{judge_range}' if judge_range else ''
         title = f'温度（℃）{title_suffix}'
-        row = _write_section_simple(ws, row, title, temp_vals, _result(room, 'temperature'), _judge_from_result(_result(room, 'temperature')))
+        row = _write_section_simple(ws, row, title, temp_vals, _result(room, 'temperature'), _judge_text(room, 'temperature'))
 
     # --- 相对湿度 ---
     humid_vals = _values(room, 'humidity')
@@ -676,7 +710,7 @@ def _build_pharma_cleanroom_record(export_payload, output_path):
         judge_range = _get_judge_range(export_payload, 'humidity')
         title_suffix = f' 判定范围：{judge_range}' if judge_range else ''
         title = f'相对湿度（%）{title_suffix}'
-        row = _write_section_simple(ws, row, title, humid_vals, _result(room, 'humidity'), _judge_from_result(_result(room, 'humidity')))
+        row = _write_section_simple(ws, row, title, humid_vals, _result(room, 'humidity'), _judge_text(room, 'humidity'))
 
     # --- 噪声 ---
     noise_vals = _values(room, 'noise')
@@ -684,7 +718,7 @@ def _build_pharma_cleanroom_record(export_payload, output_path):
         judge_range = _get_judge_range(export_payload, 'noise')
         title_suffix = f' 判定范围：{judge_range}' if judge_range else ''
         title = f'噪声（dB(A)）{title_suffix}'
-        row = _write_section_simple(ws, row, title, noise_vals, _result(room, 'noise'), _judge_from_result(_result(room, 'noise')))
+        row = _write_section_simple(ws, row, title, noise_vals, _result(room, 'noise'), _judge_text(room, 'noise'))
 
     # --- 照度 ---
     illum_vals = _values(room, 'illumination', 'illumination_main_room')
@@ -692,7 +726,7 @@ def _build_pharma_cleanroom_record(export_payload, output_path):
         judge_range = _get_judge_range(export_payload, 'illumination')
         title_suffix = f' 判定范围：{judge_range}' if judge_range else ''
         title = f'照度（lx）{title_suffix}'
-        row = _write_section_simple(ws, row, title, illum_vals, _result(room, 'illumination', 'illumination_main_room'), _judge_from_result(_result(room, 'illumination', 'illumination_main_room')))
+        row = _write_section_simple(ws, row, title, illum_vals, _result(room, 'illumination', 'illumination_main_room'), _judge_text(room, 'illumination', 'illumination_main_room'))
 
     # --- 自净时间 ---
     self_purify_vals = _values(room, 'self_purification_time', 'self_purify_time')

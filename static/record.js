@@ -2945,7 +2945,8 @@ function renderAirchangeSpeedOnly(rid,p){
         h += `</div>`;
     }
     h += `<div class="dp dp-wide" data-dp-airspeedonly="${p.key}">`;
-    h += `<div style="font-size:12px;color:#666;margin-bottom:6px;">仅按风速仪法录入风口面积与风速，自动计算换气次数</div>`;
+    h += `<div style="font-size:12px;color:#666;margin-bottom:6px;">按风速仪法录入风口面积与风速，系统会结合房间长×宽×高自动计算换气次数</div>`;
+    h += `<div style="font-size:12px;color:#d46b08;background:#fff7e6;border:1px solid #ffd591;border-radius:6px;padding:6px 8px;margin-bottom:8px;">⚠️ 需先补全房间尺寸（长/宽/高）和至少一个风口的面积、风速，否则换气次数无法生成有效结果</div>`;
     h += `<div data-ac-vents="${p.key}">`;
     h += `<div class="vent-grid" data-vent-row>
         <div class="vent-item"><label>面积(m²)</label><input type="number" step="any" data-va oninput="calc_airchange('${rid}','${p.key}')"></div>
@@ -4468,9 +4469,15 @@ function calc_airchange(rid,pk){
     const room=document.querySelector(`[data-rid="${rid}"]`);
     const rows=room.querySelectorAll(`[data-ac-vents="${pk}"] [data-vent-row]`);
     let totalQ=0;
+    let hasArea=false, hasSpeed=false, hasCompleteVent=false;
     rows.forEach(row=>{
-        const area=parseFloat(row.querySelector('[data-va]')?.value)||0;
-        const speed=parseFloat(row.querySelector('[data-vs]')?.value)||0;
+        const areaRaw=row.querySelector('[data-va]')?.value||'';
+        const speedRaw=row.querySelector('[data-vs]')?.value||'';
+        const area=parseFloat(areaRaw)||0;
+        const speed=parseFloat(speedRaw)||0;
+        if(String(areaRaw).trim()!=='') hasArea=true;
+        if(String(speedRaw).trim()!=='') hasSpeed=true;
+        if(area>0 && speed>0) hasCompleteVent=true;
         const q=area*speed*3600;
         row.querySelector('[data-vq]').value=q>0?q.toFixed(1):'';
         totalQ+=q;
@@ -4482,7 +4489,14 @@ function calc_airchange(rid,pk){
         const pass=judgeRange(ac,pr.range);
         setRes(rid,pk,`总风量${totalQ.toFixed(0)}m3/h ÷ 体积${vol.toFixed(1)}m3 = ${ac.toFixed(1)}次/h`,pass);
     } else {
-        const hint = totalQ > 0 && vol <= 0 ? '缺少房间体积' : '-';
+        let hint='-';
+        if(vol<=0 && !hasArea && !hasSpeed) hint='缺少房间尺寸及风口参数';
+        else if(vol<=0 && !hasCompleteVent) hint='缺少房间尺寸及完整风口参数';
+        else if(vol<=0) hint='缺少房间体积';
+        else if(!hasArea && !hasSpeed) hint='缺少风口面积和风速';
+        else if(!hasArea) hint='缺少风口面积';
+        else if(!hasSpeed) hint='缺少风口风速';
+        else if(!hasCompleteVent) hint='风口参数不完整';
         setRes(rid,pk,hint,'');
     }
 }
@@ -5555,6 +5569,20 @@ function validate(){
         if(r.type_id === 'operating_room' && (r.surgery_room_type || '') && !(r.clean_class || '') && (Object.keys(r.params||{}).length > 0 || Boolean(r.basis_expanded) || Boolean(r.judgement_expanded))){
             showToast(`${roomLabel}:手术室洁净等级未完成,不得保留参数区或展开态`,'error');
             return null;
+        }
+        if(r.type_id === 'operating_room' && (r.surgery_room_type || '') === '洁净辅房'){
+            const auxAirchangeEntry = Object.entries(r.params||{}).find(([_, param]) => {
+                const ptype = String(param?.type || '');
+                return ptype === 'airchange_speed' || ptype === 'airchange_speed_only' || ptype === 'airchange_volume';
+            });
+            if(auxAirchangeEntry){
+                const airParam = auxAirchangeEntry[1] || {};
+                const airResult = String(airParam.result || '').trim();
+                if(!airResult || airResult === '-' || airResult.includes('缺少')){
+                    showToast(`${roomLabel}:辅房换气次数未形成有效结果，请补全房间尺寸（长宽高）及风口面积/风速后再提交`,'error');
+                    return null;
+                }
+            }
         }
         if(r.type_id === 'animal_room' && Boolean(r.clean_class) && r.clean_class === '屏障环境' && !(r.barrier_room_class || '')){
             showToast(`${roomLabel}:动物房链路异常,屏障环境已存在但房间类别为空`,'error');

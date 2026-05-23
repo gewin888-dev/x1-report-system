@@ -9,6 +9,21 @@ from xml.sax.saxutils import escape
 from template_standard_profiles import get_template_standard_profile
 
 
+def _replace_tc_text_minimal(cell_xml: str, new_text: str) -> str:
+    text_matches = list(re.finditer(r'(<w:t[^>]*>)(.*?)(</w:t>)', cell_xml, re.S))
+    if text_matches:
+        last = text_matches[-1]
+        return cell_xml[:last.start()] + last.group(1) + escape(str(new_text)) + last.group(3) + cell_xml[last.end():]
+    tcpr = re.search(r'(<w:tcPr\b.*?</w:tcPr>)', cell_xml, re.S)
+    if tcpr:
+        inner = cell_xml[tcpr.end():]
+        return cell_xml[:tcpr.end()] + _para_xml(new_text) + inner
+    inner = re.match(r'(<w:tc\b[^>]*>)(.*?)(</w:tc>)', cell_xml, re.S)
+    if inner:
+        return inner.group(1) + _para_xml(new_text) + inner.group(2) + inner.group(3)
+    return cell_xml
+
+
 def _para_xml(text: str) -> str:
     return (
         '<w:p>'
@@ -315,7 +330,23 @@ def get_param_item(param_map: Dict[str, Dict[str, Any]], *aliases: str) -> Dict[
 def get_param_values(param_map: Dict[str, Dict[str, Any]], *aliases: str) -> Dict[str, Any]:
     item = get_param_item(param_map, *aliases)
     values = item.get('values') if isinstance(item, dict) else {}
-    return values if isinstance(values, dict) else {}
+    if isinstance(values, dict):
+        return values
+    data = item.get('data') if isinstance(item, dict) else {}
+    if isinstance(data, dict):
+        fallback = {}
+        for key in (
+            'max_0_5um', 'max_5um', 'ucl_0_5um', 'ucl_5um',
+            'p05_max', 'p5_max', 'p05_ucl', 'p5_ucl',
+            'op_05_max', 'op_5_max', 'op_05_ucl', 'op_5_ucl',
+            'surr_05_max', 'surr_5_max', 'surr_05_ucl', 'surr_5_ucl',
+            'value', 'avg', 'average', 'mean', 'text', 'display'
+        ):
+            if data.get(key) not in (None, ''):
+                fallback[key] = data.get(key)
+        if fallback:
+            return fallback
+    return {}
 
 
 def get_param_meta(param_map: Dict[str, Dict[str, Any]], *aliases: str) -> Dict[str, Any]:
@@ -879,6 +910,14 @@ def _build_placeholder_fill_plan(export_payload: Dict[str, Any]) -> List[Tuple[s
         def _op_compact_value(*keys: str) -> str:
             raw = str(_op_value(*keys) or '').strip()
             if not raw:
+                item = get_param_item(param_map, *keys)
+                if isinstance(item, dict):
+                    vents = item.get('vents') or []
+                    if isinstance(vents, list) and vents:
+                        first = vents[0] if isinstance(vents[0], dict) else {}
+                        volume = str(first.get('volume', '') or '').strip()
+                        if volume:
+                            return volume
                 return ''
             import re as _re_op_val
             _m = _re_op_val.search(r'=\s*([\-]?[\d.]+)\s*(?:次/h|m/s|Pa|℃|%|lx|dB\(?A?\)?)?\s*$', raw)
@@ -894,24 +933,55 @@ def _build_placeholder_fill_plan(export_payload: Dict[str, Any]) -> List[Tuple[s
 
         particle_meta = get_param_meta(param_map, 'particle')
         particle_values = get_param_values(param_map, 'particle')
+        particle_item = get_param_item(param_map, 'particle')
+        particle_data = particle_item.get('data', {}) if isinstance(particle_item, dict) else {}
+        if not isinstance(particle_data, dict):
+            particle_data = {}
         particle_clean_class = particle_meta.get('clean_class', '') or clean_class_text
-        particle_max_05 = str(particle_values.get('max_0_5um', '') or '')
+        particle_max_05 = str(
+            particle_values.get('max_0_5um', '')
+            or particle_values.get('op_05_max', '')
+            or particle_data.get('op_05_max', '')
+            or particle_data.get('p05_max', '')
+            or ''
+        )
         particle_result = get_param_result(param_map, 'particle')
-        particle_max_5 = str(particle_values.get('max_5um', '') or '')
-        particle_ucl_05 = str(particle_values.get('ucl_0_5um', '') or particle_values.get('op_05_ucl', '') or '')
-        particle_ucl_5 = str(particle_values.get('ucl_5um', '') or particle_values.get('op_5_ucl', '') or '')
-        particle_op_max_05 = str(particle_values.get('op_05_max', '') or particle_values.get('max_0_5um_op', '') or '')
-        particle_op_ucl_05 = str(particle_values.get('op_05_ucl', '') or particle_values.get('ucl_0_5um_op', '') or '')
-        particle_op_max_5 = str(particle_values.get('op_5_max', '') or particle_values.get('max_5um_op', '') or '')
-        particle_op_ucl_5 = str(particle_values.get('op_5_ucl', '') or particle_values.get('ucl_5um_op', '') or '')
-        particle_surr_max_05 = str(particle_values.get('surr_05_max', '') or particle_values.get('max_0_5um_surr', '') or '')
-        particle_surr_ucl_05 = str(particle_values.get('surr_05_ucl', '') or particle_values.get('ucl_0_5um_surr', '') or '')
-        particle_surr_max_5 = str(particle_values.get('surr_5_max', '') or particle_values.get('max_5um_surr', '') or '')
-        particle_surr_ucl_5 = str(particle_values.get('surr_5_ucl', '') or particle_values.get('ucl_5um_surr', '') or '')
+        if surgery_room_type in ('洁净辅房', '辅房'):
+            particle_max_05 = str(particle_values.get('p05_max', '') or particle_data.get('p05_max', '') or particle_values.get('max_0_5um', '') or '')
+            particle_max_5 = str(particle_values.get('p5_max', '') or particle_data.get('p5_max', '') or particle_values.get('max_5um', '') or '')
+            particle_ucl_05 = str(particle_values.get('p05_ucl', '') or particle_data.get('p05_ucl', '') or particle_values.get('ucl_0_5um', '') or '')
+            particle_ucl_5 = str(particle_values.get('p5_ucl', '') or particle_data.get('p5_ucl', '') or particle_values.get('ucl_5um', '') or '')
+        else:
+            particle_max_5 = str(
+                particle_values.get('max_5um', '')
+                or particle_values.get('op_5_max', '')
+                or particle_data.get('op_5_max', '')
+                or particle_data.get('p5_max', '')
+                or ''
+            )
+        particle_ucl_05 = str(particle_values.get('ucl_0_5um', '') or particle_values.get('op_05_ucl', '') or particle_data.get('op_05_ucl', '') or particle_data.get('p05_ucl', '') or '')
+        particle_ucl_5 = str(particle_values.get('ucl_5um', '') or particle_values.get('op_5_ucl', '') or particle_data.get('op_5_ucl', '') or particle_data.get('p5_ucl', '') or '')
+        particle_op_max_05 = str(particle_values.get('op_05_max', '') or particle_data.get('op_05_max', '') or particle_values.get('max_0_5um_op', '') or '')
+        particle_op_ucl_05 = str(particle_values.get('op_05_ucl', '') or particle_data.get('op_05_ucl', '') or particle_values.get('ucl_0_5um_op', '') or '')
+        particle_op_max_5 = str(particle_values.get('op_5_max', '') or particle_data.get('op_5_max', '') or particle_values.get('max_5um_op', '') or '')
+        particle_op_ucl_5 = str(particle_values.get('op_5_ucl', '') or particle_data.get('op_5_ucl', '') or particle_values.get('ucl_5um_op', '') or '')
+        particle_surr_max_05 = str(particle_values.get('surr_05_max', '') or particle_data.get('surr_05_max', '') or particle_values.get('max_0_5um_surr', '') or '')
+        particle_surr_ucl_05 = str(particle_values.get('surr_05_ucl', '') or particle_data.get('surr_05_ucl', '') or particle_values.get('ucl_0_5um_surr', '') or '')
+        particle_surr_max_5 = str(particle_values.get('surr_5_max', '') or particle_data.get('surr_5_max', '') or particle_values.get('max_5um_surr', '') or '')
+        particle_surr_ucl_5 = str(particle_values.get('surr_5_ucl', '') or particle_data.get('surr_5_ucl', '') or particle_values.get('ucl_5um_surr', '') or '')
 
         bacteria_values = get_param_values(param_map, 'bacteria')
-        bacteria_op_value = str(bacteria_values.get('op_value', '') or bacteria_values.get('surgical', '') or _op_value('settle_bacteria_surgical') or '')
-        bacteria_surr_value = str(bacteria_values.get('surr_value', '') or bacteria_values.get('surrounding', '') or _op_value('settle_bacteria_surrounding') or '')
+        bacteria_item = get_param_item(param_map, 'bacteria')
+        bacteria_data = bacteria_item.get('data', {}) if isinstance(bacteria_item, dict) else {}
+        if not isinstance(bacteria_data, dict):
+            bacteria_data = {}
+        bacteria_op_value = str(bacteria_values.get('op_value', '') or bacteria_values.get('surgical', '') or bacteria_data.get('op_value', '') or _op_value('settle_bacteria_surgical') or '')
+        bacteria_surr_value = str(bacteria_values.get('surr_value', '') or bacteria_values.get('surrounding', '') or bacteria_data.get('surr_value', '') or _op_value('settle_bacteria_surrounding') or '')
+        if surgery_room_type in ('洁净辅房', '辅房'):
+            vals = bacteria_item.get('values') if isinstance(bacteria_item, dict) else []
+            if isinstance(vals, list) and vals:
+                bacteria_op_value = str(vals[0] or '')
+                bacteria_surr_value = ''
 
         plan.extend([
             ('房间名称', room_display_name),
@@ -1132,9 +1202,15 @@ def _build_placeholder_fill_plan(export_payload: Dict[str, Any]) -> List[Tuple[s
         particle = param_map.get('particle', {}) or {}
         particle_meta = particle.get('meta', {}) or {}
         particle_values = particle.get('values', {}) or {}
+        if not isinstance(particle_values, dict):
+            particle_values = {}
+        particle_data = particle.get('data', {}) or {}
+        if not isinstance(particle_data, dict):
+            particle_data = {}
         particle_clean_class = str(particle_meta.get('clean_class', '') or gmp_grade or '')
         particle_max_05 = str(
             particle_values.get('max_0_5um', '')
+            or particle_data.get('p05_max', '')
             or _vgmp_value('particle', 'cleanliness_05um', '≥0.5μm', '0.5um', '0.5μm')
             or ''
         )
@@ -4573,7 +4649,7 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
 
                 _aux_rows = [
                     (_R['wind'], _op_std_ranges.get('wind_speed', '') or _op_std_ranges.get('airchange', ''),
-                     replacements.get('截面风速', '') or replacements.get('截面平均风速', '') or replacements.get('换气次数', ''),
+                     replacements.get('截面风速', '') or replacements.get('截面平均风速', '') or replacements.get('换气次数', '') or str((((_param_map.get('airchange') or {}).get('vents') or [{}])[0].get('volume', '')) or ''),
                      _op_conclusion_for('截面风速结果', '截面平均风速结果', '换气次数结果', '换气次数'), 2, 3, 4),
                     (_R['pressure'], _op_std_ranges.get('pressure', ''),
                      replacements.get('静压差', ''),
@@ -4602,9 +4678,21 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
 
                 _pt = _param_map.get('particle', {})
                 _pt_data = _pt.get('data', {}) if isinstance(_pt, dict) else {}
+                _pt_values = _pt.get('values', {}) if isinstance(_pt, dict) else {}
+                if not isinstance(_pt_values, dict):
+                    _pt_values = {}
                 _pt_result = str(_pt.get('result', '') or '') if isinstance(_pt, dict) else ''
                 _pt_conclusion = '合格' if '✅' in _pt_result and '❌' not in _pt_result else ('不合格' if '❌' in _pt_result else '')
                 if isinstance(_pt_data, dict):
+                    if not _pt_data.get('p05_max') and _pt_values.get('p05_max'):
+                        _pt_data['p05_max'] = _pt_values.get('p05_max')
+                    if not _pt_data.get('p05_ucl') and _pt_values.get('p05_ucl'):
+                        _pt_data['p05_ucl'] = _pt_values.get('p05_ucl')
+                    if not _pt_data.get('p5_max') and _pt_values.get('p5_max'):
+                        _pt_data['p5_max'] = _pt_values.get('p5_max')
+                    if not _pt_data.get('p5_ucl') and _pt_values.get('p5_ucl'):
+                        _pt_data['p5_ucl'] = _pt_values.get('p5_ucl')
+
                     _pt_local_std = _op_std_ranges.get('particle', '')
                     _pt_local_std_05 = ''
                     _pt_local_std_5 = ''
@@ -4615,6 +4703,7 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                                 _pt_local_std_05 = _seg
                             elif '5' in _seg:
                                 _pt_local_std_5 = _seg
+
                     _pt_surr_std = ''
                     try:
                         _pt_std_entry = _level_std.get('particle', {})
@@ -4630,21 +4719,32 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                                 _pt_surr_std_05 = _seg
                             elif '5' in _seg:
                                 _pt_surr_std_5 = _seg
+
                     _pt_val_col = 6 if _R['pt_cols'] == 9 else 5
                     _pt_iso_col = 7 if _R['pt_cols'] == 9 else 6
                     _pt_concl_col = 8 if _R['pt_cols'] == 9 else 7
                     _pts = _R['pt_local_start']
+
                     if _pt_local_std_05:
                         document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _pts, _pt_local_std_05, 3)
                     if _pt_local_std_5:
-                        document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _pts+2, _pt_local_std_5, 3)
-                    for _off, _dk in [(0,'op_05_max'),(1,'op_05_ucl'),(2,'op_5_max'),(3,'op_5_ucl')]:
-                        _rv = _pt_data.get(_dk, '')
-                        if _rv:
-                            document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _pts+_off, str(_rv), _pt_val_col)
+                        document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _pts + 2, _pt_local_std_5, 3)
+
+                    if not _R['has_bact_split']:
+                        for _off, _dk in [(0, 'p05_max'), (1, 'p05_ucl'), (2, 'p5_max'), (3, 'p5_ucl')]:
+                            _rv = _pt_data.get(_dk, '')
+                            if _rv:
+                                document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _pts + _off, str(_rv), _pt_val_col)
+                    else:
+                        for _off, _dk in [(0, 'op_05_max'), (1, 'op_05_ucl'), (2, 'op_5_max'), (3, 'op_5_ucl')]:
+                            _rv = _pt_data.get(_dk, '')
+                            if _rv:
+                                document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _pts + _off, str(_rv), _pt_val_col)
+
                     if _pt_conclusion:
                         document_xml = _replace_conclusion_table_cell_by_row_index(document_xml, '静压差', _R['particle_hdr'], _pt_conclusion, 6)
                         document_xml = _replace_conclusion_table_cell_by_row_index(document_xml, '静压差', _pts, _pt_conclusion, _pt_concl_col)
+
                     _local_iso = 'ISO-5' if '3520' in str(_pt_local_std_05) and '35200' not in str(_pt_local_std_05) else ('ISO-7' if '352000' in str(_pt_local_std_05) else 'ISO-8')
                     if _pt_conclusion == '合格' and _pt_local_std_05:
                         document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _pts, _local_iso, _pt_iso_col)
@@ -4656,11 +4756,11 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                         if _pt_surr_std_05:
                             document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _ptss, _pt_surr_std_05, 3)
                         if _pt_surr_std_5:
-                            document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _ptss+2, _pt_surr_std_5, 3)
-                        for _off, _dk in [(0,'surr_05_max'),(1,'surr_05_ucl'),(2,'surr_5_max'),(3,'surr_5_ucl')]:
+                            document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _ptss + 2, _pt_surr_std_5, 3)
+                        for _off, _dk in [(0, 'surr_05_max'), (1, 'surr_05_ucl'), (2, 'surr_5_max'), (3, 'surr_5_ucl')]:
                             _rv = _pt_data.get(_dk, '')
                             if _rv:
-                                document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _ptss+_off, str(_rv), _pt_val_col)
+                                document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _ptss + _off, str(_rv), _pt_val_col)
                         _surr_iso = 'ISO-6'
                         if '352000' in str(_pt_surr_std_05) and '3520000' not in str(_pt_surr_std_05):
                             _surr_iso = 'ISO-7'
@@ -4675,7 +4775,10 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                 _bact_data = _bact.get('data', {}) if isinstance(_bact, dict) else {}
                 _bact_result = str(_bact.get('result', '') or '') if isinstance(_bact, dict) else ''
                 _bact_conclusion = '合格' if '✅' in _bact_result and '❌' not in _bact_result else ('不合格' if '❌' in _bact_result else '')
+                _bact_values = _bact.get('values', []) if isinstance(_bact, dict) else []
                 if isinstance(_bact_data, dict):
+                    if (not _bact_data.get('op_values')) and isinstance(_bact_values, list) and _bact_values:
+                        _bact_data['op_values'] = list(_bact_values)
                     def _avg_list(vals):
                         if not vals or not isinstance(vals, list): return ''
                         try:
@@ -4687,13 +4790,13 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                     _local_avg = _avg_list(_bact_data.get('op_values', []) or _bact_data.get('local_values', []))
                     _surr_avg = _avg_list(_bact_data.get('surr_values', []))
                     if _local_avg:
-                        document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _R['bact_local'], _local_avg, 4)
+                        document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _R['bact_local'], _local_avg, 3)
                         if _bact_conclusion:
-                            document_xml = _replace_conclusion_table_cell_by_row_index(document_xml, '静压差', _R['bact_local'], _bact_conclusion, 5)
+                            document_xml = _replace_conclusion_table_cell_by_row_index(document_xml, '静压差', _R['bact_local'], _bact_conclusion, 4)
                     if _R['bact_surr'] is not None and _surr_avg:
-                        document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _R['bact_surr'], _surr_avg, 4)
+                        document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _R['bact_surr'], _surr_avg, 3)
                         if _bact_conclusion:
-                            document_xml = _replace_conclusion_table_cell_by_row_index(document_xml, '静压差', _R['bact_surr'], _bact_conclusion, 5)
+                            document_xml = _replace_conclusion_table_cell_by_row_index(document_xml, '静压差', _R['bact_surr'], _bact_conclusion, 4)
 
                 _hepa = _param_map.get('hepa_leak', {})
                 if isinstance(_hepa, dict):
@@ -4879,7 +4982,10 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                 _bact_data = _bact.get('data', {}) if isinstance(_bact, dict) else {}
                 _bact_result = str(_bact.get('result', '') or '') if isinstance(_bact, dict) else ''
                 _bact_conclusion = '合格' if '✅' in _bact_result and '❌' not in _bact_result else ('不合格' if '❌' in _bact_result else '')
+                _bact_values = _bact.get('values', []) if isinstance(_bact, dict) else []
                 if isinstance(_bact_data, dict):
+                    if (not _bact_data.get('op_values')) and isinstance(_bact_values, list) and _bact_values:
+                        _bact_data['op_values'] = list(_bact_values)
                     def _avg_list(vals):
                         if not vals or not isinstance(vals, list): return ''
                         try:
@@ -5286,9 +5392,23 @@ def _fill_data_table_xml(table_xml: str, room_export: dict, export_payload: dict
     _area_str = str(round(_rl * _rw, 2)).rstrip('0').rstrip('.') if (_rl > 0 and _rw > 0) else ''
     _vol_str = str(round(_rl * _rw * _rh, 2)).rstrip('0').rstrip('.') if (_rl > 0 and _rw > 0 and _rh > 0) else ''
     if _area_str or _vol_str:
-        table_xml = _replace_table_cell_by_table_and_row(table_xml, 0, 1, {
-            1: f'面积S（m²）={_area_str}          体积V（m³）={_vol_str}'
-        }, allow_blank=True)
+        import re as _re_sv
+        _tbl_rows = list(_re_sv.finditer(r'<w:tr\b.*?</w:tr>', table_xml, _re_sv.S))
+        if len(_tbl_rows) >= 2:
+            _row1_xml = _tbl_rows[1].group(0)
+            _sv_text = f'面积S（m²）={_area_str}          体积V（m³）={_vol_str}'
+            _sv_replaced = False
+            _tc_matches = list(_re_sv.finditer(r'<w:tc\b.*?</w:tc>', _row1_xml, _re_sv.S))
+            if len(_tc_matches) >= 2:
+                _target_tc = _tc_matches[1].group(0)
+                _new_tc = _replace_tc_text_minimal(_target_tc, _sv_text)
+                if _new_tc != _target_tc:
+                    table_xml = table_xml.replace(_target_tc, _new_tc, 1)
+                    _sv_replaced = True
+            if not _sv_replaced:
+                table_xml = _replace_table_cell_by_table_and_row(table_xml, 0, 1, {
+                    1: _sv_text
+                }, allow_blank=True)
 
     # === 构建判定结果索引（key → {range, passed}）===
     _judgement = room_export.get('judgement_result') or {}
@@ -5315,6 +5435,8 @@ def _fill_data_table_xml(table_xml: str, room_export: dict, export_payload: dict
         'settling': '沉降菌',
         'floating': '浮游菌',
         'floating_bacteria': '浮游菌',
+        'particle': '悬浮粒子数/m³',
+        'bacteria': '细菌浓度',
         'self_purification_time': '自净时间',
         'downflow_speed': '截面风速',
         'avg_speed': '截面风速',
@@ -5330,7 +5452,6 @@ def _fill_data_table_xml(table_xml: str, room_export: dict, export_payload: dict
         'airflow_pattern': '气流流型',
         'airflow_direction': '气流流向',
         'tightness': '严密性',
-        'bacteria': '细菌浓度',
         'appearance': '外观检验',
         'door_interlock': '门互锁功能',
     }
@@ -5342,7 +5463,14 @@ def _fill_data_table_xml(table_xml: str, room_export: dict, export_payload: dict
             _conclusion = '合格' if _jv.get('passed') else '不合格'
             _anchor_judgement[_anc] = {'range': _jv['range'], 'conclusion': _conclusion}
     # 锚点别名扩展：模板标签变体也能命中判定结果
-    _ANCHOR_ALIASES = {'相对湿度': '湿度', '平均照度': '照度', '沉降菌': '细菌浓度', '细菌浓度': '沉降菌'}
+    _ANCHOR_ALIASES = {
+        '相对湿度': '湿度',
+        '平均照度': '照度',
+        '沉降菌': '细菌浓度',
+        '细菌浓度': '沉降菌',
+        '悬浮粒子数/m³': '≥0.5μm',
+        '≥0.5μm': '悬浮粒子数/m³',
+    }
     for _src, _dst in _ANCHOR_ALIASES.items():
         if _src in _anchor_judgement and _dst not in _anchor_judgement:
             _anchor_judgement[_dst] = _anchor_judgement[_src]
@@ -5356,11 +5484,13 @@ def _fill_data_table_xml(table_xml: str, room_export: dict, export_payload: dict
         '温度': replacements.get('温度', ''),
         '相对湿度': replacements.get('相对湿度', ''),
         '湿度': replacements.get('相对湿度', '') or replacements.get('湿度', ''),
-        '平均照度': replacements.get('照度', '') or replacements.get('平均照度', ''),
-        '照度': replacements.get('照度', '') or replacements.get('平均照度', ''),
+        '平均照度': replacements.get('照度', '') or replacements.get('平均照度', '') or replacements.get('最低照度', ''),
+        '照度': replacements.get('照度', '') or replacements.get('平均照度', '') or replacements.get('最低照度', ''),
         '噪声': replacements.get('噪声', ''),
-        '沉降菌': replacements.get('沉降菌', ''),
-        '浮游菌': replacements.get('浮游菌', ''),
+        '沉降菌': replacements.get('沉降菌', '') or replacements.get('细菌浓度', ''),
+        '浮游菌': replacements.get('浮游菌', '') or replacements.get('浮游菌（平均浓度）', ''),
+        '悬浮粒子数/m³': replacements.get('悬浮粒子数/m³', '') or replacements.get('≥0.5μm', ''),
+        '≥0.5μm': replacements.get('≥0.5μm', '') or replacements.get('悬浮粒子数/m³', ''),
         '自净时间': replacements.get('自净时间', ''),
         '风速不均匀度': replacements.get('风速不均匀度', ''),
         '笼内风速': replacements.get('笼内风速', ''),
@@ -5585,15 +5715,160 @@ def build_mixed_report_docx(export_payload: Dict[str, Any], output_path: str) ->
     if insert_pos < 0:
         return base_path  # 异常情况，不追加
 
+    def _apply_operating_room_fragment_fill(fragment_xml: str, room_export: dict) -> str:
+        # 当前字符串级 fragment 回拼已多次导致 DOCX XML 结构损坏；
+        # operating_room 后续页改为回退到稳定原子函数路线，
+        # 在此函数重写完成前先禁用不安全补写，避免继续生成坏文档。
+        return fragment_xml
+
     additional_xml = ''
+
+    def _set_tc_plain_text_xmlsafe(tc_xml: str, new_text: str, replace_all_text_nodes: bool = False, rebuild_cell_body: bool = False) -> str:
+        try:
+            from lxml import etree as _etree
+            _ns = {'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
+            _w_ns = 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'
+            tc_node = _etree.fromstring(tc_xml.encode('utf-8'))
+            if rebuild_cell_body:
+                tcpr = tc_node.find(f'{{{_w_ns}}}tcPr')
+                for child in list(tc_node):
+                    if child is tcpr:
+                        continue
+                    tc_node.remove(child)
+                p = _etree.SubElement(tc_node, f'{{{_w_ns}}}p')
+                pPr = _etree.SubElement(p, f'{{{_w_ns}}}pPr')
+                _etree.SubElement(pPr, f'{{{_w_ns}}}spacing', {f'{{{_w_ns}}}line': '240', f'{{{_w_ns}}}lineRule': 'auto'})
+                _etree.SubElement(pPr, f'{{{_w_ns}}}jc', {f'{{{_w_ns}}}val': 'center'})
+                _etree.SubElement(pPr, f'{{{_w_ns}}}textAlignment', {f'{{{_w_ns}}}val': 'bottom'})
+                rPr = _etree.SubElement(pPr, f'{{{_w_ns}}}rPr')
+                _etree.SubElement(rPr, f'{{{_w_ns}}}rFonts', {f'{{{_w_ns}}}hint': 'default', f'{{{_w_ns}}}ascii': 'Arial', f'{{{_w_ns}}}hAnsi': 'Arial', f'{{{_w_ns}}}eastAsia': '宋体', f'{{{_w_ns}}}cs': 'Arial'})
+                _etree.SubElement(rPr, f'{{{_w_ns}}}kern', {f'{{{_w_ns}}}val': '2'})
+                _etree.SubElement(rPr, f'{{{_w_ns}}}sz', {f'{{{_w_ns}}}val': '28'})
+                _etree.SubElement(rPr, f'{{{_w_ns}}}szCs', {f'{{{_w_ns}}}val': '28'})
+                _etree.SubElement(rPr, f'{{{_w_ns}}}lang', {f'{{{_w_ns}}}val': 'en-US', f'{{{_w_ns}}}eastAsia': 'zh-CN', f'{{{_w_ns}}}bidi': 'ar-SA'})
+                r = _etree.SubElement(p, f'{{{_w_ns}}}r')
+                rPr2 = _etree.SubElement(r, f'{{{_w_ns}}}rPr')
+                _etree.SubElement(rPr2, f'{{{_w_ns}}}rFonts', {f'{{{_w_ns}}}hint': 'eastAsia', f'{{{_w_ns}}}ascii': '宋体', f'{{{_w_ns}}}hAnsi': '宋体', f'{{{_w_ns}}}eastAsia': '宋体', f'{{{_w_ns}}}cs': '宋体'})
+                _etree.SubElement(rPr2, f'{{{_w_ns}}}b')
+                _etree.SubElement(rPr2, f'{{{_w_ns}}}bCs')
+                _etree.SubElement(rPr2, f'{{{_w_ns}}}color', {f'{{{_w_ns}}}val': '000000'})
+                _etree.SubElement(rPr2, f'{{{_w_ns}}}sz', {f'{{{_w_ns}}}val': '24'})
+                _etree.SubElement(rPr2, f'{{{_w_ns}}}lang', {f'{{{_w_ns}}}val': 'en-US', f'{{{_w_ns}}}eastAsia': 'zh-CN'})
+                t = _etree.SubElement(r, f'{{{_w_ns}}}t')
+                t.set('{http://www.w3.org/XML/1998/namespace}space', 'preserve')
+                t.text = str(new_text)
+                return _etree.tostring(tc_node, encoding='unicode')
+            t_nodes = tc_node.xpath('.//w:t', namespaces=_ns)
+            if t_nodes:
+                if replace_all_text_nodes:
+                    for _idx, _t in enumerate(t_nodes):
+                        _t.text = str(new_text) if _idx == 0 else ''
+                else:
+                    for _t in t_nodes[:-1]:
+                        _t.text = ''
+                    t_nodes[-1].text = str(new_text)
+            else:
+                p_node = tc_node.xpath('./w:p', namespaces=_ns)
+                if p_node:
+                    p = p_node[0]
+                else:
+                    p = _etree.SubElement(tc_node, '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p')
+                r = _etree.SubElement(p, '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}r')
+                t = _etree.SubElement(r, '{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t')
+                t.set('{http://www.w3.org/XML/1998/namespace}space', 'preserve')
+                t.text = str(new_text)
+            return _etree.tostring(tc_node, encoding='unicode')
+        except Exception:
+            return tc_xml
+
+    def _patch_appended_table_header(table_xml: str, room_export: dict) -> str:
+        room = room_export.get('room') or {}
+        fill_plan = _build_placeholder_fill_plan({
+            **dict(export_payload),
+            'room': room,
+            'report_context': room_export.get('report_context') or {},
+            'judgement_result': room_export.get('judgement_result') or {},
+            'clean_class_semantics': room_export.get('clean_class_semantics') or {},
+            'template_rule': room_export.get('template_rule') or {},
+            'template_resource': room_export.get('template_resource') or {},
+            'rooms_export': [room_export],
+        })
+        replacements = {k: v for k, v in fill_plan}
+        room_name = room.get('room_name', '') or replacements.get('受检区域名称', '') or replacements.get('房间名称', '')
+        detection_date = replacements.get('检测日期', '')
+        level_value = replacements.get('洁净级别', '') or replacements.get('洁净等级', '') or replacements.get('洁净度级别', '') or room.get('clean_class', '') or room.get('level_name', '')
+        _room_length = str(room.get('length', '') or '').strip()
+        _room_width = str(room.get('width', '') or '').strip()
+        _room_height = str(room.get('height', '') or '').strip()
+        try:
+            _rl = float(_room_length) if _room_length else 0
+            _rw = float(_room_width) if _room_width else 0
+            _rh = float(_room_height) if _room_height else 0
+        except (ValueError, TypeError):
+            _rl = _rw = _rh = 0
+        _area_str = str(round(_rl * _rw, 2)).rstrip('0').rstrip('.') if (_rl > 0 and _rw > 0) else ''
+        _vol_str = str(round(_rl * _rw * _rh, 2)).rstrip('0').rstrip('.') if (_rl > 0 and _rw > 0 and _rh > 0) else ''
+        _sv_text = f'面积S（m²）={_area_str}          体积V（m³）={_vol_str}' if (_area_str or _vol_str) else ''
+        for _old_label in ['受检区域名称及编号', '受检区域名称']:
+            table_xml = table_xml.replace(_old_label, '房间名称')
+        _row_pattern = re.compile(r'<w:tr\b.*?</w:tr>', re.S)
+        _cell_pattern = re.compile(r'<w:tc\b.*?</w:tc>', re.S)
+        _rows = _row_pattern.findall(table_xml)
+        if len(_rows) >= 1:
+            _row0 = _rows[0]
+            _cells0 = _cell_pattern.findall(_row0)
+            if len(_cells0) >= 6:
+                _new0 = _row0
+                _new0 = _new0.replace(_cells0[1], _set_tc_plain_text_xmlsafe(_cells0[1], room_name), 1)
+                _new0 = _new0.replace(_cells0[3], _set_tc_plain_text_xmlsafe(_cells0[3], detection_date), 1)
+                _new0 = _new0.replace(_cells0[5], _set_tc_plain_text_xmlsafe(_cells0[5], level_value), 1)
+                table_xml = table_xml.replace(_row0, _new0, 1)
+        if _sv_text:
+            _rows = _row_pattern.findall(table_xml)
+            if len(_rows) >= 2:
+                _row1 = _rows[1]
+                _cells1 = _cell_pattern.findall(_row1)
+                if len(_cells1) >= 2:
+                    _new1 = _row1.replace(_cells1[1], _set_tc_plain_text_xmlsafe(_cells1[1], _sv_text, rebuild_cell_body=True), 1)
+                    table_xml = table_xml.replace(_row1, _new1, 1)
+        return table_xml
     for room_export in rooms_export[1:]:
         tpl_resource = room_export.get('template_resource', {}) or {}
         tpl_path = tpl_resource.get('template_path', '')
         if not tpl_path or not Path(tpl_path).exists():
             continue
 
-        # 从该房间等级的模板提取所有参数数据表（排除前四页骨架表）
-        data_tables = _extract_data_tables_xml(tpl_path)
+        # 从该房间自己的已填充完整文档中提取所有参数数据表（排除前四页骨架表）
+        # 这样复杂对象继续复用 build_template_filled_docx() 的专用填充逻辑，
+        # 避免在 fragment 上做不稳定的二次字符串补写。
+        room_payload = dict(export_payload)
+        room_payload['room'] = room_export.get('room') or {}
+        room_payload['template_rule'] = room_export.get('template_rule') or {}
+        room_payload['template_resource'] = room_export.get('template_resource') or {}
+        room_payload['report_context'] = room_export.get('report_context') or {}
+        room_payload['clean_class_semantics'] = room_export.get('clean_class_semantics') or {}
+        room_payload['judgement_result'] = room_export.get('judgement_result') or {}
+        room_payload['rooms_export'] = [room_export]
+
+        try:
+            import tempfile
+            with tempfile.NamedTemporaryFile(suffix='.room.filled.docx', delete=False) as _tmpf:
+                _room_tmp_path = _tmpf.name
+            try:
+                _filled_room_path = build_template_filled_docx(room_payload, _room_tmp_path)
+                data_tables = _extract_data_tables_xml(_filled_room_path) if _filled_room_path and Path(_filled_room_path).exists() else []
+            finally:
+                try:
+                    if Path(_room_tmp_path).exists():
+                        Path(_room_tmp_path).unlink()
+                except Exception:
+                    pass
+        except Exception:
+            data_tables = []
+
+        if not data_tables:
+            # 回退：如果专用填充生成失败，再回退到原模板提取空数据表
+            data_tables = _extract_data_tables_xml(tpl_path)
         if not data_tables:
             # 兼容回退：如果新函数未识别到数据表，尝试旧逻辑取最后一张
             fallback = _extract_last_table_xml(tpl_path)
@@ -5604,8 +5879,17 @@ def build_mixed_report_docx(export_payload: Dict[str, Any], output_path: str) ->
 
         # 对每张数据表分别填充并追加
         for dt_idx, data_table_xml in enumerate(data_tables):
-            filled_table = _fill_data_table_xml(data_table_xml, room_export, export_payload)
-
+            filled_table = data_table_xml
+            if dt_idx == 0:
+                room_name_probe = ((room_export.get('room') or {}).get('room_name') or '').strip()
+                if room_name_probe and room_name_probe in data_table_xml and ('检测日期' in data_table_xml or '洁净度设计级别' in data_table_xml):
+                    filled_table = data_table_xml
+                else:
+                    try:
+                        filled_table = _patch_appended_table_header(filled_table, room_export)
+                        filled_table = _fill_data_table_xml(filled_table, room_export, export_payload)
+                    except Exception:
+                        filled_table = data_table_xml
             # 追加分页符 + 标题段落 + 数据表（仅第一张表前加标题）
             if dt_idx == 0:
                 header_xml = (
