@@ -112,6 +112,8 @@ PARAM_KEY_MAP = {
     'particle_door': 'particle_door',
     'particle_negative': 'particle_negative',
     'settling': 'settling',
+    'self_clean': 'self_purification_time',
+    'self_purification_time': 'self_purification_time',
 }
 
 

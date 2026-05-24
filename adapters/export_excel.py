@@ -82,6 +82,33 @@ def _judge_from_result(v):
     return ''
 
 
+def _judge_for_key(result_text, *param_keys):
+    """优先使用 judgement_result 索引（后端引擎权威判定），
+    找不到时 fallback 到 result 文本解析（emoji/关键词）。
+    """
+    # 优先：judgement_result 索引
+    if _current_judgement_index and param_keys:
+        for k in param_keys:
+            if k in _current_judgement_index:
+                return '合格' if _current_judgement_index[k] else '不合格'
+            # 前缀匹配
+            matched_any = False
+            all_passed = True
+            for idx_key, idx_passed in _current_judgement_index.items():
+                if idx_key == k or idx_key.startswith(k + '.'):
+                    matched_any = True
+                    if not idx_passed:
+                        all_passed = False
+                        break
+            if matched_any:
+                return '合格' if all_passed else '不合格'
+    # fallback：从 result 文本解析
+    judged = _judge_from_result(result_text)
+    if judged:
+        return judged
+    return ''
+
+
 def _normalize_param_item(item):
     if isinstance(item, dict):
         if 'value' in item and 'values' not in item:
@@ -100,10 +127,10 @@ def _normalize_param_item(item):
 def _get_param(room, *keys):
     params = room.get('params', {}) or {}
     alias_map = {
-        'settling': ('settling', 'settle_bacteria'),
-        'floating': ('floating', 'floating_bacteria', 'particle'),
-        'self_purification_time': ('self_purification_time', 'self_purify_time'),
-        'illumination': ('illumination', 'illumination_main_room'),
+        'settling': ('settling', 'settle_bacteria', 'bacteria'),
+        'floating': ('floating', 'floating_bacteria'),
+        'self_purification_time': ('self_purification_time', 'self_purify_time', 'self_clean'),
+        'illumination': ('illumination', 'illumination_main_room', 'illumination_main', 'illumination_mixed_processing'),
     }
     search_keys = []
     for key in keys:
@@ -137,17 +164,77 @@ def _result(room, *keys, default=''):
     return raw
 
 
+def _build_judgement_index(export_payload):
+    """从 judgement_result.item_results 建立 {key: passed} 索引。
+    支持两种结构：
+      - item_results 是 list[dict]，每个 dict 有 key + passed
+      - item_results 是 dict，key → {passed: bool}
+    """
+    jr = export_payload.get('judgement_result') or {}
+    items = jr.get('item_results') or []
+    index = {}
+    if isinstance(items, list):
+        for item in items:
+            if isinstance(item, dict) and 'key' in item and 'passed' in item:
+                index[item['key']] = item['passed']
+    elif isinstance(items, dict):
+        for k, v in items.items():
+            if isinstance(v, dict) and 'passed' in v:
+                index[k] = v['passed']
+            elif isinstance(v, bool):
+                index[k] = v
+    return index
+
+
+# 模块级缓存，由各 _build_xxx_record 函数在开头设置
+_current_judgement_index = {}
+
+
 def _judge_text(room, *keys, default=''):
+    """判定文本：优先从 judgement_result 索引取，再 fallback 到 result 文本解析。"""
+    # 优先查 judgement_result 索引
+    if _current_judgement_index and keys:
+        # 尝试多种 key 格式匹配
+        for k in keys:
+            if k in _current_judgement_index:
+                return '合格' if _current_judgement_index[k] else '不合格'
+            # 尝试带前缀的 key，如 particle.op_05_max
+            for idx_key, passed in _current_judgement_index.items():
+                if idx_key.startswith(k + '.') or idx_key == k:
+                    # 只要有一个不合格就不合格
+                    if not passed:
+                        return '不合格'
+
     p = _get_param(room, *keys)
-    result_text = _clean_text(p.get('result', default))
+    # 先用原始 result（含 emoji）做判定，再用 clean 版本做 fallback
+    raw_result = p.get('result', default)
+    judged = _judge_from_result(raw_result)
+    if judged:
+        return judged
+    # 再试 clean 版本（去掉 emoji 后可能暴露中文判定词）
+    result_text = _clean_text(raw_result)
     judged = _judge_from_result(result_text)
     if judged:
         return judged
-    passed = p.get('passed')
+    # fallback: passed 布尔 (少数 param 如 airtightness 有 pass 字段)
+    passed = p.get('passed') if p.get('passed') is not None else p.get('pass')
     if passed is True:
         return '合格'
     if passed is False:
         return '不合格'
+    # 最后再查一次索引（用第一个 key 做前缀匹配）
+    if _current_judgement_index and keys:
+        main_key = keys[0]
+        matched_any = False
+        all_passed = True
+        for idx_key, idx_passed in _current_judgement_index.items():
+            if idx_key == main_key or idx_key.startswith(main_key + '.'):
+                matched_any = True
+                if not idx_passed:
+                    all_passed = False
+                    break
+        if matched_any:
+            return '合格' if all_passed else '不合格'
     return ''
 
 
@@ -367,6 +454,8 @@ def _build_hospital_record(export_payload, output_path):
            洁净度（悬浮粒子，含手术区/周边区多区域）、开门后洁净度、温度、相对湿度、
            噪声、照度（最低照度）、照度均匀度、沉降菌、浮游菌
     """
+    global _current_judgement_index
+    _current_judgement_index = _build_judgement_index(export_payload)
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
     wb = openpyxl.Workbook()
@@ -408,7 +497,7 @@ def _build_hospital_record(export_payload, output_path):
         judge_range = _get_judge_range(export_payload, 'wind_speed')
         title_suffix = f' 判定范围：{judge_range}' if judge_range else ''
         title = f'截面平均风速（m/s）{title_suffix}'
-        row = _write_section_simple(ws, row, title, wind_vals, _result(room, 'wind_speed', 'air_velocity'), _judge_from_result(_result(room, 'wind_speed', 'air_velocity')))
+        row = _write_section_simple(ws, row, title, wind_vals, _result(room, 'wind_speed', 'air_velocity'), _judge_for_key(_result(room, 'wind_speed', 'air_velocity'), 'wind_speed'))
 
     # --- 风速不均匀度 ---
     uniformity_vals = _values(room, 'wind_uniformity', 'velocity_uniformity')
@@ -416,7 +505,25 @@ def _build_hospital_record(export_payload, output_path):
         judge_range = _get_judge_range(export_payload, 'wind_uniformity')
         title_suffix = f' 判定范围：{judge_range}' if judge_range else ''
         title = f'风速不均匀度{title_suffix}'
-        row = _write_section_simple(ws, row, title, uniformity_vals, _result(room, 'wind_uniformity', 'velocity_uniformity'), _judge_from_result(_result(room, 'wind_uniformity', 'velocity_uniformity')))
+        row = _write_section_simple(ws, row, title, uniformity_vals, _result(room, 'wind_uniformity', 'velocity_uniformity'), _judge_for_key(_result(room, 'wind_uniformity', 'velocity_uniformity'), 'wind_uniformity'))
+
+    # --- 排风口风速（负压病房） ---
+    exhaust_vals = _values(room, 'exhaust_speed')
+    exhaust_result = _result(room, 'exhaust_speed')
+    if exhaust_vals or exhaust_result:
+        judge_range = _get_judge_range(export_payload, 'exhaust_speed')
+        title_suffix = f' 判定范围：{judge_range}' if judge_range else ''
+        title = f'排风口风速（m/s）{title_suffix}'
+        row = _write_section_simple(ws, row, title, exhaust_vals or [exhaust_result], exhaust_result, _judge_for_key(exhaust_result, 'exhaust_speed'))
+
+    # --- 笼具工作面风速（动物房） ---
+    cage_vals = _values(room, 'cage_airspeed')
+    cage_result = _result(room, 'cage_airspeed')
+    if cage_vals or cage_result:
+        judge_range = _get_judge_range(export_payload, 'cage_airspeed')
+        title_suffix = f' 判定范围：{judge_range}' if judge_range else ''
+        title = f'笼具工作面风速（m/s）{title_suffix}'
+        row = _write_section_simple(ws, row, title, cage_vals or [cage_result], cage_result, _judge_for_key(cage_result, 'cage_airspeed'))
 
     # --- 静压差 ---
     prs = _pairs(room, 'pressure')
@@ -439,9 +546,9 @@ def _build_hospital_record(export_payload, output_path):
                 avg = pair.get('avg', '') or pair.get('result', '')
                 row_data = [ref] + [str(v) for v in vals[:3]] + [str(avg)] + [''] * (8 - 5)
                 data_rows.append(row_data[:8])
-            row = _write_section(ws, row, title, headers, data_rows, _result(room, 'pressure'), _judge_from_result(_result(room, 'pressure')))
+            row = _write_section(ws, row, title, headers, data_rows, _result(room, 'pressure'), _judge_for_key(_result(room, 'pressure'), 'pressure'))
         else:
-            row = _write_section_simple(ws, row, title, pressure_vals, _result(room, 'pressure'), _judge_from_result(_result(room, 'pressure')))
+            row = _write_section_simple(ws, row, title, pressure_vals, _result(room, 'pressure'), _judge_for_key(_result(room, 'pressure'), 'pressure'))
 
     # --- 高效过滤器检漏 ---
     hepa = _get_param(room, 'hepa_leak')
@@ -453,7 +560,7 @@ def _build_hospital_record(export_payload, output_path):
         if not hepa_vals:
             total = _data(room, 'hepa_leak').get('total', '')
             hepa_vals = [str(total)] if total not in (None, '') else ['']
-        row = _write_section_simple(ws, row, title, hepa_vals, _result(room, 'hepa_leak'), _judge_from_result(_result(room, 'hepa_leak')))
+        row = _write_section_simple(ws, row, title, hepa_vals, _result(room, 'hepa_leak'), _judge_for_key(_result(room, 'hepa_leak'), 'hepa_leak'))
 
     # --- 严密性 ---
     airtight_vals = _values(room, 'airtightness', 'tightness')
@@ -462,7 +569,7 @@ def _build_hospital_record(export_payload, output_path):
         title_suffix = f' 判定范围：{judge_range}' if judge_range else ''
         title = f'严密性{title_suffix}'
         result = _result(room, 'airtightness', 'tightness') or '符合要求'
-        row = _write_section_simple(ws, row, title, airtight_vals or [result], result, _judge_from_result(result))
+        row = _write_section_simple(ws, row, title, airtight_vals or [result], result, _judge_for_key(result, 'airtightness'))
 
     # --- 洁净度（悬浮粒子） ---
     pdata = _data(room, 'particle')
@@ -494,9 +601,9 @@ def _build_hospital_record(export_payload, output_path):
                     zones_data.append({'zone': zone_name, 'particles': particles})
 
             if zones_data:
-                row = _write_cleanness_section(ws, row, title, zones_data, _result(room, 'particle'), _judge_from_result(particle_param.get('result', '')))
+                row = _write_cleanness_section(ws, row, title, zones_data, _result(room, 'particle'), _judge_for_key(particle_param.get('result', ''), 'particle'))
             else:
-                row = _write_section_simple(ws, row, title, particle_vals, _result(room, 'particle'), _judge_from_result(particle_param.get('result', '')))
+                row = _write_section_simple(ws, row, title, particle_vals, _result(room, 'particle'), _judge_for_key(particle_param.get('result', ''), 'particle'))
         elif pdata:
             # 标准粒子数据格式
             zones_data = [{'zone': '检测区域', 'particles': []}]
@@ -505,11 +612,11 @@ def _build_hospital_record(export_payload, output_path):
             if pdata.get('p5_max') or pdata.get('p5_ucl'):
                 zones_data[0]['particles'].append({'size': '≥5μm', 'max': pdata.get('p5_max', ''), 'ucl': pdata.get('p5_ucl', '')})
             if zones_data[0]['particles']:
-                row = _write_cleanness_section(ws, row, title, zones_data, _result(room, 'particle'), _judge_from_result(particle_param.get('result', '')))
+                row = _write_cleanness_section(ws, row, title, zones_data, _result(room, 'particle'), _judge_for_key(particle_param.get('result', ''), 'particle'))
             else:
-                row = _write_section_simple(ws, row, title, particle_vals, _result(room, 'particle'), _judge_from_result(particle_param.get('result', '')))
+                row = _write_section_simple(ws, row, title, particle_vals, _result(room, 'particle'), _judge_for_key(particle_param.get('result', ''), 'particle'))
         else:
-            row = _write_section_simple(ws, row, title, particle_vals, _result(room, 'particle'), _judge_from_result(particle_param.get('result', '')))
+            row = _write_section_simple(ws, row, title, particle_vals, _result(room, 'particle'), _judge_for_key(particle_param.get('result', ''), 'particle'))
 
     # --- 开门后洁净度 ---
     door_open_vals = _values(room, 'particle_door_open', 'door_open_particle')
@@ -517,7 +624,7 @@ def _build_hospital_record(export_payload, output_path):
         judge_range = _get_judge_range(export_payload, 'particle_door_open')
         title_suffix = f' 判定范围：{judge_range}' if judge_range else ''
         title = f'开门后洁净度（粒/m³）{title_suffix}'
-        row = _write_section_simple(ws, row, title, door_open_vals or [''], _result(room, 'particle_door_open', 'door_open_particle'), _judge_from_result(_result(room, 'particle_door_open', 'door_open_particle')))
+        row = _write_section_simple(ws, row, title, door_open_vals or [''], _result(room, 'particle_door_open', 'door_open_particle'), _judge_for_key(_result(room, 'particle_door_open', 'door_open_particle'), 'particle_door_open'))
 
     # --- 温度 ---
     temp_vals = _values(room, 'temperature')
@@ -537,11 +644,12 @@ def _build_hospital_record(export_payload, output_path):
 
     # --- 噪声 ---
     noise_vals = _values(room, 'noise')
-    if noise_vals:
+    noise_result = _result(room, 'noise')
+    if noise_vals or noise_result:
         judge_range = _get_judge_range(export_payload, 'noise')
         title_suffix = f' 判定范围：{judge_range}' if judge_range else ''
         title = f'噪声（dB(A)）{title_suffix}'
-        row = _write_section_simple(ws, row, title, noise_vals, _result(room, 'noise'), _judge_text(room, 'noise'))
+        row = _write_section_simple(ws, row, title, noise_vals or [noise_result], noise_result, _judge_text(room, 'noise'))
 
     # --- 照度（最低照度） ---
     illum_vals = _values(room, 'illumination', 'illumination_main_room', 'illumination_min')
@@ -557,7 +665,43 @@ def _build_hospital_record(export_payload, output_path):
         judge_range = _get_judge_range(export_payload, 'illumination_uniformity')
         title_suffix = f' 判定范围：{judge_range}' if judge_range else ''
         title = f'照度均匀度{title_suffix}'
-        row = _write_section_simple(ws, row, title, illum_uni_vals, _result(room, 'illumination_uniformity'), _judge_from_result(_result(room, 'illumination_uniformity')))
+        row = _write_section_simple(ws, row, title, illum_uni_vals, _result(room, 'illumination_uniformity'), _judge_for_key(_result(room, 'illumination_uniformity'), 'illumination_uniformity'))
+
+    # --- 工作照度（动物房） ---
+    work_illum_vals = _values(room, 'work_illumination')
+    work_illum_result = _result(room, 'work_illumination')
+    if work_illum_vals or work_illum_result:
+        judge_range = _get_judge_range(export_payload, 'work_illumination')
+        title_suffix = f' 判定范围：{judge_range}' if judge_range else ''
+        title = f'工作照度（lx）{title_suffix}'
+        row = _write_section_simple(ws, row, title, work_illum_vals or [work_illum_result], work_illum_result, _judge_for_key(work_illum_result, 'work_illumination'))
+
+    # --- 动物照度（动物房） ---
+    animal_illum_vals = _values(room, 'animal_illumination')
+    animal_illum_result = _result(room, 'animal_illumination')
+    if animal_illum_vals or animal_illum_result:
+        judge_range = _get_judge_range(export_payload, 'animal_illumination')
+        title_suffix = f' 判定范围：{judge_range}' if judge_range else ''
+        title = f'动物照度（lx）{title_suffix}'
+        row = _write_section_simple(ws, row, title, animal_illum_vals or [animal_illum_result], animal_illum_result, _judge_for_key(animal_illum_result, 'animal_illumination'))
+
+    # --- 温差（动物房） ---
+    temp_diff_vals = _values(room, 'temp_diff')
+    temp_diff_result = _result(room, 'temp_diff')
+    if temp_diff_vals or temp_diff_result:
+        judge_range = _get_judge_range(export_payload, 'temp_diff')
+        title_suffix = f' 判定范围：{judge_range}' if judge_range else ''
+        title = f'日温差（℃）{title_suffix}'
+        row = _write_section_simple(ws, row, title, temp_diff_vals or [temp_diff_result], temp_diff_result, _judge_for_key(temp_diff_result, 'temp_diff'))
+
+    # --- 气流方向（负压病房） ---
+    airflow_dir_vals = _values(room, 'airflow_direction')
+    airflow_dir_result = _result(room, 'airflow_direction')
+    if airflow_dir_vals or airflow_dir_result:
+        judge_range = _get_judge_range(export_payload, 'airflow_direction')
+        title_suffix = f' 判定范围：{judge_range}' if judge_range else ''
+        title = f'气流方向{title_suffix}'
+        row = _write_section_simple(ws, row, title, airflow_dir_vals or [airflow_dir_result], airflow_dir_result, _judge_for_key(airflow_dir_result, 'airflow_direction'))
 
     # --- 沉降菌 ---
     settling_vals = _values(room, 'settling', 'settle_bacteria')
@@ -573,7 +717,7 @@ def _build_hospital_record(export_payload, output_path):
             blank = settling_data.get('blank', '0')
             neg = settling_data.get('neg', '0')
             result = f'平均值:{total} | 空白对照:{blank} | 阴性对照:{neg}'
-        row = _write_section_simple(ws, row, title, raw, result, _judge_from_result(_get_param(room, 'settling', 'settle_bacteria').get('result', '') or result))
+        row = _write_section_simple(ws, row, title, raw, result, _judge_for_key(_get_param(room, 'settling', 'settle_bacteria').get('result', '') or result, 'settling'))
 
     # --- 浮游菌 ---
     floating_vals = _values(room, 'floating', 'floating_bacteria')
@@ -589,7 +733,16 @@ def _build_hospital_record(export_payload, output_path):
             blank = floating_data.get('blank', '0')
             neg = floating_data.get('neg', '0')
             result = f'平均浓度:{total} | 空白对照:{blank} | 阴性对照:{neg}'
-        row = _write_section_simple(ws, row, title, raw, result, _judge_from_result(_get_param(room, 'floating', 'floating_bacteria').get('result', '') or result))
+        row = _write_section_simple(ws, row, title, raw, result, _judge_for_key(_get_param(room, 'floating', 'floating_bacteria').get('result', '') or result, 'floating'))
+
+    # --- 表面菌（负压病房） ---
+    surface_vals = _values(room, 'surface_bacteria')
+    surface_result = _result(room, 'surface_bacteria')
+    if surface_vals or surface_result:
+        judge_range = _get_judge_range(export_payload, 'surface_bacteria')
+        title_suffix = f' 判定范围：{judge_range}' if judge_range else ''
+        title = f'表面菌（cfu/cm²）{title_suffix}'
+        row = _write_section_simple(ws, row, title, surface_vals or [surface_result], surface_result, _judge_for_key(surface_result, 'surface_bacteria'))
 
     # 签名行
     row = _write_signature(ws, row + 1, project)
@@ -607,6 +760,8 @@ def _build_pharma_cleanroom_record(export_payload, output_path):
     检测项：换气次数、静压差、高效过滤器检漏、洁净度（悬浮粒子）、温度、相对湿度、
            噪声、照度、自净时间、沉降菌、浮游菌
     """
+    global _current_judgement_index
+    _current_judgement_index = _build_judgement_index(export_payload)
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
     wb = openpyxl.Workbook()
@@ -642,6 +797,24 @@ def _build_pharma_cleanroom_record(export_payload, output_path):
         else:
             row = _write_section_simple(ws, row, title, airchange_vals, _result(room, 'airchange'), _judge_text(room, 'airchange'))
 
+    # --- 截面平均风速（兽药车间） ---
+    wind_vals = _values(room, 'wind_speed', 'air_velocity')
+    wind_result = _result(room, 'wind_speed', 'air_velocity')
+    if wind_vals or wind_result:
+        judge_range = _get_judge_range(export_payload, 'wind_speed')
+        title_suffix = f' 判定范围：{judge_range}' if judge_range else ''
+        title = f'截面平均风速（m/s）{title_suffix}'
+        row = _write_section_simple(ws, row, title, wind_vals or [wind_result], wind_result, _judge_for_key(wind_result, 'wind_speed'))
+
+    # --- 风速不均匀度（兽药车间） ---
+    uniformity_vals = _values(room, 'wind_speed_uniformity', 'wind_uniformity', 'velocity_uniformity')
+    uniformity_result = _result(room, 'wind_speed_uniformity', 'wind_uniformity', 'velocity_uniformity')
+    if uniformity_vals or uniformity_result:
+        judge_range = _get_judge_range(export_payload, 'wind_speed_uniformity')
+        title_suffix = f' 判定范围：{judge_range}' if judge_range else ''
+        title = f'风速不均匀度{title_suffix}'
+        row = _write_section_simple(ws, row, title, uniformity_vals or [uniformity_result], uniformity_result, _judge_for_key(uniformity_result, 'wind_speed_uniformity'))
+
     # --- 静压差 ---
     prs = _pairs(room, 'pressure')
     pressure_vals = _values(room, 'pressure')
@@ -658,9 +831,9 @@ def _build_pharma_cleanroom_record(export_payload, output_path):
                 avg = pair.get('avg', '') or pair.get('result', '')
                 row_data = [ref] + [str(v) for v in vals[:3]] + [str(avg)] + [''] * 3
                 data_rows.append(row_data[:8])
-            row = _write_section(ws, row, title, headers, data_rows, _result(room, 'pressure'), _judge_from_result(_result(room, 'pressure')))
+            row = _write_section(ws, row, title, headers, data_rows, _result(room, 'pressure'), _judge_for_key(_result(room, 'pressure'), 'pressure'))
         else:
-            row = _write_section_simple(ws, row, title, pressure_vals, _result(room, 'pressure'), _judge_from_result(_result(room, 'pressure')))
+            row = _write_section_simple(ws, row, title, pressure_vals, _result(room, 'pressure'), _judge_for_key(_result(room, 'pressure'), 'pressure'))
 
     # --- 高效过滤器检漏 ---
     hepa = _get_param(room, 'hepa_leak')
@@ -672,7 +845,7 @@ def _build_pharma_cleanroom_record(export_payload, output_path):
         if not hepa_vals:
             total = _data(room, 'hepa_leak').get('total', '')
             hepa_vals = [str(total)] if total not in (None, '') else ['']
-        row = _write_section_simple(ws, row, title, hepa_vals, _result(room, 'hepa_leak'), _judge_from_result(_result(room, 'hepa_leak')))
+        row = _write_section_simple(ws, row, title, hepa_vals, _result(room, 'hepa_leak'), _judge_for_key(_result(room, 'hepa_leak'), 'hepa_leak'))
 
     # --- 洁净度（悬浮粒子） ---
     pdata = _data(room, 'particle')
@@ -690,11 +863,11 @@ def _build_pharma_cleanroom_record(export_payload, output_path):
             if pdata.get('p5_max') or pdata.get('p5_ucl'):
                 zones_data[0]['particles'].append({'size': '≥5μm', 'max': pdata.get('p5_max', ''), 'ucl': pdata.get('p5_ucl', '')})
             if zones_data[0]['particles']:
-                row = _write_cleanness_section(ws, row, title, zones_data, _result(room, 'particle'), _judge_from_result(particle_param.get('result', '')))
+                row = _write_cleanness_section(ws, row, title, zones_data, _result(room, 'particle'), _judge_for_key(particle_param.get('result', ''), 'particle'))
             else:
-                row = _write_section_simple(ws, row, title, particle_vals, _result(room, 'particle'), _judge_from_result(particle_param.get('result', '')))
+                row = _write_section_simple(ws, row, title, particle_vals, _result(room, 'particle'), _judge_for_key(particle_param.get('result', ''), 'particle'))
         else:
-            row = _write_section_simple(ws, row, title, particle_vals, _result(room, 'particle'), _judge_from_result(particle_param.get('result', '')))
+            row = _write_section_simple(ws, row, title, particle_vals, _result(room, 'particle'), _judge_for_key(particle_param.get('result', ''), 'particle'))
 
     # --- 温度 ---
     temp_vals = _values(room, 'temperature')
@@ -714,11 +887,12 @@ def _build_pharma_cleanroom_record(export_payload, output_path):
 
     # --- 噪声 ---
     noise_vals = _values(room, 'noise')
-    if noise_vals:
+    noise_result = _result(room, 'noise')
+    if noise_vals or noise_result:
         judge_range = _get_judge_range(export_payload, 'noise')
         title_suffix = f' 判定范围：{judge_range}' if judge_range else ''
         title = f'噪声（dB(A)）{title_suffix}'
-        row = _write_section_simple(ws, row, title, noise_vals, _result(room, 'noise'), _judge_text(room, 'noise'))
+        row = _write_section_simple(ws, row, title, noise_vals or [noise_result], noise_result, _judge_text(room, 'noise'))
 
     # --- 照度 ---
     illum_vals = _values(room, 'illumination', 'illumination_main_room')
@@ -730,11 +904,21 @@ def _build_pharma_cleanroom_record(export_payload, output_path):
 
     # --- 自净时间 ---
     self_purify_vals = _values(room, 'self_purification_time', 'self_purify_time')
-    if self_purify_vals:
+    self_purify_result = _result(room, 'self_purification_time', 'self_purify_time')
+    if self_purify_vals or self_purify_result:
         judge_range = _get_judge_range(export_payload, 'self_purification_time')
         title_suffix = f' 判定范围：{judge_range}' if judge_range else ''
         title = f'自净时间（min）{title_suffix}'
-        row = _write_section_simple(ws, row, title, self_purify_vals, _result(room, 'self_purification_time', 'self_purify_time'), _judge_from_result(_result(room, 'self_purification_time', 'self_purify_time')))
+        row = _write_section_simple(ws, row, title, self_purify_vals or [self_purify_result], self_purify_result, _judge_for_key(self_purify_result, 'self_purification_time'))
+
+    # --- 气流流型 ---
+    airflow_vals = _values(room, 'airflow_pattern')
+    airflow_result = _result(room, 'airflow_pattern')
+    if airflow_vals or airflow_result:
+        judge_range = _get_judge_range(export_payload, 'airflow_pattern')
+        title_suffix = f' 判定范围：{judge_range}' if judge_range else ''
+        title = f'气流流型{title_suffix}'
+        row = _write_section_simple(ws, row, title, airflow_vals or [airflow_result], airflow_result, _judge_for_key(airflow_result, 'airflow_pattern'))
 
     # --- 沉降菌 ---
     settling_vals = _values(room, 'settling', 'settle_bacteria')
@@ -750,7 +934,7 @@ def _build_pharma_cleanroom_record(export_payload, output_path):
             blank = settling_data.get('blank', '0')
             neg = settling_data.get('neg', '0')
             result = f'平均值:{total} | 空白对照:{blank} | 阴性对照:{neg}'
-        row = _write_section_simple(ws, row, title, raw, result, _judge_from_result(_get_param(room, 'settling', 'settle_bacteria').get('result', '') or result))
+        row = _write_section_simple(ws, row, title, raw, result, _judge_for_key(_get_param(room, 'settling', 'settle_bacteria').get('result', '') or result, 'settling'))
 
     # --- 浮游菌 ---
     floating_vals = _values(room, 'floating', 'floating_bacteria')
@@ -766,7 +950,7 @@ def _build_pharma_cleanroom_record(export_payload, output_path):
             blank = floating_data.get('blank', '0')
             neg = floating_data.get('neg', '0')
             result = f'平均浓度:{total} | 空白对照:{blank} | 阴性对照:{neg}'
-        row = _write_section_simple(ws, row, title, raw, result, _judge_from_result(_get_param(room, 'floating', 'floating_bacteria').get('result', '') or result))
+        row = _write_section_simple(ws, row, title, raw, result, _judge_for_key(_get_param(room, 'floating', 'floating_bacteria').get('result', '') or result, 'floating'))
 
     # 签名行
     row = _write_signature(ws, row + 1, project)
@@ -792,6 +976,8 @@ def _build_electronics_record(export_payload, output_path):
 # ============================================================
 def _build_fallback_record(export_payload, output_path):
     """通用 fallback：遍历所有 params 导出"""
+    global _current_judgement_index
+    _current_judgement_index = _build_judgement_index(export_payload)
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
     wb = openpyxl.Workbook()
@@ -835,7 +1021,7 @@ def _build_fallback_record(export_payload, output_path):
         judge_range = _get_judge_range(export_payload, key)
         title_suffix = f' 判定范围：{judge_range}' if judge_range else ''
         title = f'{key}{title_suffix}'
-        row = _write_section_simple(ws, row, title, vals or [''], result, _judge_from_result(item.get('result', '')))
+        row = _write_section_simple(ws, row, title, vals or [''], result, _judge_for_key(item.get('result', ''), key))
 
     # 签名行
     row = _write_signature(ws, row + 1, project)

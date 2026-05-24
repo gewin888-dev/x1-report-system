@@ -10,7 +10,7 @@ from template_standard_profiles import get_template_standard_profile
 
 
 def _replace_tc_text_minimal(cell_xml: str, new_text: str) -> str:
-    text_matches = list(re.finditer(r'(<w:t[^>]*>)(.*?)(</w:t>)', cell_xml, re.S))
+    text_matches = list(re.finditer(r'(<w:t(?:\s[^>]*)?>)(.*?)(</w:t>)', cell_xml, re.S))
     if text_matches:
         last = text_matches[-1]
         return cell_xml[:last.start()] + last.group(1) + escape(str(new_text)) + last.group(3) + cell_xml[last.end():]
@@ -41,7 +41,7 @@ def _replace_negative_pressure_result_row(document_xml: str, row_label: str, res
     tbl_pattern = re.compile(r'<w:tbl\b.*?</w:tbl>', re.S)
     row_pattern = re.compile(r'<w:tr\b.*?</w:tr>', re.S)
     cell_pattern = re.compile(r'<w:tc\b.*?</w:tc>', re.S)
-    text_pattern = re.compile(r'<w:t[^>]*>(.*?)</w:t>', re.S)
+    text_pattern = re.compile(r'<w:t(?:\s[^>]*)?>([^<]*)</w:t>', re.S)
 
     def _cell_plain(cell_xml: str) -> str:
         texts = text_pattern.findall(cell_xml)
@@ -423,6 +423,18 @@ def get_param_value(param_map: Dict[str, Dict[str, Any]], *aliases: str) -> str:
             avg = sum(nums) / len(nums)
             # 如果均值是整数则不带小数点
             return str(int(avg)) if avg == int(avg) else str(round(avg, 2))
+    # hepa_leak_multi 等多对象参数：objects[].value
+    objects = item.get('objects') if isinstance(item, dict) else None
+    if isinstance(objects, list) and objects:
+        obj_vals = []
+        for obj in objects:
+            if isinstance(obj, dict):
+                ov = str(obj.get('value', '') or '').strip()
+                on = str(obj.get('name', '') or '').strip()
+                if ov:
+                    obj_vals.append(f'{on}:{ov}' if on else ov)
+        if obj_vals:
+            return _strip_emoji('；'.join(obj_vals))
     data = item.get('data') if isinstance(item, dict) else {}
     if isinstance(data, dict):
         for key in ('value', 'avg', 'average', 'mean', 'text', 'display'):
@@ -1007,7 +1019,7 @@ def _build_placeholder_fill_plan(export_payload: Dict[str, Any]) -> List[Tuple[s
             ('照度', _op_single_illumination_value('illumination', 'illumination_main_room', 'illumination_aux_room', 'illumination_min', 'illumination_main', 'illumination_aux', '照度', '最低照度')),
             ('最低照度', _op_single_illumination_value('illumination_min', 'illumination_main_room', 'illumination_aux_room', 'illumination_main', 'illumination_aux', 'illumination', '最低照度')),
             ('照度均匀度', _op_value('illumination_uniformity', '照度均匀度')),
-            ('细菌浓度', _op_result('bacteria', 'settling_bacteria', '细菌浓度') or _op_value('bacteria', 'settling_bacteria', '细菌浓度')),
+            ('细菌浓度', bacteria_op_value or bacteria_surr_value),
             ('洁净度级别', particle_clean_class),
             ('悬浮粒子数/m³', particle_max_05),
             ('洁净度结果', particle_result),
@@ -1084,7 +1096,7 @@ def _build_placeholder_fill_plan(export_payload: Dict[str, Any]) -> List[Tuple[s
         detection_environment = ' / '.join([v for v in [gmp_grade, room_display_name] if str(v).strip()])
         airchange_rate = _gmp_value('airchange_rate', 'air_change_rate', 'airchange', '换气次数')
         wind_speed = _gmp_value('wind_speed', 'air_velocity', 'sectional_air_velocity', '截面风速')
-        wind_uniformity = _gmp_value('wind_uniformity', 'speed_uniformity', '风速不均匀度')
+        wind_uniformity = _gmp_value('wind_speed_uniformity', 'wind_uniformity', 'speed_uniformity', '风速不均匀度')
         pressure_diff = _gmp_value('static_pressure_diff', 'pressure_diff', 'pressure', '静压差')
         temperature = _gmp_value('temperature', '温度')
         humidity = _gmp_value('relative_humidity', 'humidity', '相对湿度')
@@ -1185,7 +1197,7 @@ def _build_placeholder_fill_plan(export_payload: Dict[str, Any]) -> List[Tuple[s
         detection_environment = ' / '.join([v for v in [gmp_grade, room_display_name] if str(v).strip()])
         airflow_speed = _vgmp_value('sectional_air_velocity', 'air_velocity', 'wind_speed', '截面风速')
         airchange_rate = _vgmp_value('airchange_rate', 'air_change_rate', 'airchange', '换气次数')
-        speed_uniformity = _vgmp_value('speed_uniformity', 'wind_uniformity', '风速不均匀度')
+        speed_uniformity = _vgmp_value('wind_speed_uniformity', 'speed_uniformity', 'wind_uniformity', '风速不均匀度')
         pressure_diff = _vgmp_value('static_pressure_diff', 'pressure_diff', 'pressure', '静压差')
         hepa_leak = _vgmp_value('hepa_leak', '送风高效过滤器检漏')
         temperature = _vgmp_value('temperature', '温度')
@@ -2058,7 +2070,7 @@ def _replace_table_value_by_left_label(xml_text: str, label: str, value: str, va
     tbl_pattern = re.compile(r'<w:tbl\b.*?</w:tbl>', re.S)
     row_pattern = re.compile(r'<w:tr\b.*?</w:tr>', re.S)
     cell_pattern = re.compile(r'<w:tc\b.*?</w:tc>', re.S)
-    text_pattern = re.compile(r'<w:t[^>]*>(.*?)</w:t>', re.S)
+    text_pattern = re.compile(r'<w:t(?:\s[^>]*)?>([^<]*)</w:t>', re.S)
 
     def _cell_plain(cell_xml: str) -> str:
         texts = text_pattern.findall(cell_xml)
@@ -2147,7 +2159,7 @@ def _replace_table_row_cells_by_anchor(xml_text: str, anchor_text: str, replacem
         return xml_text
     row_pattern = re.compile(r'<w:tr\b.*?</w:tr>', re.S)
     cell_pattern = re.compile(r'<w:tc\b.*?</w:tc>', re.S)
-    text_pattern = re.compile(r'<w:t[^>]*>(.*?)</w:t>', re.S)
+    text_pattern = re.compile(r'<w:t(?:\s[^>]*)?>([^<]*)</w:t>', re.S)
 
     def _cell_plain(cell_xml: str) -> str:
         texts = text_pattern.findall(cell_xml)
@@ -2192,7 +2204,7 @@ def _replace_table_row_cells_by_anchor_index(xml_text: str, anchor_text: str, ro
     tbl_pattern = re.compile(r'<w:tbl\b.*?</w:tbl>', re.S)
     row_pattern = re.compile(r'<w:tr\b.*?</w:tr>', re.S)
     cell_pattern = re.compile(r'<w:tc\b.*?</w:tc>', re.S)
-    text_pattern = re.compile(r'<w:t[^>]*>(.*?)</w:t>', re.S)
+    text_pattern = re.compile(r'<w:t(?:\s[^>]*)?>([^<]*)</w:t>', re.S)
 
     def _cell_plain(cell_xml: str) -> str:
         texts = text_pattern.findall(cell_xml)
@@ -2202,6 +2214,19 @@ def _replace_table_row_cells_by_anchor_index(xml_text: str, anchor_text: str, ro
         ).strip()
 
     def _force_set_cell_content(cell_xml: str, new_text: str) -> str:
+        # 最小改写：第一个 <w:t> 写入新值，其余 <w:t> 清空内容，保留原有段落/run/合并结构
+        text_matches = list(re.finditer(r'(<w:t(?:\s[^>]*)?>)(.*?)(</w:t>)', cell_xml, re.S))
+        if text_matches:
+            # 从后往前替换，避免偏移量变化
+            result = cell_xml
+            for i in range(len(text_matches) - 1, -1, -1):
+                m = text_matches[i]
+                if i == 0:
+                    result = result[:m.start(2)] + escape(str(new_text)) + result[m.end(2):]
+                else:
+                    result = result[:m.start(2)] + result[m.end(2):]
+            return result
+        # 无文本节点时，在 tcPr 后追加段落
         tcpr = re.search(r'(<w:tcPr\b.*?</w:tcPr>)', cell_xml, re.S)
         if tcpr:
             return cell_xml[:tcpr.end()] + _para_xml(new_text) + cell_xml[tcpr.end():]
@@ -2330,7 +2355,7 @@ def _replace_table_cell_by_table_and_row(xml_text: str, table_index: int, row_in
     tbl_pattern = re.compile(r'<w:tbl\b.*?</w:tbl>', re.S)
     row_pattern = re.compile(r'<w:tr\b.*?</w:tr>', re.S)
     cell_pattern = re.compile(r'<w:tc\b.*?</w:tc>', re.S)
-    text_pattern = re.compile(r'<w:t[^>]*>(.*?)</w:t>', re.S)
+    text_pattern = re.compile(r'<w:t(?:\s[^>]*)?>([^<]*)</w:t>', re.S)
 
 
 
@@ -2340,7 +2365,7 @@ def _replace_table_cell_by_table_and_row(xml_text: str, table_index: int, row_in
     tbl_pattern = re.compile(r'<w:tbl\b.*?</w:tbl>', re.S)
     row_pattern = re.compile(r'<w:tr\b.*?</w:tr>', re.S)
     cell_pattern = re.compile(r'<w:tc\b.*?</w:tc>', re.S)
-    text_pattern = re.compile(r'<w:t[^>]*>(.*?)</w:t>', re.S)
+    text_pattern = re.compile(r'<w:t(?:\s[^>]*)?>([^<]*)</w:t>', re.S)
 
     def _cell_plain(cell_xml: str) -> str:
         texts = text_pattern.findall(cell_xml)
@@ -2350,11 +2375,18 @@ def _replace_table_cell_by_table_and_row(xml_text: str, table_index: int, row_in
         ).strip()
 
     def _force_set_cell_content(cell_xml: str, new_text: str) -> str:
-        # 最小改写：优先只替换现有文本节点，保留原有段落/run/合并结构
-        text_matches = list(re.finditer(r'(<w:t[^>]*>)(.*?)(</w:t>)', cell_xml, re.S))
+        # 最小改写：第一个 <w:t> 写入新值，其余 <w:t> 清空内容，保留原有段落/run/合并结构
+        text_matches = list(re.finditer(r'(<w:t(?:\s[^>]*)?>)(.*?)(</w:t>)', cell_xml, re.S))
         if text_matches:
-            last = text_matches[-1]
-            return cell_xml[:last.start()] + last.group(1) + escape(str(new_text)) + last.group(3) + cell_xml[last.end():]
+            # 从后往前替换，避免偏移量变化
+            result = cell_xml
+            for i in range(len(text_matches) - 1, -1, -1):
+                m = text_matches[i]
+                if i == 0:
+                    result = result[:m.start(2)] + escape(str(new_text)) + result[m.end(2):]
+                else:
+                    result = result[:m.start(2)] + result[m.end(2):]
+            return result
         tcpr = re.search(r'(<w:tcPr\b.*?</w:tcPr>)', cell_xml, re.S)
         if tcpr:
             inner = cell_xml[tcpr.end():]
@@ -2574,10 +2606,8 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                 continue
             if type_id in ('gmp_workshop', 'veterinary_gmp_workshop', 'food_workshop', 'electronics_workshop') and label in {'洁净度级别', '级别', '洁净度'}:
                 continue
-            # 冻结页保护：检查标签在文档中的位置，如果落在冻结页则跳过
-            _label_pos = document_xml.find(label)
-            if _label_pos >= 0 and _is_in_frozen_range(_label_pos):
-                continue
+            # 注：这些标签已通过 table_must_contain='委托单位' 精确定位到骨架信息表，
+            # 不需要冻结页保护（冻结页保护会误杀落在声明页同区间的骨架表字段）
             document_xml = _replace_table_value_by_left_label(document_xml, label, replacements.get(label, ''), value_cell_offset=offset, table_must_contain='委托单位')
         document_xml = _replace_table_value_by_left_label(document_xml, '设备状态', replacements.get('设备状态', ''), value_cell_offset=1)
         document_xml = _replace_table_value_by_left_label(document_xml, '产品内尺寸', replacements.get('产品内尺寸', ''), value_cell_offset=1)
@@ -2592,7 +2622,7 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
             document_xml = _replace_table_value_by_left_label(document_xml, '委托单位', replacements.get('委托单位', ''), value_cell_offset=1, max_hits=1)
         if replacements.get('受检区域名称') or replacements.get('房间名称'):
             room_name_value = replacements.get('受检区域名称', '') or replacements.get('房间名称', '')
-            if room_name_value:
+            if room_name_value and type_id not in ('gmp_workshop', 'veterinary_gmp_workshop', 'food_workshop', 'electronics_workshop'):
                 document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '受检区域名称', 1, {
                     1: room_name_value,
                 }, debug_notes=debug_notes)
@@ -2664,10 +2694,7 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                 _rl = _rw = _rh = 0
             _area_str = str(round(_rl * _rw, 2)).rstrip('0').rstrip('.') if (_rl > 0 and _rw > 0) else ''
             _vol_str = str(round(_rl * _rw * _rh, 2)).rstrip('0').rstrip('.') if (_rl > 0 and _rw > 0 and _rh > 0) else ''
-            if _area_str or _vol_str:
-                document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 1, {
-                    1: f'面积S（m²）={_area_str}          体积V（m³）={_vol_str}'
-                }, debug_notes=debug_notes, allow_blank=True)
+            # S/V 填充统一由后面的 ROW 1 tc[1] 清空+写入逻辑处理，这里不再重复写入
             if replacements.get('换气次数'):
                 document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '换气次数', 0, {
                     2: str(((_cf_std_ranges.get('airchange') or {}).get('range', '') or '')),
@@ -2694,9 +2721,9 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                 }, debug_notes=debug_notes, allow_blank=True)
             if replacements.get('照度'):
                 document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 13, {
-                    2: str(((_cf_std_ranges.get('illumination') or {}).get('range', '') or '')),
-                    3: replacements.get('照度', ''),
-                    4: _normalize_conclusion_text(get_param_result(build_param_map(room.get('params')), 'illumination_min', 'illumination', '照度', '平均照度')),
+                    3: str(((_cf_std_ranges.get('illumination') or {}).get('range', '') or '')),
+                    4: replacements.get('照度', ''),
+                    5: _normalize_conclusion_text(get_param_result(build_param_map(room.get('params')), 'illumination_min', 'illumination', '照度', '平均照度')),
                 }, debug_notes=debug_notes, allow_blank=True)
             if replacements.get('噪声'):
                 document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 14, {
@@ -3017,9 +3044,11 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
             def _gmp_std(key): return str(((_gmp_std_ranges.get(key) or {}).get('range', '') or ''))
             def _gmp_concl(*keys): return _normalize_conclusion_text(get_param_result(_gmp_pm, *keys))
 
-            # --- ROW 0: 表头（检测日期 + 洁净度级别）---
-            if replacements.get('检测日期') or gmp_grade:
+            # --- ROW 0: 表头（房间名 + 检测日期 + 洁净度级别）---
+            _room_name_display = replacements.get('受检区域名称', '') or replacements.get('房间名称', '') or room.get('room_name', '')
+            if replacements.get('检测日期') or gmp_grade or _room_name_display:
                 document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 0, {
+                    1: _room_name_display,
                     3: replacements.get('检测日期', ''),
                     5: _grade_display,
                 }, debug_notes=debug_notes, allow_blank=True)
@@ -3045,7 +3074,7 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
             _gmp_anchor_fills = [
                 ('截面风速', 'wind_speed', 'wind_speed', 'air_velocity', '截面风速'),
                 ('换气次数', 'airchange', 'airchange', 'air_change_rate', '换气次数'),
-                ('风速不均匀度', 'wind_uniformity', 'wind_uniformity', 'speed_uniformity', '风速不均匀度'),
+                ('风速不均匀度', 'wind_speed_uniformity', 'wind_uniformity', 'wind_uniformity', 'speed_uniformity', '风速不均匀度'),
                 ('静压差', 'pressure', 'pressure', 'pressure_diff', '静压差'),
                 ('送风高效', 'hepa_leak', 'hepa_leak', '送风高效过滤器检漏'),
                 ('气流流型', None, 'airflow_pattern', '气流流型'),
@@ -3090,30 +3119,30 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                     _particle_limit_5 = _parts[1].replace('μm', '㎛').replace('≤', '：≤') if '：' not in _parts[1] else _parts[1]
             _gmp_grade_norm = str(room.get('clean_class', '') or room.get('level_name', '') or replacements.get('洁净度级别', '') or '').strip()
             _is_gmp_a_grade = _gmp_grade_norm == 'A级'
-            # GMP A级模板粒子块结构稳定：表3行6-10，直接定点，避免锚点序号串写
+            # GMP A级模板粒子块结构：表3行8-12（洁净度标题=8, ≥0.5μm=9, UCL=10, ≥5μm=11, UCL=12）
             if _is_gmp_a_grade:
                 if replacements.get('洁净度') or replacements.get('洁净度级别'):
-                    document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 6, {
-                        3: _grade_display, 5: _grade_display,
+                    document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 8, {
+                        3: _grade_display,
                         6: _gmp_concl('particle', '洁净度级别（悬浮粒子浓度）') or '合格',
                     }, debug_notes=debug_notes, allow_blank=True)
                 if replacements.get('≥0.5μm') or _particle_limit_05:
                     # A级模板该范围文本在合并单元格中结构脆弱；模板原值正确时不重写，只写等级/检测值
                     _05_fill = {3: _grade_display, 5: replacements.get('≥0.5μm', '')}
-                    document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 7, _05_fill, debug_notes=debug_notes, allow_blank=True)
+                    document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 9, _05_fill, debug_notes=debug_notes, allow_blank=True)
                 if replacements.get('0.5μmUCL'):
-                    document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 8, {5: replacements.get('0.5μmUCL', '')}, debug_notes=debug_notes, allow_blank=True)
+                    document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 10, {5: replacements.get('0.5μmUCL', '')}, debug_notes=debug_notes, allow_blank=True)
                 if replacements.get('≥5μm') or _particle_limit_5:
                     # A级模板范围格保持模板原文，避免破坏合并单元格 XML
                     _5_fill = {5: replacements.get('≥5μm', '')}
-                    document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 9, _5_fill, debug_notes=debug_notes, allow_blank=True)
+                    document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 11, _5_fill, debug_notes=debug_notes, allow_blank=True)
                 if replacements.get('5μmUCL'):
-                    document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 10, {5: replacements.get('5μmUCL', '')}, debug_notes=debug_notes, allow_blank=True)
+                    document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 12, {5: replacements.get('5μmUCL', '')}, debug_notes=debug_notes, allow_blank=True)
             else:
                 # 洁净度标题行
                 if replacements.get('洁净度') or replacements.get('洁净度级别'):
                     document_xml = _replace_table_row_cells_by_anchor_index(document_xml, '洁净度级别', 1, {
-                        3: _grade_display, 5: _grade_display,
+                        3: _grade_display,
                         6: _gmp_concl('particle', '洁净度级别（悬浮粒子浓度）') or '合格',
                     }, debug_notes=debug_notes, table_match_index=-1)
                 # ≥0.5μm 子行（按文本锚点定位）
@@ -3160,9 +3189,11 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
             def _vgmp_std(key): return str(((_vgmp_std_ranges.get(key) or {}).get('range', '') or ''))
             def _vgmp_concl(*keys): return _normalize_conclusion_text(get_param_result(_vgmp_pm, *keys))
 
-            # --- ROW 0: 表头 ---
-            if replacements.get('检测日期') or vgmp_grade:
+            # --- ROW 0: 表头（房间名 + 检测日期 + 洁净度级别）---
+            _vroom_name_display = replacements.get('受检区域名称', '') or replacements.get('房间名称', '') or room.get('room_name', '')
+            if replacements.get('检测日期') or vgmp_grade or _vroom_name_display:
                 document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 0, {
+                    1: _vroom_name_display,
                     3: replacements.get('检测日期', ''), 5: _vgrade_display,
                 }, debug_notes=debug_notes, allow_blank=True)
 
@@ -3187,7 +3218,7 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
             _vgmp_anchor_fills = [
                 ('截面风速', 'wind_speed', 'wind_speed', 'air_velocity', '截面风速'),
                 ('换气次数', 'airchange', 'airchange', 'air_change_rate', '换气次数'),
-                ('风速不均匀度', 'wind_uniformity', 'wind_uniformity', 'speed_uniformity', '风速不均匀度'),
+                ('风速不均匀度', 'wind_speed_uniformity', 'wind_uniformity', 'wind_uniformity', 'speed_uniformity', '风速不均匀度'),
                 ('静压差', 'pressure', 'pressure', 'pressure_diff', '静压差'),
                 ('送风高效', 'hepa_leak', 'hepa_leak', '送风高效过滤器检漏'),
                 ('气流流型', None, 'airflow_pattern', '气流流型'),
@@ -3327,14 +3358,8 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
             _length = str(room.get('length', '') or '')
             _width = str(room.get('width', '') or '')
             _height = str(room.get('height', '') or '')
-            if _length and _width and _height:
-                try:
-                    _s = round(float(_length) * float(_width), 1)
-                    _v = round(float(_length) * float(_width) * float(_height), 0)
-                    _sv_text = f'面积S（m²）={_s}              体积V（m³）={int(_v)}'
-                    document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 1, {1: _sv_text}, debug_notes=debug_notes)
-                except (ValueError, TypeError):
-                    pass
+            # S/V 填充统一由后面的 ROW 1 tc[1] 清空+写入逻辑处理（约第 5024 行），
+            # 这里不再重复写入，避免新旧文本并存。
 
             # --- ROW 3: 截面风速 / 换气次数 ---
             # 百级模板 row3=截面风速，万级模板 row3=换气次数（无截面风速行）
@@ -5053,7 +5078,9 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
             _t_pat = re.compile(r'(<w:t(?:\s[^>]*)?>)([^<]*)(</w:t>)', re.S)
             for _tm in _tbl_pat.finditer(document_xml):
                 _tbl = _tm.group(0)
-                if '\u622a\u9762\u5e73\u5747\u98ce\u901f' not in ''.join(re.findall(r'<w:t[^>]*>([^<]*)</w:t>', _tbl)):
+                _tbl_texts = ''.join(re.findall(r'<w:t[^>]*>([^<]*)</w:t>', _tbl))
+                # 必须是数据表（含"房间参数"或"房间名称"），不能是仪器表
+                if '\u623f\u95f4\u53c2\u6570' not in _tbl_texts and '\u623f\u95f4\u540d\u79f0' not in _tbl_texts:
                     continue
                 _rows = _row_pat.findall(_tbl)
                 if len(_rows) < 2:
@@ -5084,9 +5111,12 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
         document_xml = _replace_cover_field(document_xml, '委托单位', replacements.get('委托单位', ''))
         document_xml = _replace_cover_field(document_xml, '检测区域', replacements.get('检测区域', ''))
         document_xml = _replace_cover_field(document_xml, '受检区域', replacements.get('检测区域', ''))
-        # 正文中多处“报告编号：”也需要填充，但封面重复编号只保留前面的正式字段，避免重复写入造成双编号
+        # 正文中多处"报告编号："也需要填充，但封面已由 _replace_cover_field 处理，跳过封面区域避免双编号
         if replacements.get('报告编号') and type_id != 'operating_room':
-            document_xml = _replace_all_plain_text(document_xml, '报告编号：', replacements.get('报告编号', ''), max_count=10)
+            _cover_end = 25000
+            _body_xml = document_xml[_cover_end:]
+            _body_xml = _replace_all_plain_text(_body_xml, '报告编号：', replacements.get('报告编号', ''), max_count=10)
+            document_xml = document_xml[:_cover_end] + _body_xml
         document_xml = _cleanup_placeholder_noise(document_xml)
 
         if type_id == 'operating_room':
@@ -5304,7 +5334,7 @@ def _is_skeleton_table(table_xml: str) -> bool:
     """判断一张表是否属于前四页骨架信息表（封面/声明/信息/仪器页）。
     规则：如果表中包含 2 个以上骨架标签，则认定为骨架表。
     """
-    text_pattern = re.compile(r'<w:t[^>]*>(.*?)</w:t>', re.S)
+    text_pattern = re.compile(r'<w:t(?:\s[^>]*)?>([^<]*)</w:t>', re.S)
     texts = text_pattern.findall(table_xml)
     plain = ''.join(t.replace('&lt;', '<').replace('&gt;', '>').replace('&amp;', '&') for t in texts)
     hit_count = sum(1 for label in _SKELETON_TABLE_LABELS if label in plain)
@@ -5373,6 +5403,30 @@ def _fill_data_table_xml(table_xml: str, room_export: dict, export_payload: dict
     # cell[0] 标签标准化：受检区域名称 / 受检区域名称及编号 → 房间名称（防止通用替换拼入值导致重复）
     for _old_label in ['受检区域名称及编号', '受检区域名称']:
         table_xml = table_xml.replace(_old_label, '房间名称')
+    # 清理 build_template_filled_docx 对标签的污染：受检区域{旧房间名}... → 房间名称
+    # 注意：模板中标签可能跨多个 <w:t> 节点（如 <w:t>受检区域</w:t><w:t>名称</w:t><w:t>及编号</w:t>），
+    # 简单 regex 无法跨标签清理，需要清除 cell 0 中所有残留文本片段
+    _row_pat_local = re.compile(r'<w:tr\b.*?</w:tr>', re.S)
+    _tc_pat_local = re.compile(r'<w:tc\b.*?</w:tc>', re.S)
+    _wt_pat_local = re.compile(r'(<w:t(?:\s[^>]*)?>)([\s\S]*?)(</w:t>)', re.S)
+    _rows_local = _row_pat_local.findall(table_xml)
+    if _rows_local:
+        _row0 = _rows_local[0]
+        _tcs_local = _tc_pat_local.findall(_row0)
+        if _tcs_local:
+            _tc0 = _tcs_local[0]
+            _tc0_texts = _wt_pat_local.findall(_tc0)
+            # 只有当 cell 0 包含"受检"或"名称"等残留时才重写
+            _tc0_plain = ''.join(t[1] for t in _tc0_texts)
+            if '受检' in _tc0_plain or '名称' in _tc0_plain or '编号' in _tc0_plain:
+                _tc0_new = _tc0
+                _tc0_matches = list(_wt_pat_local.finditer(_tc0_new))
+                for _mi in range(len(_tc0_matches) - 1, -1, -1):
+                    _mm = _tc0_matches[_mi]
+                    _repl = escape('房间名称') if _mi == 0 else ''
+                    _tc0_new = _tc0_new[:_mm.start(2)] + _repl + _tc0_new[_mm.end(2):]
+                if _tc0_new != _tc0:
+                    table_xml = table_xml.replace(_tc0, _tc0_new, 1)
     table_xml = _replace_table_cell_by_table_and_row(table_xml, 0, 0, {
         1: room_name,
         3: detection_date,
@@ -5391,24 +5445,8 @@ def _fill_data_table_xml(table_xml: str, room_export: dict, export_payload: dict
         _rl = _rw = _rh = 0
     _area_str = str(round(_rl * _rw, 2)).rstrip('0').rstrip('.') if (_rl > 0 and _rw > 0) else ''
     _vol_str = str(round(_rl * _rw * _rh, 2)).rstrip('0').rstrip('.') if (_rl > 0 and _rw > 0 and _rh > 0) else ''
-    if _area_str or _vol_str:
-        import re as _re_sv
-        _tbl_rows = list(_re_sv.finditer(r'<w:tr\b.*?</w:tr>', table_xml, _re_sv.S))
-        if len(_tbl_rows) >= 2:
-            _row1_xml = _tbl_rows[1].group(0)
-            _sv_text = f'面积S（m²）={_area_str}          体积V（m³）={_vol_str}'
-            _sv_replaced = False
-            _tc_matches = list(_re_sv.finditer(r'<w:tc\b.*?</w:tc>', _row1_xml, _re_sv.S))
-            if len(_tc_matches) >= 2:
-                _target_tc = _tc_matches[1].group(0)
-                _new_tc = _replace_tc_text_minimal(_target_tc, _sv_text)
-                if _new_tc != _target_tc:
-                    table_xml = table_xml.replace(_target_tc, _new_tc, 1)
-                    _sv_replaced = True
-            if not _sv_replaced:
-                table_xml = _replace_table_cell_by_table_and_row(table_xml, 0, 1, {
-                    1: _sv_text
-                }, allow_blank=True)
+    # S/V 填充已由 build_template_filled_docx 的 ROW 1 tc[1] 清空+写入逻辑统一处理，
+    # _fill_data_table_xml 不再重复写入，避免新旧文本并存。
 
     # === 构建判定结果索引（key → {range, passed}）===
     _judgement = room_export.get('judgement_result') or {}
@@ -5432,6 +5470,8 @@ def _fill_data_table_xml(table_xml: str, room_export: dict, export_payload: dict
         'illumination': '平均照度',
         'illumination_main': '平均照度',
         'illumination_min': '平均照度',
+        'illumination_main_room': '平均照度',
+        'illumination_aux_room': '平均照度',
         'settling': '沉降菌',
         'floating': '浮游菌',
         'floating_bacteria': '浮游菌',
@@ -5513,6 +5553,8 @@ def _fill_data_table_xml(table_xml: str, room_export: dict, export_payload: dict
     _wt_pat = re.compile(r'<w:t(?:\s[^>]*)?>([\s\S]*?)</w:t>', re.S)
     def _write_tc_value(tc_xml, value):
         """向一个 <w:tc> 的第一个 <w:t> 写入 value，清空其余 <w:t>。"""
+        # 清掉 emoji 标记（✅❌✓✗☑☒），报告正文不应出现 emoji
+        _clean_value = re.sub(r'[✅❌✓✗☑☒]', '', str(value)).strip()
         _t_matches = list(_wt_pat.finditer(tc_xml))
         if _t_matches:
             new_tc = tc_xml
@@ -5520,7 +5562,7 @@ def _fill_data_table_xml(table_xml: str, room_export: dict, export_payload: dict
             for _ti in range(len(_all_t) - 1, -1, -1):
                 _tm = _all_t[_ti]
                 if _ti == 0:
-                    new_tc = new_tc[:_tm.start(1)] + escape(str(value)) + new_tc[_tm.end(1):]
+                    new_tc = new_tc[:_tm.start(1)] + escape(_clean_value) + new_tc[_tm.end(1):]
                 else:
                     new_tc = new_tc[:_tm.start(1)] + new_tc[_tm.end(1):]
             return new_tc
@@ -5549,10 +5591,21 @@ def _fill_data_table_xml(table_xml: str, room_export: dict, export_payload: dict
 
             _new_row = _row_xml
 
-            # --- cell2: 判定范围（以标准数据库/判定引擎为准：相同不动，不同替换）---
+            # 照度行特殊处理：百级模板照度行有 6 列（标签|单位|子标签|范围|检测值|结论），
+            # 需要把 cell index 往后偏移 1
+            _cell_offset = 0
+            if _anchor in ('照度', '平均照度') and len(_tcs) >= 6:
+                # 检查 tc[1] 是否是单位（lx），tc[2] 是否是子标签（最低值/最低照度）
+                _tc1_text = ''.join(_wt_pat.findall(_tcs[1].group())).strip()
+                _tc2_text = ''.join(_wt_pat.findall(_tcs[2].group())).strip()
+                if _tc1_text in ('lx', '') and _tc2_text in ('最低值', '最低照度', '平均照度', ''):
+                    _cell_offset = 1
+
+            # --- cell2+offset: 判定范围（以标准数据库/判定引擎为准：相同不动，不同替换）---
+            _range_idx = 2 + _cell_offset
             _aj = _anchor_judgement.get(_anchor)
-            if _aj and _aj.get('range') and len(_tcs) > 2:
-                _old_tc2 = _tcs[2].group()
+            if _aj and _aj.get('range') and len(_tcs) > _range_idx:
+                _old_tc2 = _tcs[_range_idx].group()
                 _tc2_texts = _wt_pat.findall(_old_tc2)
                 _tc2_plain = ''.join(_tc2_texts).strip()
                 _db_range = _aj['range']
@@ -5562,15 +5615,17 @@ def _fill_data_table_xml(table_xml: str, room_export: dict, export_payload: dict
                     _new_tc2 = _write_tc_value(_old_tc2, _db_range)
                     _new_row = _new_row.replace(_old_tc2, _new_tc2, 1)
 
-            # --- cell3: 检测值（唯一来源=检测录入值；按语义强制写入）---
-            if len(_tcs) > 3:
-                _old_tc3 = _tcs[3].group()
+            # --- cell3+offset: 检测值（唯一来源=检测录入值；按语义强制写入）---
+            _value_idx = 3 + _cell_offset
+            if len(_tcs) > _value_idx:
+                _old_tc3 = _tcs[_value_idx].group()
                 _new_tc3 = _write_tc_value(_old_tc3, _value or '')
                 _new_row = _new_row.replace(_old_tc3, _new_tc3, 1)
 
-            # --- cell4: 单项结论（唯一来源=判定结果；按语义强制写入）---
-            if _aj and _aj.get('conclusion') and len(_tcs) > 4:
-                _old_tc4 = _tcs[4].group()
+            # --- cell4+offset: 单项结论（唯一来源=判定结果；按语义强制写入）---
+            _concl_idx = 4 + _cell_offset
+            if _aj and _aj.get('conclusion') and len(_tcs) > _concl_idx:
+                _old_tc4 = _tcs[_concl_idx].group()
                 _new_tc4 = _write_tc_value(_old_tc4, _aj['conclusion'])
                 _new_row = _new_row.replace(_old_tc4, _new_tc4, 1)
 
@@ -5811,6 +5866,8 @@ def build_mixed_report_docx(export_payload: Dict[str, Any], output_path: str) ->
         _sv_text = f'面积S（m²）={_area_str}          体积V（m³）={_vol_str}' if (_area_str or _vol_str) else ''
         for _old_label in ['受检区域名称及编号', '受检区域名称']:
             table_xml = table_xml.replace(_old_label, '房间名称')
+        # 清理 build_template_filled_docx 对标签的污染：受检区域{旧房间名}... → 房间名称
+        table_xml = re.sub(r'受检区域[^<]{0,30}(?:名称及编号|名称)?', '房间名称', table_xml)
         _row_pattern = re.compile(r'<w:tr\b.*?</w:tr>', re.S)
         _cell_pattern = re.compile(r'<w:tc\b.*?</w:tc>', re.S)
         _rows = _row_pattern.findall(table_xml)
@@ -5819,6 +5876,8 @@ def build_mixed_report_docx(export_payload: Dict[str, Any], output_path: str) ->
             _cells0 = _cell_pattern.findall(_row0)
             if len(_cells0) >= 6:
                 _new0 = _row0
+                # Cell 0 标签清理：跨 run 残留（受检区域/名称/及编号）→ 房间名称
+                _new0 = _new0.replace(_cells0[0], _set_tc_plain_text_xmlsafe(_cells0[0], '房间名称'), 1)
                 _new0 = _new0.replace(_cells0[1], _set_tc_plain_text_xmlsafe(_cells0[1], room_name), 1)
                 _new0 = _new0.replace(_cells0[3], _set_tc_plain_text_xmlsafe(_cells0[3], detection_date), 1)
                 _new0 = _new0.replace(_cells0[5], _set_tc_plain_text_xmlsafe(_cells0[5], level_value), 1)
@@ -5881,15 +5940,15 @@ def build_mixed_report_docx(export_payload: Dict[str, Any], output_path: str) ->
         for dt_idx, data_table_xml in enumerate(data_tables):
             filled_table = data_table_xml
             if dt_idx == 0:
-                room_name_probe = ((room_export.get('room') or {}).get('room_name') or '').strip()
-                if room_name_probe and room_name_probe in data_table_xml and ('检测日期' in data_table_xml or '洁净度设计级别' in data_table_xml):
-                    filled_table = data_table_xml
-                else:
-                    try:
+                # Room 2+ 始终走 anchor-based 二次填充，确保检测值和结论不丢失
+                # （positional fill 可能因行号不匹配而静默失败）
+                try:
+                    room_name_probe = ((room_export.get('room') or {}).get('room_name') or '').strip()
+                    if not (room_name_probe and room_name_probe in data_table_xml and ('检测日期' in data_table_xml or '洁净度设计级别' in data_table_xml)):
                         filled_table = _patch_appended_table_header(filled_table, room_export)
-                        filled_table = _fill_data_table_xml(filled_table, room_export, export_payload)
-                    except Exception:
-                        filled_table = data_table_xml
+                    filled_table = _fill_data_table_xml(filled_table, room_export, export_payload)
+                except Exception:
+                    filled_table = data_table_xml
             # 追加分页符 + 标题段落 + 数据表（仅第一张表前加标题）
             if dt_idx == 0:
                 header_xml = (

@@ -4901,7 +4901,7 @@ function calc_illum_uniformity(rid,pk,vals){
 
 // 通用判定
 function judgeRange(val,range){
-    if(!range||range==='/')return true;
+    if(!range||range==='/')return null;
     // 支持全角和半角波浪号
     if(range.includes('~')||range.includes('～')){
         const parts=range.replace(/[^\d.~～\-]/g,'').split(/[~～]/);
@@ -4911,7 +4911,7 @@ function judgeRange(val,range){
     }
     if(range.includes('≥')){return val>=parseFloat(range.replace(/[^0-9.\-]/g,''));}
     if(range.includes('≤')){return val<=parseFloat(range.replace(/[^0-9.\-]/g,''));}
-    return true;
+    return null;
 }
 
 function setRes(rid,pk,text,pass){
@@ -4925,6 +4925,13 @@ function setRes(rid,pk,text,pass){
             room.dataset.passBoxResultState = getPassBoxResultState(room);
             syncPassBoxResultState(rid);
         }
+        updateRoomSummary(rid);
+        return;
+    }
+    if(pass===null){
+        // 无判定范围，不标记合格/不合格
+        span.textContent=text;
+        span.className='cv';
         updateRoomSummary(rid);
         return;
     }

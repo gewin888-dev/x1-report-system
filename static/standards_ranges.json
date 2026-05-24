@@ -1173,6 +1173,22 @@
         "illumination_aux_room": {
           "range": "≥200",
           "unit": "lx"
+        },
+        "settling": {
+          "range": "≤1",
+          "unit": "cfu/皿"
+        },
+        "floating": {
+          "range": "≤1",
+          "unit": "cfu/m³"
+        },
+        "self_purification_time": {
+          "range": "≤20",
+          "unit": "min"
+        },
+        "wind_uniformity": {
+          "range": "≤0.25",
+          "unit": ""
         }
       },
       "B级": {
@@ -1199,6 +1215,18 @@
         "illumination_aux_room": {
           "range": "≥200",
           "unit": "lx"
+        },
+        "settling": {
+          "range": "≤1",
+          "unit": "cfu/皿"
+        },
+        "floating": {
+          "range": "≤5",
+          "unit": "cfu/m³"
+        },
+        "self_purification_time": {
+          "range": "≤20",
+          "unit": "min"
         }
       },
       "C级": {
@@ -1233,6 +1261,18 @@
         "illumination_aux_room": {
           "range": "≥200",
           "unit": "lx"
+        },
+        "settling": {
+          "range": "≤3",
+          "unit": "cfu/皿"
+        },
+        "floating": {
+          "range": "≤100",
+          "unit": "cfu/m³"
+        },
+        "self_purification_time": {
+          "range": "≤20",
+          "unit": "min"
         }
       },
       "D级": {
@@ -1259,6 +1299,18 @@
         "illumination_aux_room": {
           "range": "≥200",
           "unit": "lx"
+        },
+        "settling": {
+          "range": "≤10",
+          "unit": "cfu/皿"
+        },
+        "floating": {
+          "range": "≤500",
+          "unit": "cfu/m³"
+        },
+        "self_purification_time": {
+          "range": "≤20",
+          "unit": "min"
         }
       }
     },
