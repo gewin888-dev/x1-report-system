@@ -127,6 +127,7 @@ def serialize_business_project(row):
         'source': row['source'] if 'source' in row.keys() else '',
         'has_urge': row['has_urge'] if 'has_urge' in row.keys() else '',
         'report_file_path': row['report_file_path'] if 'report_file_path' in row.keys() else '',
+        'version': row['version'] if 'version' in row.keys() else 1,
     }
 
 
