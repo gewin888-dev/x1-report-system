@@ -181,19 +181,23 @@ function showTab(tab){
     if((previousTab === 'draft' || previousTab === 'history') && tab === 'new'){
         window._returningFromListTab = true;
     }
+    const suppressAll = !!window._suppressReturnToEditPrompt;
     const shouldPromptReturnToNew = (
         tab === 'new' &&
         window._returningFromListTab &&
-        !window._suppressReturnToEditPrompt &&
+        !suppressAll &&
         hasMeaningfulEditingContent() &&
         (window._hasSavedDraftOnce || window._editCompleted)
     );
     window._returningFromListTab = false;
     window._suppressReturnToEditPrompt = false;
-    if(tab==='new' && window._editCompleted){
+    if(tab==='new' && window._editCompleted && !suppressAll){
         // 编辑完成后切回新建,提示清空表单
         window._editCompleted = false;
         showResetDialog();
+    }else if(tab==='new' && window._editCompleted && suppressAll){
+        // 从记录列表点击加载时,静默清除editCompleted状态,不弹窗
+        window._editCompleted = false;
     }else if(shouldPromptReturnToNew){
         showReturnToEditDialog();
     }
@@ -7095,8 +7099,7 @@ async function loadRecordForEdit(id){
             });
         }
 
-        // 5. 切到新建记录tab
-        showTab('new');
+        // 5. 确保滚动到顶部并延迟解除恢复状态
         const roomCount = d.rooms?.length || 0;
         const safeDelay = Math.max(1500, roomCount * 500 + 800);
         setTimeout(()=>{
@@ -7884,7 +7887,8 @@ function prefillFromTask(taskId, btnEl){
       if(!res.ok || !res.data.success) throw new Error(res.data.error || '获取项目信息失败');
       var d = res.data;
       var p = d.prefill || {};
-      // 切到录入 tab
+      // 切到录入 tab（抑制弹窗，因为是从任务进入）
+      window._suppressReturnToEditPrompt = true;
       showTab('new');
       // 填入项目基础信息
       var map = {
