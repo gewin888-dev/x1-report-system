@@ -6822,6 +6822,10 @@ async function doTransferDraft(draftId, targetUser, btn){
 async function loadRecordForEdit(id){
     pullRefreshDisabled = true;
     window._suppressReturnToEditPrompt = true;
+    // 防御性清除：确保不会触发 showResetDialog / showReturnToEditDialog
+    window._editCompleted = false;
+    window._hasSavedDraftOnce = false;
+    window._returningFromListTab = false;
     // 第一层止血：恢复期间暂停 auto-save，避免保存中间态
     window._isRestoringDraft = true;
     _autoSaveDirty = false;
