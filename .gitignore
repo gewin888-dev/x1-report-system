@@ -52,6 +52,9 @@ _archive/
 # Uploads directory
 uploads/
 
+# Uploaded reports (customer data)
+uploaded_reports/
+
 # Backup files
 *.bak
 *.bak_*
