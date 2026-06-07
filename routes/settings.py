@@ -333,6 +333,11 @@ def admin_api_settings_backup_now():
         else:
             tar.add(str(BASE_DIR), arcname=BASE_DIR.name)
     log_action(current_user.id, '执行立即备份', 'system_settings', json.dumps({'backup_file': str(backup_file), 'type': backup_type}, ensure_ascii=False))
+    # 只保留最新10份，删除多余旧备份
+    all_backups = sorted(backup_subdir.glob('*.tar.gz'), key=lambda x: x.stat().st_mtime)
+    for old in all_backups[:-10]:
+        try: old.unlink()
+        except Exception: pass
     return jsonify({'success': True, 'backup_file': str(backup_file), 'size': backup_file.stat().st_size, 'version_updated': version_updated, 'version': version, 'type': backup_type})
 
 
