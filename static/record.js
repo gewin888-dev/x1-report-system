@@ -6820,12 +6820,17 @@ async function doTransferDraft(draftId, targetUser, btn){
 // - 目标是"返回录入页编辑当前记录",不是重新打开页面,不是进入新建空表
 // - 这段逻辑一旦调整,必须完整验证:打开记录、回填数据、继续暂存、继续生成报告
 async function loadRecordForEdit(id){
+    // 防重入锁：防止连续快速点击并发执行互相破坏状态
+    if(window._loadRecordForEditLock) return;
+    window._loadRecordForEditLock = true;
     pullRefreshDisabled = true;
     window._suppressReturnToEditPrompt = true;
     // 防御性清除：确保不会触发 showResetDialog / showReturnToEditDialog
     window._editCompleted = false;
     window._hasSavedDraftOnce = false;
     window._returningFromListTab = false;
+    // 强制 currentTab 为 'new'，阻断 showTab 内 previousTab==='draft' 触发 _returningFromListTab 误判
+    window._currentTab = 'new';
     // 第一层止血：恢复期间暂停 auto-save，避免保存中间态
     window._isRestoringDraft = true;
     _autoSaveDirty = false;
@@ -7117,7 +7122,13 @@ async function loadRecordForEdit(id){
 
         // 当前阶段以真实导出、页面回归和收楼文档作为验收依据。
 
-    }catch(e){showToast('加载失败: '+e.message, 'error');}
+    }catch(e){
+        window._isRestoringDraft = false;
+        window._loadRecordForEditLock = false;
+        showToast('加载失败: '+e.message, 'error');
+        return;
+    }
+    window._loadRecordForEditLock = false;
 }
 
 function fillRoomParams(rid, card, params){
