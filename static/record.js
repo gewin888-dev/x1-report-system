@@ -6268,16 +6268,10 @@ function previewReportFile(feishuUrl, localFilename, label){
     }
 
     function fallbackToLocal(){
-        if(!localFilename){
-            pvStage.innerHTML='<p style="text-align:center;color:#ff4d4f">飞书预览失败且本地文件不可用</p>';
-            return;
-        }
-        fetch('/api/preview/'+encodeURIComponent(localFilename),{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){
-            if(!d.success){pvStage.innerHTML='<p style="text-align:center;color:#ff4d4f">预览失败: '+(d.error||'未知错误')+'</p>';return;}
-            renderPreview(d, 'local');
-        }).catch(function(e){
-            pvStage.innerHTML='<p style="text-align:center;color:#ff4d4f">本地预览失败: '+e.message+'</p>';
-        });
+        var openLink = feishuUrl
+            ? '<br><a href="'+feishuUrl+'" target="_blank" style="display:inline-block;margin-top:12px;padding:8px 18px;background:#1890ff;color:#fff;border-radius:6px;text-decoration:none;font-size:13px">📂 在飞书中打开</a>'
+            : '';
+        pvStage.innerHTML='<p style="text-align:center;color:#ff4d4f;padding:20px">飞书文件暂时无法预览，请在飞书App或电脑端打开查看。'+openLink+'</p>';
     }
 
     // 优先飞书

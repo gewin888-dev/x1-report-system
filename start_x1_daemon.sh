@@ -48,7 +48,9 @@ fi
 write_event "启动 X1 服务..."
 cd "$SCRIPT_DIR"
 write_start_banner
-nohup /usr/bin/python3 -m waitress --host="$APP_HOST" --port="$APP_PORT" app_x1:app >> "$APP_LOG_FILE" 2>&1 &
+nohup env PYTHONPATH=/Users/fuwuqi/Library/Python/3.9/lib/python/site-packages \
+  /Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/Resources/Python.app/Contents/MacOS/Python \
+  -m waitress --host="$APP_HOST" --port="$APP_PORT" app_x1:app >> "$APP_LOG_FILE" 2>&1 &
 PID=$!
 
 echo $PID > "$PID_FILE"

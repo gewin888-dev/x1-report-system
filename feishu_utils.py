@@ -294,11 +294,6 @@ def build_feishu_open_url(file_token, file_name=''):
     """根据文件扩展名构造更贴近原格式的飞书打开链接。"""
     if not file_token:
         return ''
-    suffix = Path(str(file_name or '')).suffix.lower()
-    if suffix == '.docx':
-        return f'https://pudi-test.feishu.cn/docx/{file_token}'
-    if suffix in ('.xlsx', '.xls', '.csv'):
-        return f'https://pudi-test.feishu.cn/sheets/{file_token}'
     return f'https://pudi-test.feishu.cn/drive/file/{file_token}'
 
 
@@ -334,7 +329,7 @@ def upload_file_to_feishu(file_path, folder_token):
             'feishu_open_url': feishu_open_url,
             'feishu_open_kind': Path(file_path.name).suffix.lower().lstrip('.')
         }
-    return {'success': False, 'error': data.get('msg', '上传失败')}
+    raise RuntimeError(f"飞书API错误 code={data.get('code')} msg={data.get('msg', '上传失败')}")
 
 
 def download_file_content_from_feishu(file_token):

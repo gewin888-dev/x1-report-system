@@ -275,6 +275,8 @@ def api_x_submit_export():
                     feishu_report = upload_file_to_feishu(str(report_file), reports_folder)
                     if feishu_report.get('success'):
                         print(f"✅ 检测报告已上传飞书: {feishu_report.get('feishu_url', '')}")
+                    else:
+                        print(f"❌ 检测报告上传飞书失败: {feishu_report.get('error', '未知错误')} | 文件: {report_file.name}")
 
             if feishu_enabled and xlsx_target.exists():
                 exports_folder = resolve_feishu_upload_folder('exports', year)
@@ -282,6 +284,8 @@ def api_x_submit_export():
                     feishu_export = upload_file_to_feishu(str(xlsx_target), exports_folder)
                     if feishu_export.get('success'):
                         print(f"✅ 原始记录已上传飞书: {feishu_export.get('feishu_url', '')}")
+                    else:
+                        print(f"❌ 原始记录上传飞书失败: {feishu_export.get('error', '未知错误')} | 文件: {xlsx_target.name}")
 
             # 正式目录双落地
             project_info = export_payload.get('project', {}) or {}
