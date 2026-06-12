@@ -2072,6 +2072,12 @@ function waitForRoomRestore(conditionFn, onReady, options={}){
     tick();
 }
 
+function waitForRoomRestoreAsync(conditionFn, options={}){
+    return new Promise(resolve => {
+        waitForRoomRestore(conditionFn, resolve, options);
+    });
+}
+
 function isRoomParamRestoreReady(card, room){
     if(!card || !room) return false;
     const typeId = room.type_id || card.dataset.typeId || '';
@@ -6924,7 +6930,8 @@ async function loadRecordForEdit(id){
 
         // 4. 逐个添加房间并填充数据
         if(d.rooms && d.rooms.length > 0){
-            d.rooms.forEach((room, ri) => {
+            const roomRestoreTasks = [];
+            d.rooms.forEach((room) => {
                 addRoom();
                 const rid = 'r' + roomCounter;
                 const card = document.querySelector(`[data-rid="${rid}"]`);
@@ -6957,160 +6964,16 @@ async function loadRecordForEdit(id){
                     if(typeBtn) selRoomType(rid, room.type_id);
                 }
 
-                // 等待检测类型渲染完成后填充洁净等级和参数
-                setTimeout(()=>{
-                    // 恢复房间级 dataset / summary（第一轮抽离）
-                    restoreRoomDatasets(rid, room, card);
-
-                    // 重新按已恢复dataset渲染依据/判定面板
-                    const detTypeForRestore = getRoomDetType(rid);
-                    if(detTypeForRestore){
-                        renderRoomBasis(rid, currentDomain, detTypeForRestore);
-                        renderRoomJudgementForType(rid, currentDomain, detTypeForRestore);
-                    }
-                    if(room.type_id === 'electronics_workshop' && card.dataset.electronicsParamsReady !== 'true'){
-                        card.dataset.electronicsManualRangeKeys = '[]';
-                        card.dataset.electronicsManualSource = '';
-                    }
-                    if(room.type_id === 'pass_box'){
-                        const passBoxParams = room.params && typeof room.params === 'object' ? room.params : null;
-                        const hasSavedPassBoxParams = !!(passBoxParams && Object.keys(passBoxParams).length > 0);
-                        card.dataset.businessDomainHint = 'pharma';
-                        card.dataset.passBoxParamsReady = hasSavedPassBoxParams ? 'true' : 'false';
-                        if(!hasSavedPassBoxParams){
-                            card.dataset.passBoxJudgementActive = '[]';
-                            card.dataset.passBoxJudgementSource = '';
-                            card.dataset.passBoxResultState = '';
-                        } else if(!(Array.isArray(room.pass_box_judgement_active) && room.pass_box_judgement_active.length > 0)){
-                            card.dataset.passBoxJudgementSource = '';
-                        }
-                    } else {
-                        card.dataset.passBoxParamsReady = 'false';
-                        card.dataset.passBoxJudgementActive = '[]';
-                        card.dataset.passBoxJudgementSource = '';
-                        card.dataset.passBoxResultState = '';
-                    }
-                    if(room.type_id === 'animal_room'){
-                        if(room.clean_class) {
-                            card.dataset.cleanClass = room.clean_class;
-                            card.dataset.levelName = room.clean_class;
-                        }
-                        if(room.barrier_room_class) card.dataset.barrierRoomClass = room.barrier_room_class;
-                        if(room.barrier_aux_room) card.dataset.barrierAuxRoom = room.barrier_aux_room;
-                        card.dataset.animalContextIncomplete = room.animal_context_incomplete ? 'true' : 'false';
-                        if(room.animal_context_incomplete){
-                            card.querySelector('.rb-summary') && (card.querySelector('.rb-summary').textContent = '未完成');
-                            card.querySelector('.rj-summary') && (card.querySelector('.rj-summary').textContent = '未完成');
-                            card.querySelector('.rb-body') && (card.querySelector('.rb-body').style.display = 'none');
-                            card.querySelector('.rj-body') && (card.querySelector('.rj-body').style.display = 'none');
-                            card.querySelector('.rb-arrow') && (card.querySelector('.rb-arrow').textContent = '▼');
-                            card.querySelector('.rj-arrow') && (card.querySelector('.rj-arrow').textContent = '▼');
-                        }
-                    }
-                    if(room.type_id === 'clean_function_room'){
-                        if(room.clean_function_subroom) card.dataset.cleanFunctionSubroom = room.clean_function_subroom;
-                        if(room.clean_class){
-                            const normalizedFoodCleanClass = room.type_id === 'food_workshop' ? normalizeFoodGradeValue(room.clean_class) : room.clean_class;
-                            card.dataset.cleanClass = normalizedFoodCleanClass;
-                            card.dataset.levelName = normalizedFoodCleanClass;
-                        }
-                    }
-                    updateRoomSummary(rid);
-                    if(room.animal_context_incomplete){
-                        if(room.clean_class === '屏障环境' && !room.barrier_room_class){
-                            card.querySelector('.rparams').innerHTML = '<p style="color:#999;font-size:13px;text-align:center;padding:20px;">💡 请选择房间类别</p>';
-                        } else if(room.clean_class === '屏障环境' && room.barrier_room_class === '洁净辅房' && !room.barrier_aux_room){
-                            card.querySelector('.rparams').innerHTML = '<p style="color:#999;font-size:13px;text-align:center;padding:20px;">💡 请选择洁净辅房名称</p>';
-                        }
-                    }
-
-                    // 统一恢复对象上下文 / 等级选择（第一轮抽离）
-                    restoreNestedRoomContext(rid, room, card);
-                    if(room.type_id === 'animal_room'){
-                        setTimeout(()=>{
-                            syncAnimalRoomContextSummary(rid);
-                            updateRoomSummary(rid);
-                        }, 120);
-                    }
-
-                    // 等待参数渲染完成后填充数据
-                    waitForRoomRestore(()=>isRoomParamRestoreReady(card, room), ()=>{
-                        if(room.type_id === 'ivc'){
-                            handleRoomDimensionChange(rid);
-                        }
-                        const animalContextIncompleteBeforeFill = isAnimalBarrierContextIncomplete(card);
-                        if(!animalContextIncompleteBeforeFill){
-                            fillRoomParams(rid, card, room.params||{});
-                            const hasAirchangeParam = !!Object.keys(room.params || {}).find(k => {
-                                const p = room.params[k] || {};
-                                const t = p.type || p.inputType || '';
-                                return t.includes('airchange') || k === 'airchange' || k === 'airchange_clean';
-                            });
-                            if(hasAirchangeParam){
-                                setTimeout(()=>{ handleRoomDimensionChange(rid); }, 80);
-                            }
-                            if(room.type_id === 'operating_room'){
-                                setTimeout(()=>{ fillRoomParams(rid, card, room.params||{}); updateRoomSummary(rid); }, 180);
-                            }
-                            if(room.type_id === 'animal_room' && room.clean_class === '屏障环境'){
-                                setTimeout(()=>{ fillRoomParams(rid, card, room.params||{}); updateRoomSummary(rid); }, 220);
-                            }
-                            if(room.type_id === 'pass_box'){
-                                const hasPassBoxParams = (room.params && Object.keys(room.params||{}).length > 0) || !!card.querySelector('.pb');
-                                card.dataset.passBoxParamsReady = hasPassBoxParams ? 'true' : 'false';
-                                setTimeout(()=>{ syncPassBoxResultState(rid); updateRoomJudgementSummary(rid); }, 80);
-                            }
-                            if(room.type_id === 'electronics_workshop'){
-                                setTimeout(()=>{ syncElectronicsManualState(rid); }, 60);
-                            }
-                            if(room.type_id === 'bsl'){
-                                setTimeout(()=>{ syncPressurePairSummaryState(rid, 'pressure'); }, 60);
-                            }
-                            if(room.type_id === 'animal_room'){
-                                setTimeout(()=>{ syncAnimalContextMarker(rid); }, 60);
-                            }
-                            if((room.type_id === 'pass_box' || room.type_id === 'laminar_hood') && room.hepa_leak_summary && !card.dataset.hepaLeakSourceState){
-                                card.dataset.hepaLeakSourceState = 'saved';
-                            }
-                        } else if(room.clean_class === '屏障环境' && !room.barrier_room_class){
-                            card.querySelector('.rparams').innerHTML = '<p style="color:#999;font-size:13px;text-align:center;padding:20px;">💡 请选择房间类别</p>';
-                        } else if(room.clean_class === '屏障环境' && room.barrier_room_class === '洁净辅房' && !room.barrier_aux_room){
-                            card.querySelector('.rparams').innerHTML = '<p style="color:#999;font-size:13px;text-align:center;padding:20px;">💡 请选择洁净辅房名称</p>';
-                        }
-                        restoreRoomExpandedStates(card, room);
-                        if(room.type_id === 'animal_room'){
-                            syncAnimalRoomContextSummary(rid);
-                            const animalContextIncomplete = isAnimalBarrierContextIncomplete(card);
-                            if(animalContextIncomplete){
-                                const rbBody = card.querySelector('.rb-body');
-                                const rjBody = card.querySelector('.rj-body');
-                                if(rbBody) rbBody.innerHTML = '';
-                                if(rjBody) rjBody.innerHTML = '';
-                                renderRoomBasis(rid, currentDomain, detTypeForRestore);
-                                renderRoomJudgementForType(rid, currentDomain, detTypeForRestore);
-                                syncAnimalRoomContextSummary(rid);
-                                if(room.clean_class === '屏障环境' && !room.barrier_room_class){
-                                    card.querySelector('.rparams').innerHTML = '<p style="color:#999;font-size:13px;text-align:center;padding:20px;">💡 请选择房间类别</p>';
-                                } else if(room.clean_class === '屏障环境' && room.barrier_room_class === '洁净辅房' && !room.barrier_aux_room){
-                                    card.querySelector('.rparams').innerHTML = '<p style="color:#999;font-size:13px;text-align:center;padding:20px;">💡 请选择洁净辅房名称</p>';
-                                }
-                            }
-                        }
-                        updateRoomSummary(rid);
-                    }, { retries: 16, delay: 40 });
-                }, 200);
+                roomRestoreTasks.push(restoreRoomForEditAsync(rid, room, card));
             });
+            await Promise.all(roomRestoreTasks);
         }
 
         // 5. 确保滚动到顶部并延迟解除恢复状态
-        const roomCount = d.rooms?.length || 0;
-        const safeDelay = Math.max(1500, roomCount * 500 + 800);
-        setTimeout(()=>{
-            window.scrollTo(0,0);
-            // 恢复完成，解除恢复中状态，重新允许 auto-save
-            window._isRestoringDraft = false;
-            _autoSaveDirty = false;
-        }, safeDelay);
+        await new Promise(resolve => setTimeout(resolve, 120));
+        window.scrollTo(0,0);
+        window._isRestoringDraft = false;
+        _autoSaveDirty = false;
         updateProjectInfoSummary();
         showToast('✅ 记录已加载,可以修改','success');
 
@@ -7123,6 +6986,154 @@ async function loadRecordForEdit(id){
         return;
     }
     window._loadRecordForEditLock = false;
+}
+
+function restoreRoomForEditAsync(rid, room, card){
+    return new Promise(resolve => {
+        setTimeout(()=>{
+            try{
+                restoreRoomDatasets(rid, room, card);
+
+                const detTypeForRestore = getRoomDetType(rid);
+                if(detTypeForRestore){
+                    renderRoomBasis(rid, currentDomain, detTypeForRestore);
+                    renderRoomJudgementForType(rid, currentDomain, detTypeForRestore);
+                }
+                if(room.type_id === 'electronics_workshop' && card.dataset.electronicsParamsReady !== 'true'){
+                    card.dataset.electronicsManualRangeKeys = '[]';
+                    card.dataset.electronicsManualSource = '';
+                }
+                if(room.type_id === 'pass_box'){
+                    const passBoxParams = room.params && typeof room.params === 'object' ? room.params : null;
+                    const hasSavedPassBoxParams = !!(passBoxParams && Object.keys(passBoxParams).length > 0);
+                    card.dataset.businessDomainHint = 'pharma';
+                    card.dataset.passBoxParamsReady = hasSavedPassBoxParams ? 'true' : 'false';
+                    if(!hasSavedPassBoxParams){
+                        card.dataset.passBoxJudgementActive = '[]';
+                        card.dataset.passBoxJudgementSource = '';
+                        card.dataset.passBoxResultState = '';
+                    } else if(!(Array.isArray(room.pass_box_judgement_active) && room.pass_box_judgement_active.length > 0)){
+                        card.dataset.passBoxJudgementSource = '';
+                    }
+                } else {
+                    card.dataset.passBoxParamsReady = 'false';
+                    card.dataset.passBoxJudgementActive = '[]';
+                    card.dataset.passBoxJudgementSource = '';
+                    card.dataset.passBoxResultState = '';
+                }
+                if(room.type_id === 'animal_room'){
+                    if(room.clean_class) {
+                        card.dataset.cleanClass = room.clean_class;
+                        card.dataset.levelName = room.clean_class;
+                    }
+                    if(room.barrier_room_class) card.dataset.barrierRoomClass = room.barrier_room_class;
+                    if(room.barrier_aux_room) card.dataset.barrierAuxRoom = room.barrier_aux_room;
+                    card.dataset.animalContextIncomplete = room.animal_context_incomplete ? 'true' : 'false';
+                    if(room.animal_context_incomplete){
+                        card.querySelector('.rb-summary') && (card.querySelector('.rb-summary').textContent = '未完成');
+                        card.querySelector('.rj-summary') && (card.querySelector('.rj-summary').textContent = '未完成');
+                        card.querySelector('.rb-body') && (card.querySelector('.rb-body').style.display = 'none');
+                        card.querySelector('.rj-body') && (card.querySelector('.rj-body').style.display = 'none');
+                        card.querySelector('.rb-arrow') && (card.querySelector('.rb-arrow').textContent = '▼');
+                        card.querySelector('.rj-arrow') && (card.querySelector('.rj-arrow').textContent = '▼');
+                    }
+                }
+                if(room.type_id === 'clean_function_room'){
+                    if(room.clean_function_subroom) card.dataset.cleanFunctionSubroom = room.clean_function_subroom;
+                    if(room.clean_class){
+                        const normalizedFoodCleanClass = room.type_id === 'food_workshop' ? normalizeFoodGradeValue(room.clean_class) : room.clean_class;
+                        card.dataset.cleanClass = normalizedFoodCleanClass;
+                        card.dataset.levelName = normalizedFoodCleanClass;
+                    }
+                }
+                updateRoomSummary(rid);
+                if(room.animal_context_incomplete){
+                    if(room.clean_class === '屏障环境' && !room.barrier_room_class){
+                        card.querySelector('.rparams').innerHTML = '<p style="color:#999;font-size:13px;text-align:center;padding:20px;">💡 请选择房间类别</p>';
+                    } else if(room.clean_class === '屏障环境' && room.barrier_room_class === '洁净辅房' && !room.barrier_aux_room){
+                        card.querySelector('.rparams').innerHTML = '<p style="color:#999;font-size:13px;text-align:center;padding:20px;">💡 请选择洁净辅房名称</p>';
+                    }
+                }
+
+                restoreNestedRoomContext(rid, room, card);
+                if(room.type_id === 'animal_room'){
+                    setTimeout(()=>{
+                        syncAnimalRoomContextSummary(rid);
+                        updateRoomSummary(rid);
+                    }, 120);
+                }
+
+                waitForRoomRestore(()=>isRoomParamRestoreReady(card, room), ()=>{
+                    if(room.type_id === 'ivc'){
+                        handleRoomDimensionChange(rid);
+                    }
+                    const animalContextIncompleteBeforeFill = isAnimalBarrierContextIncomplete(card);
+                    if(!animalContextIncompleteBeforeFill){
+                        fillRoomParams(rid, card, room.params||{});
+                        const hasAirchangeParam = !!Object.keys(room.params || {}).find(k => {
+                            const p = room.params[k] || {};
+                            const t = p.type || p.inputType || '';
+                            return t.includes('airchange') || k === 'airchange' || k === 'airchange_clean';
+                        });
+                        if(hasAirchangeParam){
+                            setTimeout(()=>{ handleRoomDimensionChange(rid); }, 80);
+                        }
+                        if(room.type_id === 'operating_room'){
+                            setTimeout(()=>{ fillRoomParams(rid, card, room.params||{}); updateRoomSummary(rid); }, 180);
+                        }
+                        if(room.type_id === 'animal_room' && room.clean_class === '屏障环境'){
+                            setTimeout(()=>{ fillRoomParams(rid, card, room.params||{}); updateRoomSummary(rid); }, 220);
+                        }
+                        if(room.type_id === 'pass_box'){
+                            const hasPassBoxParams = (room.params && Object.keys(room.params||{}).length > 0) || !!card.querySelector('.pb');
+                            card.dataset.passBoxParamsReady = hasPassBoxParams ? 'true' : 'false';
+                            setTimeout(()=>{ syncPassBoxResultState(rid); updateRoomJudgementSummary(rid); }, 80);
+                        }
+                        if(room.type_id === 'electronics_workshop'){
+                            setTimeout(()=>{ syncElectronicsManualState(rid); }, 60);
+                        }
+                        if(room.type_id === 'bsl'){
+                            setTimeout(()=>{ syncPressurePairSummaryState(rid, 'pressure'); }, 60);
+                        }
+                        if(room.type_id === 'animal_room'){
+                            setTimeout(()=>{ syncAnimalContextMarker(rid); }, 60);
+                        }
+                        if((room.type_id === 'pass_box' || room.type_id === 'laminar_hood') && room.hepa_leak_summary && !card.dataset.hepaLeakSourceState){
+                            card.dataset.hepaLeakSourceState = 'saved';
+                        }
+                    } else if(room.clean_class === '屏障环境' && !room.barrier_room_class){
+                        card.querySelector('.rparams').innerHTML = '<p style="color:#999;font-size:13px;text-align:center;padding:20px;">💡 请选择房间类别</p>';
+                    } else if(room.clean_class === '屏障环境' && room.barrier_room_class === '洁净辅房' && !room.barrier_aux_room){
+                        card.querySelector('.rparams').innerHTML = '<p style="color:#999;font-size:13px;text-align:center;padding:20px;">💡 请选择洁净辅房名称</p>';
+                    }
+                    restoreRoomExpandedStates(card, room);
+                    if(room.type_id === 'animal_room'){
+                        syncAnimalRoomContextSummary(rid);
+                        const animalContextIncomplete = isAnimalBarrierContextIncomplete(card);
+                        if(animalContextIncomplete){
+                            const rbBody = card.querySelector('.rb-body');
+                            const rjBody = card.querySelector('.rj-body');
+                            if(rbBody) rbBody.innerHTML = '';
+                            if(rjBody) rjBody.innerHTML = '';
+                            renderRoomBasis(rid, currentDomain, detTypeForRestore);
+                            renderRoomJudgementForType(rid, currentDomain, detTypeForRestore);
+                            syncAnimalRoomContextSummary(rid);
+                            if(room.clean_class === '屏障环境' && !room.barrier_room_class){
+                                card.querySelector('.rparams').innerHTML = '<p style="color:#999;font-size:13px;text-align:center;padding:20px;">💡 请选择房间类别</p>';
+                            } else if(room.clean_class === '屏障环境' && room.barrier_room_class === '洁净辅房' && !room.barrier_aux_room){
+                                card.querySelector('.rparams').innerHTML = '<p style="color:#999;font-size:13px;text-align:center;padding:20px;">💡 请选择洁净辅房名称</p>';
+                            }
+                        }
+                    }
+                    updateRoomSummary(rid);
+                    resolve();
+                }, { retries: 24, delay: 50 });
+            }catch(e){
+                console.error('restoreRoomForEditAsync failed', rid, e);
+                resolve();
+            }
+        }, 80);
+    });
 }
 
 function fillRoomParams(rid, card, params){
