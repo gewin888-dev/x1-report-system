@@ -38,7 +38,13 @@ template_mgmt_bp = Blueprint('template_mgmt', __name__)
 BASE_DIR = Path(__file__).parent.parent
 _CFG = load_x1_config(BASE_DIR)
 _PATHS = _CFG.get('paths', {})
-TEMPLATE_BASE = Path(_CFG.get('template_base', '')).expanduser().resolve()
+def _get_template_base_mgmt():
+    import pwd, os
+    tb = str(_CFG.get('template_base', '~/公司资料/检测部/检测报告模板') or '~/公司资料/检测部/检测报告模板')
+    real_home = pwd.getpwuid(os.getuid()).pw_dir
+    resolved = tb.replace('~', real_home, 1) if tb.startswith('~') else tb
+    return Path(resolved).resolve()
+TEMPLATE_BASE = _get_template_base_mgmt()
 UPLOADS_DIR = BASE_DIR / _PATHS.get('uploads', 'uploads_x1')
 APP_VERSION = _CFG.get('version', 'UNKNOWN_VERSION')
 

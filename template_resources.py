@@ -15,10 +15,14 @@ _logger = logging.getLogger('template_resources')
 BASE_DIR = Path(__file__).resolve().parent
 CFG = load_x1_config(BASE_DIR)
 
-# 从配置文件读取模板基础路径
+# 从配置文件读取模板基础路径（运行时动态解析，避免模块导入时 HOME 被污染）
 def _get_template_base():
     template_base = str(CFG.get('template_base', '~/公司资料/检测部/检测报告模板') or '~/公司资料/检测部/检测报告模板')
-    return Path(os.path.expanduser(template_base)).resolve()
+    # 强制用 passwd 数据库中的真实 home，不依赖 HOME 环境变量
+    import pwd
+    real_home = pwd.getpwuid(os.getuid()).pw_dir
+    resolved = template_base.replace('~', real_home, 1) if template_base.startswith('~') else template_base
+    return Path(resolved).resolve()
 
 BASE = _get_template_base()
 REGISTRY_FILE = BASE_DIR / 'template_registry.json'
@@ -124,17 +128,21 @@ def _normalize_template_entry(key: str, item: Dict[str, Any]) -> Dict[str, Any]:
     rel = str(item.get('template_relpath') or '').strip()
     project_rel = str(item.get('template_project_relpath') or '').strip()
     path_value = str(item.get('template_path') or '').strip()
+    _base = _get_template_base()  # 每次动态计算，避免模块级 BASE 被污染时拼错路径
     if rel:
         item['template_relpath'] = rel.replace('\\', '/')
-        item['template_path'] = str((BASE / item['template_relpath']).resolve())
+        item['template_path'] = str((_base / item['template_relpath']).resolve())
     elif project_rel:
         item['template_project_relpath'] = project_rel.replace('\\', '/')
         item['template_path'] = str((BASE_DIR / item['template_project_relpath']).resolve())
     elif path_value:
         try:
-            p = Path(os.path.expanduser(path_value)).resolve()
+            import pwd
+            real_home = pwd.getpwuid(os.getuid()).pw_dir
+            pv = path_value.replace('~', real_home, 1) if path_value.startswith('~') else path_value
+            p = Path(pv).resolve()
             try:
-                item['template_relpath'] = str(p.relative_to(BASE)).replace('\\', '/')
+                item['template_relpath'] = str(p.relative_to(_base)).replace('\\', '/')
             except Exception:
                 try:
                     item['template_project_relpath'] = str(p.relative_to(BASE_DIR)).replace('\\', '/')
