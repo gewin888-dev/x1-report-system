@@ -2235,11 +2235,19 @@ function restoreNestedRoomContext(rid, room, card){
         return;
     }
     if(flow.mode === 'context-single'){
-        applyFlatCleanClassRestore(rid, room, card);
+        waitForRoomRestore(
+            ()=>!!card.querySelectorAll('.room-clean-options .level-btn').length,
+            ()=>{ applyFlatCleanClassRestore(rid, room, card); },
+            { retries: 60, delay: 50 }
+        );
         return;
     }
     if(flow.mode === 'flat-default'){
-        applyFlatCleanClassRestore(rid, room, card);
+        waitForRoomRestore(
+            ()=>!!card.querySelectorAll('.room-clean-options .level-btn').length,
+            ()=>{ applyFlatCleanClassRestore(rid, room, card); },
+            { retries: 60, delay: 50 }
+        );
         return;
     }
     const animalBarrierRoomClass = room.barrier_room_class || room?.context?.barrier_room_class || '';
@@ -7127,7 +7135,7 @@ function restoreRoomForEditAsync(rid, room, card){
                     }
                     updateRoomSummary(rid);
                     resolve();
-                }, { retries: 24, delay: 50 });
+                }, { retries: 60, delay: 50 });
             }catch(e){
                 console.error('restoreRoomForEditAsync failed', rid, e);
                 resolve();
