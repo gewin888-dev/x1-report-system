@@ -61,6 +61,7 @@ INCLUDE_PATHS=(
     "feishu_utils.py"
     "config_loader.py"
     "adapters/"
+    "static/admin.js"
     "static/record.js"
     "static/record.css"
     "static/admin_customers.js"

@@ -2574,9 +2574,9 @@ function renderStandards(stds){
   stds.forEach(s=>{
     var domainTags=(s.domains||[]).map(d=>'<span class="tag tag-domain">'+d+'</span>').join('');
     var objTags=(s.objects||[]).map(o=>'<span class="tag">'+(OBJ_NAMES[o]||o)+'</span>').join('');
-    html+='<tr><td><strong>'+s.code+'</strong></td><td style="font-size:12px;color:#555">'+(STD_NAMES[s.code]||'—')+'</td><td>'+(domainTags||'<span style="color:#999">—</span>')+'</td><td>'+objTags+'</td><td style="text-align:right"><button class="btn btn-sm" onclick="viewStandard(\''+s.code+'\')" >查看</button></td></tr>';
+    html+='<tr style="cursor:pointer" onclick="viewStandard(\''+s.code+'\')"><td><strong>'+s.code+'</strong></td><td style="font-size:12px;color:#555">'+(STD_NAMES[s.code]||'—')+'</td><td>'+(domainTags||'<span style="color:#999">—</span>')+'</td><td>'+objTags+'</td></tr>';
   });
-  document.getElementById('tb-standards').innerHTML=html||'<tr><td colspan="5" class="empty">暂无匹配标准</td></tr>';
+  document.getElementById('tb-standards').innerHTML=html||'<tr><td colspan="4" class="empty">暂无匹配标准</td></tr>';
 }
 
 function filterStandards(){
@@ -2725,7 +2725,7 @@ function loadMonitor(){
     d.items.forEach(function(b){
       if(b.type==='data') dataCount++;
       else if(b.type==='code') codeCount++;
-      else if(b.type==='full') fullCount++;
+      else if(b.type==='full'||b.type==='自动'||b.type==='手动') fullCount++;
       var typeBadge='';
       var toneMap={code:'#e6f4ff;color:#0958d9;border:1px solid #91caff',data:'#f6ffed;color:#389e0d;border:1px solid #b7eb8f',full:'#f9f0ff;color:#722ed1;border:1px solid #d3adf7','自动':'#fff7e6;color:#d46b08;border:1px solid #ffd591','手动':'#e6f4ff;color:#0958d9;border:1px solid #91caff'};
       var tone=toneMap[b.type]||toneMap['手动'];
