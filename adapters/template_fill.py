@@ -432,7 +432,7 @@ def get_param_value(param_map: Dict[str, Dict[str, Any]], *aliases: str) -> str:
                 ov = str(obj.get('value', '') or '').strip()
                 on = str(obj.get('name', '') or '').strip()
                 if ov:
-                    obj_vals.append(f'{on}:{ov}' if on else ov)
+                    obj_vals.append(ov)
         if obj_vals:
             return _strip_emoji('；'.join(obj_vals))
     data = item.get('data') if isinstance(item, dict) else {}
@@ -702,6 +702,7 @@ def _build_placeholder_fill_plan(export_payload: Dict[str, Any]) -> List[Tuple[s
         bacteria_value = str(bacteria_values.get('value', '') or _cf_value('bacteria') or _cf_value('settle_bacteria') or _cf_value('settling_bacteria') or _cf_value('细菌浓度（沉降法）') or '')
         pressure_diff = _cf_value('static_pressure_diff') or _cf_value('pressure_diff') or _cf_value('pressure') or _cf_value('静压差')
         airchange_rate = _cf_value('airchange_rate') or _cf_value('air_change_rate') or _cf_value('airchange') or _cf_value('换气次数')
+        airchange_rate = re.sub(r'^.*=\s*', '', airchange_rate).strip() or airchange_rate
         temperature = _cf_value('temperature') or _cf_value('温度')
         humidity = _cf_value('humidity') or _cf_value('relative_humidity') or _cf_value('相对湿度')
         noise = _cf_value('noise') or _cf_value('噪声')
@@ -1012,13 +1013,13 @@ def _build_placeholder_fill_plan(export_payload: Dict[str, Any]) -> List[Tuple[s
             ('风速不均匀度', _op_compact_value('wind_uniformity', 'speed_uniformity', '风速不均匀度')),
             ('静压差', _op_value('static_pressure_diff', 'pressure_diff', 'pressure', '静压差')),
             ('严密性', _op_result('airtightness', '严密性') or '符合要求'),
-            ('送风高效过滤器检漏', _op_result('hepa_leak', '高效过滤器检漏', '送风高效过滤器检漏')),
+            ('送风高效过滤器检漏', _op_value('hepa_leak', '高效过滤器检漏', '送风高效过滤器检漏')),
             ('温度', _op_value('temperature', '温度')),
             ('相对湿度', _op_value('relative_humidity', 'humidity', '相对湿度')),
             ('噪声', _op_value('noise', '噪声')),
             ('照度', _op_single_illumination_value('illumination', 'illumination_main_room', 'illumination_aux_room', 'illumination_min', 'illumination_main', 'illumination_aux', '照度', '最低照度')),
             ('最低照度', _op_single_illumination_value('illumination_min', 'illumination_main_room', 'illumination_aux_room', 'illumination_main', 'illumination_aux', 'illumination', '最低照度')),
-            ('照度均匀度', _op_value('illumination_uniformity', '照度均匀度')),
+            ('照度均匀度', re.sub(r'^.*=\s*', '', _op_value('illumination_uniformity', '照度均匀度')).strip() or _op_value('illumination_uniformity', '照度均匀度')),
             ('细菌浓度', bacteria_op_value or bacteria_surr_value),
             ('洁净度级别', particle_clean_class),
             ('悬浮粒子数/m³', particle_max_05),
@@ -1068,7 +1069,7 @@ def _build_placeholder_fill_plan(export_payload: Dict[str, Any]) -> List[Tuple[s
             ('样品名称', room.get('type_name', '') or '负压病房'),
             ('检测类型', '现场检测'),
             ('所在房间', room_display_name),
-            ('换气次数', _np_value('airchange', 'airchange_rate', 'air_change_rate')),
+            ('换气次数', re.sub(r'^.*=\s*', '', _np_value('airchange', 'airchange_rate', 'air_change_rate')).strip() or _np_value('airchange', 'airchange_rate', 'air_change_rate')),
             ('污染区换气次数', _np_value('airchange', 'airchange_polluted')),
             ('清洁区换气次数', _np_value('airchange_clean')),
             ('排风口风速', _np_value('exhaust_speed', 'exhaust_velocity')),
@@ -2959,22 +2960,29 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                     if len(_parts) >= 1: _range_05 = _parts[0]
                     if len(_parts) >= 2 and not _range_5: _range_5 = _parts[1]
                 _particle_conclusion = _normalize_conclusion_text(get_param_result(build_param_map(room.get('params')), 'particle', '洁净度级别（悬浮粒子浓度）')) or '合格'
+                # 行7: col2=标准限值, col3=设计级别, col5=实测级别, col6=结论
+                _design_level = replacements.get('洁净级别', '') or replacements.get('洁净等级', '')
+                _measured_level = replacements.get('洁净度级别', '')
                 document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 7, {
-                    3: replacements.get('洁净度级别', ''),
-                    5: replacements.get('洁净度级别', ''),
+                    2: _range_05,
+                    3: _design_level,
+                    5: _measured_level,
                     6: _particle_conclusion,
                 }, debug_notes=debug_notes, allow_blank=True)
+                # 行8: 8列, col5=≥0.5μm最大值
                 document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 8, {
-                    4: replacements.get('≥0.5μm', ''),
-                    2: _range_05,
+                    5: replacements.get('≥0.5μm', ''),
                 }, debug_notes=debug_notes, allow_blank=True)
+                # 行9: 8列, col5=0.5μm UCL
                 document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 9, {
                     5: replacements.get('0.5μmUCL', ''),
                 }, debug_notes=debug_notes, allow_blank=True)
+                # 行10: 8列, col5=≥5μm最大值
                 document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 10, {
                     2: _range_5,
-                    4: replacements.get('≥5μm', ''),
+                    5: replacements.get('≥5μm', ''),
                 }, debug_notes=debug_notes, allow_blank=True)
+                # 行11: 8列, col5=5μm UCL
                 document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 11, {
                     5: replacements.get('5μmUCL', ''),
                 }, debug_notes=debug_notes, allow_blank=True)
@@ -5632,14 +5640,52 @@ def _fill_data_table_xml(table_xml: str, room_export: dict, export_payload: dict
             table_xml = table_xml.replace(_row_xml, _new_row, 1)
             break  # 每个 anchor 只匹配一次
 
-    # 填充洁净度检测结果（多行）
-    for key in ['≥ 0.5μm', '≥0.5μm', '≥5μm', '≥ 5μm',
-                '≥0.5µm静态', '≥0.5µm动态',
-                '≥5µm静态', '≥5µm动态']:
-        val = replacements.get(key, '')
-        if val and key in table_xml:
-            table_xml = _replace_table_row_cells_by_anchor_index(
-                table_xml, key, 0, {3: val})
+    # 填充洁净度检测结果（多行）；BSL由下方专项块处理，跳过
+    if type_id != 'bsl':
+        for key in ['≥ 0.5μm', '≥0.5μm', '≥5μm', '≥ 5μm',
+                    '≥0.5µm静态', '≥0.5µm动态',
+                    '≥5µm静态', '≥5µm动态']:
+            val = replacements.get(key, '')
+            if val and key in table_xml:
+                table_xml = _replace_table_row_cells_by_anchor_index(
+                    table_xml, key, 0, {3: val})
+
+    # BSL 专项：修正换气次数（提取计算结果中的数值）+ 洁净度级别行(行7)和粒子数据行(行8-11)
+    if type_id == 'bsl':
+        # 换气次数：从 "总风量Xm3/h ÷ 体积Ym3 = Z次/h ✅" 提取 Z
+        _ac_raw = replacements.get('换气次数', '')
+        _ac_match = re.search(r'=\s*([\d.]+)\s*次/h', _ac_raw)
+        if _ac_match:
+            _ac_val = _ac_match.group(1)
+            table_xml = _replace_table_cell_by_table_and_row(table_xml, 0, 3, {3: _ac_val}, allow_blank=True)
+
+        # 洁净度行 (行7, 7列): col3=设计级别, col5=实测级别, col6=单项结论
+        _design_level = replacements.get('洁净级别', '') or replacements.get('洁净等级', '')
+        _measured_level = replacements.get('洁净度级别', '')
+        # particle 判定 key 可能是 'particle' 或 'particle.p05_max' 等子key
+        _pt_jr = _jr_map.get('particle') or next((v for k, v in _jr_map.items() if k.startswith('particle')), {})
+        _pt_conclusion = '合格' if _pt_jr.get('passed') else ('不合格' if _pt_jr else '')
+        _pt_range = _pt_jr.get('range', '')
+        if _design_level or _measured_level:
+            table_xml = _replace_table_cell_by_table_and_row(table_xml, 0, 7, {
+                3: _design_level,
+                5: _measured_level,
+                6: _pt_conclusion,
+            }, allow_blank=True)
+
+        # 粒子数据行 (行8-11, 8列): col5=数值
+        _p05_max = replacements.get('≥0.5μm', '')
+        _p05_ucl = replacements.get('0.5μmUCL', '')
+        _p5_max  = replacements.get('≥5μm', '')
+        _p5_ucl  = replacements.get('5μmUCL', '')
+        if _p05_max:
+            table_xml = _replace_table_cell_by_table_and_row(table_xml, 0, 8,  {5: _p05_max}, allow_blank=True)
+        if _p05_ucl:
+            table_xml = _replace_table_cell_by_table_and_row(table_xml, 0, 9,  {5: _p05_ucl}, allow_blank=True)
+        if _p5_max:
+            table_xml = _replace_table_cell_by_table_and_row(table_xml, 0, 10, {5: _p5_max},  allow_blank=True)
+        if _p5_ucl:
+            table_xml = _replace_table_cell_by_table_and_row(table_xml, 0, 11, {5: _p5_ucl},  allow_blank=True)
 
     return table_xml
 
