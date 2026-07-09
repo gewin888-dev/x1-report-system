@@ -913,6 +913,37 @@ def _build_placeholder_fill_plan(export_payload: Dict[str, Any]) -> List[Tuple[s
         def _op_value(*keys: str) -> str:
             return get_param_value(param_map, *keys)
 
+        def _op_pressure_value(*keys: str) -> str:
+            """手术室静压差专用：优先拼接 pairs[].refRoom:数值，无多组数据时回退到普通取值。"""
+            item = get_param_item(param_map, *keys)
+            if not isinstance(item, dict):
+                return get_param_value(param_map, *keys)
+            pairs = item.get('pairs')
+            if isinstance(pairs, list) and pairs:
+                parts = []
+                for p in pairs:
+                    if not isinstance(p, dict):
+                        continue
+                    ref_room = str(p.get('refRoom', '') or '').strip()
+                    p_vals = p.get('values') or []
+                    if isinstance(p_vals, list) and p_vals:
+                        try:
+                            p_nums = [float(str(v).strip()) for v in p_vals if str(v).strip()]
+                            p_avg = sum(p_nums) / len(p_nums) if p_nums else None
+                            p_str = (str(int(p_avg)) if p_avg is not None and p_avg == int(p_avg) else str(round(p_avg, 2))) if p_avg is not None else str(p_vals[0])
+                        except (ValueError, TypeError):
+                            p_str = str(p_vals[0]) if p_vals else ''
+                    else:
+                        p_str = ''
+                    if ref_room and p_str:
+                        parts.append(f'{ref_room}:{p_str}')
+                    elif p_str:
+                        parts.append(p_str)
+                if parts:
+                    return _strip_emoji('；'.join(parts))
+            # 无 pairs 时回退普通取值
+            return get_param_value(param_map, *keys)
+
         # 医院洁净部照度映射规则（刘总 2026-05-07 明确）：
         # 前台虽然存在多个照度录入入口，但单次业务录入不会把所有照度都输入；
         # 模板侧只有一个照度落点是正确设计。
@@ -4663,6 +4694,35 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                         return v
                 return ''
 
+            def _op_pressure_std_with_room(std_range: str, param_map: dict) -> str:
+                """手术室静压差标准列：在标准范围后附加相对房间名（括号），支持多组压差多行。
+                单组示例：5～20（对洁净走廊）
+                多组时返回多行用换行连接：5～20（对洁净走廊）\n5～20（对污物通道）
+                无相对房间信息时原样返回 std_range。
+                """
+                pressure_item = get_param_item(param_map, 'static_pressure_diff', 'pressure_diff', 'pressure', '静压差')
+                if not isinstance(pressure_item, dict):
+                    return std_range
+                pairs = pressure_item.get('pairs')
+                if not isinstance(pairs, list) or not pairs:
+                    # 单组：顶层 refRoom
+                    ref_room = str(pressure_item.get('refRoom', '') or '').strip()
+                    if ref_room and std_range:
+                        return f'{std_range}（对{ref_room}）'
+                    return std_range
+                # 多组：每组拼一行
+                lines = []
+                for p in pairs:
+                    if not isinstance(p, dict):
+                        continue
+                    ref_room = str(p.get('refRoom', '') or '').strip()
+                    p_range = str(p.get('range', '') or std_range).strip()
+                    if ref_room and p_range:
+                        lines.append(f'{p_range}（对{ref_room}）')
+                    elif p_range:
+                        lines.append(p_range)
+                return '\n'.join(lines) if lines else std_range
+
             _raw_params = room.get('params', {})
             _param_map = _raw_params if isinstance(_raw_params, dict) else {}
 
@@ -4684,7 +4744,8 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                     (_R['wind'], _op_std_ranges.get('wind_speed', '') or _op_std_ranges.get('airchange', ''),
                      replacements.get('截面风速', '') or replacements.get('截面平均风速', '') or replacements.get('换气次数', '') or str((((_param_map.get('airchange') or {}).get('vents') or [{}])[0].get('volume', '')) or ''),
                      _op_conclusion_for('截面风速结果', '截面平均风速结果', '换气次数结果', '换气次数'), 2, 3, 4),
-                    (_R['pressure'], _op_std_ranges.get('pressure', ''),
+                    (_R['pressure'],
+                     _op_pressure_std_with_room(_op_std_ranges.get('pressure', ''), _param_map),
                      replacements.get('静压差', ''),
                      _op_conclusion_for('静压差结果', '静压差'), 2, 3, 4),
                     (_R['hepa'], _op_std_ranges.get('hepa_leak', ''),
@@ -4886,7 +4947,8 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                          _op_conclusion_for('风速不均匀度结果', '风速不均匀度'),
                          2, 3, 4))
                 _op_xml_rows.extend([
-                    (_R['pressure'], _op_std_ranges.get('pressure', ''),
+                    (_R['pressure'],
+                     _op_pressure_std_with_room(_op_std_ranges.get('pressure', ''), _param_map),
                      replacements.get('静压差', ''),
                      _op_conclusion_for('静压差结果', '静压差'), 2, 3, 4),
                     (_R['hepa'], _op_std_ranges.get('hepa_leak', ''),
@@ -5121,6 +5183,13 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
         document_xml = _replace_cover_field(document_xml, '受检区域', replacements.get('检测区域', ''))
         # 正文中多处"报告编号："也需要填充，但封面已由 _replace_cover_field 处理，跳过封面区域避免双编号
         if replacements.get('报告编号') and type_id != 'operating_room':
+            _cover_end = 25000
+            _body_xml = document_xml[_cover_end:]
+            _body_xml = _replace_all_plain_text(_body_xml, '报告编号：', replacements.get('报告编号', ''), max_count=10)
+            document_xml = document_xml[:_cover_end] + _body_xml
+        if replacements.get('报告编号') and type_id == 'operating_room':
+            # 手术室需在清理重复标题块之前填充报告编号（清理块会删掉第一个标题区域）
+            # 封面已由 _replace_cover_field 处理，正文区从25000字符后开始
             _cover_end = 25000
             _body_xml = document_xml[_cover_end:]
             _body_xml = _replace_all_plain_text(_body_xml, '报告编号：', replacements.get('报告编号', ''), max_count=10)
