@@ -1042,7 +1042,7 @@ def _build_placeholder_fill_plan(export_payload: Dict[str, Any]) -> List[Tuple[s
             ('截面平均风速', _op_compact_value('wind_speed', 'air_velocity', 'sectional_air_velocity', '截面风速', '截面平均风速')),
             ('截面风速', _op_compact_value('wind_speed', 'air_velocity', 'sectional_air_velocity', '截面风速')),
             ('风速不均匀度', _op_compact_value('wind_uniformity', 'speed_uniformity', '风速不均匀度')),
-            ('静压差', _op_value('static_pressure_diff', 'pressure_diff', 'pressure', '静压差')),
+            ('静压差', _op_pressure_value('static_pressure_diff', 'pressure_diff', 'pressure', '静压差')),
             ('严密性', _op_result('airtightness', '严密性') or '符合要求'),
             ('送风高效过滤器检漏', _op_value('hepa_leak', '高效过滤器检漏', '送风高效过滤器检漏')),
             ('温度', _op_value('temperature', '温度')),
@@ -2258,10 +2258,12 @@ def _replace_table_row_cells_by_anchor_index(xml_text: str, anchor_text: str, ro
                 else:
                     result = result[:m.start(2)] + result[m.end(2):]
             return result
-        # 无文本节点时，在 tcPr 后追加段落
+        # 无文本节点时（空值格），先移除 tcPr 之后的所有 <w:p>，再插入新段落，
+        # 避免出现"值段落+残留空段落"双段落导致单元格多一行空格。
         tcpr = re.search(r'(<w:tcPr\b.*?</w:tcPr>)', cell_xml, re.S)
         if tcpr:
-            return cell_xml[:tcpr.end()] + _para_xml(new_text) + cell_xml[tcpr.end():]
+            after_tcpr = re.sub(r'<w:p\b.*?</w:p>', '', cell_xml[tcpr.end():], flags=re.S)
+            return cell_xml[:tcpr.end()] + _para_xml(new_text) + after_tcpr
         inner = re.match(r'(<w:tc\b[^>]*>)(.*?)(</w:tc>)', cell_xml, re.S)
         if inner:
             return inner.group(1) + _para_xml(new_text) + inner.group(3)
@@ -2419,13 +2421,15 @@ def _replace_table_cell_by_table_and_row(xml_text: str, table_index: int, row_in
                 else:
                     result = result[:m.start(2)] + result[m.end(2):]
             return result
+        # 无文本节点时（空值格），先移除 tcPr 之后的所有 <w:p>，再插入新段落，
+        # 避免出现"值段落+残留空段落"双段落导致单元格多一行空格。
         tcpr = re.search(r'(<w:tcPr\b.*?</w:tcPr>)', cell_xml, re.S)
         if tcpr:
-            inner = cell_xml[tcpr.end():]
-            return cell_xml[:tcpr.end()] + _para_xml(new_text) + inner
+            after_tcpr = re.sub(r'<w:p\b.*?</w:p>', '', cell_xml[tcpr.end():], flags=re.S)
+            return cell_xml[:tcpr.end()] + _para_xml(new_text) + after_tcpr
         inner = re.match(r'(<w:tc\b[^>]*>)(.*?)(</w:tc>)', cell_xml, re.S)
         if inner:
-            return inner.group(1) + _para_xml(new_text) + inner.group(2) + inner.group(3)
+            return inner.group(1) + _para_xml(new_text) + inner.group(3)
         return cell_xml
 
     tables = tbl_pattern.findall(xml_text)
@@ -2790,12 +2794,29 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                         _range_05 = _parts[0]
                     if len(_parts) >= 2 and not _range_5:
                         _range_5 = _parts[1]
+                # 根据实测最大值（≥0.5μm）反查实测 ISO 级别
+                def _cf_measured_iso(max_val_str):
+                    try:
+                        _mv = float(str(max_val_str).replace(',', '').strip())
+                    except (ValueError, TypeError):
+                        return ''
+                    if _mv <= 0: return 'ISO-5'
+                    if _mv <= 3520: return 'ISO-5'
+                    if _mv <= 35200: return 'ISO-6'
+                    if _mv <= 352000: return 'ISO-7'
+                    if _mv <= 3520000: return 'ISO-8'
+                    if _mv <= 11120000: return 'ISO-8.5'
+                    return 'ISO-9'
+                _p05_max_val = replacements.get('悬浮粒子数/m³', '')
+                _cf_measured_iso_val = _cf_measured_iso(_p05_max_val) if _p05_max_val else ''
+                # col3=标准设计级别, col5=检测最大值, col6=实测ISO级别, col7=结论
                 document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 7, {
                     1: replacements.get('洁净级别', '') or replacements.get('洁净度级别', ''),
                     2: _range_05,
                     3: replacements.get('洁净度级别', ''),
                     5: replacements.get('悬浮粒子数/m³', ''),
-                    6: _pt_conclusion,
+                    6: _cf_measured_iso_val,
+                    7: _pt_conclusion,
                 }, debug_notes=debug_notes, allow_blank=True)
             if replacements.get('0.5μmUCL'):
                 document_xml = _replace_table_cell_by_table_and_row(document_xml, 3, 8, {
@@ -4839,9 +4860,23 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                         document_xml = _replace_conclusion_table_cell_by_row_index(document_xml, '静压差', _R['particle_hdr'], _pt_conclusion, 6)
                         document_xml = _replace_conclusion_table_cell_by_row_index(document_xml, '静压差', _pts, _pt_conclusion, _pt_concl_col)
 
-                    _local_iso = 'ISO-5' if '3520' in str(_pt_local_std_05) and '35200' not in str(_pt_local_std_05) else ('ISO-7' if '352000' in str(_pt_local_std_05) else 'ISO-8')
+                    # 根据实测最大值反查ISO级别（ISO 14644-1，≥0.5μm限值）
+                    def _measured_iso(measured_max_val):
+                        try:
+                            _mv = float(measured_max_val)
+                        except (TypeError, ValueError):
+                            return None
+                        if _mv <= 3520:   return 'ISO-5'
+                        if _mv <= 35200:  return 'ISO-6'
+                        if _mv <= 352000: return 'ISO-7'
+                        return 'ISO-8'
+                    _local_measured_iso = _measured_iso(_pt_data.get('op_05_max', ''))
                     if _pt_conclusion == '合格' and _pt_local_std_05:
-                        document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _pts, _local_iso, _pt_iso_col)
+                        _local_iso_label = _local_measured_iso or (
+                            'ISO-5' if '3520' in str(_pt_local_std_05) and '35200' not in str(_pt_local_std_05)
+                            else ('ISO-7' if '352000' in str(_pt_local_std_05) else 'ISO-8')
+                        )
+                        document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _pts, _local_iso_label, _pt_iso_col)
                     elif _pt_conclusion == '不合格':
                         document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _pts, '超标', _pt_iso_col)
 
@@ -4855,13 +4890,14 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                             _rv = _pt_data.get(_dk, '')
                             if _rv:
                                 document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _ptss + _off, str(_rv), _pt_val_col)
-                        _surr_iso = 'ISO-6'
-                        if '352000' in str(_pt_surr_std_05) and '3520000' not in str(_pt_surr_std_05):
-                            _surr_iso = 'ISO-7'
-                        elif '3520000' in str(_pt_surr_std_05):
-                            _surr_iso = 'ISO-8'
+                        _surr_measured_iso = _measured_iso(_pt_data.get('surr_05_max', ''))
                         if _pt_conclusion == '合格' and _pt_surr_std_05:
-                            document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _ptss, _surr_iso, _pt_iso_col)
+                            _surr_iso_label = _surr_measured_iso or (
+                                'ISO-6' if '35200' in str(_pt_surr_std_05) and '352000' not in str(_pt_surr_std_05)
+                                else ('ISO-7' if '352000' in str(_pt_surr_std_05) and '3520000' not in str(_pt_surr_std_05)
+                                else 'ISO-8')
+                            )
+                            document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _ptss, _surr_iso_label, _pt_iso_col)
                         elif _pt_conclusion == '不合格':
                             document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _ptss, '超标', _pt_iso_col)
 
@@ -4883,14 +4919,18 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                         return ''
                     _local_avg = _avg_list(_bact_data.get('op_values', []) or _bact_data.get('local_values', []))
                     _surr_avg = _avg_list(_bact_data.get('surr_values', []))
-                    if _local_avg:
-                        document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _R['bact_local'], _local_avg, 3)
+                    # 标准要求列（col=3）模板已预填，无需代码填充；检测结果col=4，结论col=5
+                    # _R key: 主路径用 bact_op/bact_surr，aux路径用 bact_local/bact_surr
+                    _bact_op_row = _R.get('bact_op') or _R.get('bact_local')
+                    _bact_surr_row = _R.get('bact_surr')
+                    if _local_avg and _bact_op_row is not None:
+                        document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _bact_op_row, _local_avg, 4)
                         if _bact_conclusion:
-                            document_xml = _replace_conclusion_table_cell_by_row_index(document_xml, '静压差', _R['bact_local'], _bact_conclusion, 4)
-                    if _R['bact_surr'] is not None and _surr_avg:
-                        document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _R['bact_surr'], _surr_avg, 3)
+                            document_xml = _replace_conclusion_table_cell_by_row_index(document_xml, '静压差', _bact_op_row, _bact_conclusion, 5)
+                    if _bact_surr_row is not None and _surr_avg:
+                        document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _bact_surr_row, _surr_avg, 4)
                         if _bact_conclusion:
-                            document_xml = _replace_conclusion_table_cell_by_row_index(document_xml, '静压差', _R['bact_surr'], _bact_conclusion, 4)
+                            document_xml = _replace_conclusion_table_cell_by_row_index(document_xml, '静压差', _bact_surr_row, _bact_conclusion, 5)
 
                 _hepa = _param_map.get('hepa_leak', {})
                 if isinstance(_hepa, dict):
@@ -4970,12 +5010,71 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                      _op_conclusion_for('噪声结果', '噪声'), 2, 3, 4),
                 ])
                 for row_idx, standard_val, result_val, conclusion_val, std_col, result_col, conclusion_col in _op_xml_rows:
-                    if standard_val and std_col is not None:
-                        document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', row_idx, standard_val, std_col)
-                    if result_val:
-                        document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', row_idx, result_val, result_col)
-                    if conclusion_val:
-                        document_xml = _replace_conclusion_table_cell_by_row_index(document_xml, '静压差', row_idx, conclusion_val, conclusion_col)
+                    # 静压差多组处理：standard_val / result_val 可能含 \n 分隔的多行（每行对应一组 pair）
+                    # 按行拆分后逐行填入 row_idx, row_idx+1, row_idx+2 ...
+                    _is_pressure_row = (row_idx == _R.get('pressure'))
+                    _pressure_pairs = []
+                    if _is_pressure_row:
+                        _pi = get_param_item(_param_map, 'static_pressure_diff', 'pressure_diff', 'pressure', '静压差')
+                        if isinstance(_pi, dict):
+                            _pressure_pairs = _pi.get('pairs') or []
+                    if _is_pressure_row and len(_pressure_pairs) > 1:
+                        # 多组压差：拆分 standard_val 分行填；result_val 从 pairs 逐组取
+                        _std_lines = (standard_val or '').split('\n')
+                        _con_lines = (conclusion_val or '').split('\n')
+                        for _pi_off, _pair in enumerate(_pressure_pairs):
+                            _ri = row_idx + _pi_off
+                            _sv = _std_lines[_pi_off] if _pi_off < len(_std_lines) else (_std_lines[-1] if _std_lines else '')
+                            # 结果值：从 pair.values 取均值
+                            _pair_vals = _pair.get('values') or []
+                            if _pair_vals:
+                                try:
+                                    _pnums = [float(str(v).strip()) for v in _pair_vals if str(v).strip()]
+                                    _pavg = sum(_pnums) / len(_pnums) if _pnums else None
+                                    _rv = (str(int(_pavg)) if _pavg == int(_pavg) else str(round(_pavg, 2))) if _pavg is not None else str(_pair_vals[0])
+                                except (ValueError, TypeError):
+                                    _rv = str(_pair_vals[0]) if _pair_vals else ''
+                            else:
+                                _rv = ''
+                            _cv = _con_lines[_pi_off] if _pi_off < len(_con_lines) else (_con_lines[0] if _con_lines else '')
+                            # 对每组 pair 的值和 range 单独做合格/不合格判定，覆盖合并结论
+                            if _rv and _pair.get('range'):
+                                try:
+                                    _rng_str = str(_pair['range']).strip()
+                                    _val_f = float(_rv)
+                                    import re as _re_p
+                                    # 解析 range：支持 "5～20"、"5~20"、"≥5"、"≤20"、"-20～-10" 等
+                                    _rng_m = _re_p.match(r'^([+-]?[\d.]+)\s*[～~]\s*([+-]?[\d.]+)$', _rng_str)
+                                    if _rng_m:
+                                        _lo, _hi = float(_rng_m.group(1)), float(_rng_m.group(2))
+                                        _pair_ok = _lo <= _val_f <= _hi
+                                    else:
+                                        _ge_m = _re_p.match(r'^[≥>=]\s*([+-]?[\d.]+)$', _rng_str)
+                                        _le_m = _re_p.match(r'^[≤<=]\s*([+-]?[\d.]+)$', _rng_str)
+                                        if _ge_m:
+                                            _pair_ok = _val_f >= float(_ge_m.group(1))
+                                        elif _le_m:
+                                            _pair_ok = _val_f <= float(_le_m.group(1))
+                                        else:
+                                            _pair_ok = None  # 无法判定，沿用合并结论
+                                    if _pair_ok is not None:
+                                        _cv = '合格' if _pair_ok else '不合格'
+                                except (ValueError, TypeError):
+                                    pass  # 解析失败，沿用合并结论
+                            if _sv and std_col is not None:
+                                document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _ri, _sv, std_col)
+                            if _rv:
+                                document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _ri, _rv, result_col)
+                            if _cv:
+                                document_xml = _replace_conclusion_table_cell_by_row_index(document_xml, '静压差', _ri, _cv, conclusion_col)
+                    else:
+                        # 单组或非压差行：原逻辑
+                        if standard_val and std_col is not None:
+                            document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', row_idx, standard_val, std_col)
+                        if result_val:
+                            document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', row_idx, result_val, result_col)
+                        if conclusion_val:
+                            document_xml = _replace_conclusion_table_cell_by_row_index(document_xml, '静压差', row_idx, conclusion_val, conclusion_col)
 
                 # --- 主手术室/眼科复杂多行参数填充 ---
                 if _R['has_particle_door']:
@@ -5047,12 +5146,26 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                             _rv = _pt_data.get(_dk, '')
                             if _rv:
                                 document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _ptss+_off, str(_rv), _pt_val_col)
-                        _surr_iso = 'ISO-6'
-                        if _op_std_ranges.get('particle', ''):
-                            _psr = _op_std_ranges.get('particle', '')
-                            if '352000' in str(_psr) and '3520000' not in str(_psr): _surr_iso = 'ISO-7'
-                            elif '35200' in str(_psr) and '352000' not in str(_psr): _surr_iso = 'ISO-6'
-                        document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _ptss, _surr_iso, 4)
+                        # 周边区：根据实测最大值反查ISO级别
+                        def _measured_iso2(measured_max_val):
+                            try:
+                                _mv2 = float(measured_max_val)
+                            except (TypeError, ValueError):
+                                return None
+                            if _mv2 <= 3520:   return 'ISO-5'
+                            if _mv2 <= 35200:  return 'ISO-6'
+                            if _mv2 <= 352000: return 'ISO-7'
+                            return 'ISO-8'
+                        _surr_measured_iso2 = _measured_iso2(_pt_data.get('surr_05_max', ''))
+                        if _surr_measured_iso2 is None:
+                            _surr_iso = 'ISO-6'
+                            if _op_std_ranges.get('particle', ''):
+                                _psr = _op_std_ranges.get('particle', '')
+                                if '352000' in str(_psr) and '3520000' not in str(_psr): _surr_iso = 'ISO-7'
+                                elif '35200' in str(_psr) and '352000' not in str(_psr): _surr_iso = 'ISO-6'
+                        else:
+                            _surr_iso = _surr_measured_iso2
+                        # col=4 是模板固定的设计级别列（ISO-6），不覆盖，只写实测级别列
                         if _pt_conclusion == '合格':
                             document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _ptss, _surr_iso, _pt_iso_col)
                         elif _pt_conclusion == '不合格':
@@ -5061,13 +5174,18 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                         _hdr_concl_col = 6
                         document_xml = _replace_conclusion_table_cell_by_row_index(document_xml, '静压差', _pt_hdr, _pt_conclusion, _hdr_concl_col)
                         document_xml = _replace_conclusion_table_cell_by_row_index(document_xml, '静压差', _pts, _pt_conclusion, _pt_concl_col)
-                        _op_iso = 'ISO-5'
-                        if _op_std_ranges.get('particle', ''):
-                            _posr = str(_op_std_ranges.get('particle', ''))
-                            if '3520' in _posr and '35200' not in _posr: _op_iso = 'ISO-5'
-                            elif '35200' in _posr and '352000' not in _posr: _op_iso = 'ISO-6'
-                            elif '352000' in _posr and '3520000' not in _posr: _op_iso = 'ISO-7'
-                            elif '3520000' in _posr: _op_iso = 'ISO-8'
+                        # 手术区：根据实测最大值反查ISO级别
+                        _op_measured_iso = _measured_iso2(_pt_data.get('op_05_max', ''))
+                        if _op_measured_iso is None:
+                            _op_iso = 'ISO-5'
+                            if _op_std_ranges.get('particle', ''):
+                                _posr = str(_op_std_ranges.get('particle', ''))
+                                if '3520' in _posr and '35200' not in _posr: _op_iso = 'ISO-5'
+                                elif '35200' in _posr and '352000' not in _posr: _op_iso = 'ISO-6'
+                                elif '352000' in _posr and '3520000' not in _posr: _op_iso = 'ISO-7'
+                                elif '3520000' in _posr: _op_iso = 'ISO-8'
+                        else:
+                            _op_iso = _op_measured_iso
                         if _pt_conclusion == '合格':
                             document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _pts, _op_iso, _pt_iso_col)
                         elif _pt_conclusion == '不合格':
@@ -5092,6 +5210,7 @@ def build_template_filled_docx(export_payload: Dict[str, Any], output_path: str)
                     _surr_avg = _avg_list(_bact_data.get('surr_values', []))
                     _bact_row_op = _R['bact_op']
                     _bact_row_surr = _R['bact_surr']
+                    # 标准要求列模板已预填，无需代码填充
                     if _op_avg:
                         document_xml = _replace_result_table_cell_by_row_index(document_xml, '静压差', _bact_row_op, _op_avg, 4)
                         if _bact_conclusion:
@@ -5679,9 +5798,13 @@ def _fill_data_table_xml(table_xml: str, room_export: dict, export_payload: dict
                     _cell_offset = 1
 
             # --- cell2+offset: 判定范围（以标准数据库/判定引擎为准：相同不动，不同替换）---
+            # 细菌浓度/沉降菌行列结构特殊：col2=区域名 col3=标准要求(预填) col4=检测值 col5=结论
+            # 普通行：col2=标准要求 col3=检测值 col4=结论
+            # 因此细菌浓度行需整体偏移1，且不覆盖标准要求列
+            _is_bact_anchor = _anchor in ('细菌浓度', '沉降菌', '细菌浓度（沉降法）')
             _range_idx = 2 + _cell_offset
             _aj = _anchor_judgement.get(_anchor)
-            if _aj and _aj.get('range') and len(_tcs) > _range_idx:
+            if not _is_bact_anchor and _aj and _aj.get('range') and len(_tcs) > _range_idx:
                 _old_tc2 = _tcs[_range_idx].group()
                 _tc2_texts = _wt_pat.findall(_old_tc2)
                 _tc2_plain = ''.join(_tc2_texts).strip()
@@ -5692,21 +5815,115 @@ def _fill_data_table_xml(table_xml: str, room_export: dict, export_payload: dict
                     _new_tc2 = _write_tc_value(_old_tc2, _db_range)
                     _new_row = _new_row.replace(_old_tc2, _new_tc2, 1)
 
-            # --- cell3+offset: 检测值（唯一来源=检测录入值；按语义强制写入）---
-            _value_idx = 3 + _cell_offset
-            if len(_tcs) > _value_idx:
-                _old_tc3 = _tcs[_value_idx].group()
-                _new_tc3 = _write_tc_value(_old_tc3, _value or '')
-                _new_row = _new_row.replace(_old_tc3, _new_tc3, 1)
+            # --- cell3+offset / cell4(细菌浓度): 检测值（唯一来源=检测录入值；按语义强制写入）---
+            # 细菌浓度行：检测值在 col4，结论在 col5
+            _value_idx = (4 + _cell_offset) if _is_bact_anchor else (3 + _cell_offset)
+            # 静压差多组处理：从 room_export.room.params.pressure.pairs 取各组值
+            _pressure_pairs_dt = []
+            if _anchor == '静压差':
+                _dt_room = room_export.get('room', {})
+                _dt_pi = (_dt_room.get('params') or {}).get('pressure') or {}
+                _pressure_pairs_dt = _dt_pi.get('pairs') or []
 
-            # --- cell4+offset: 单项结论（唯一来源=判定结果；按语义强制写入）---
-            _concl_idx = 4 + _cell_offset
-            if _aj and _aj.get('conclusion') and len(_tcs) > _concl_idx:
-                _old_tc4 = _tcs[_concl_idx].group()
-                _new_tc4 = _write_tc_value(_old_tc4, _aj['conclusion'])
-                _new_row = _new_row.replace(_old_tc4, _new_tc4, 1)
+            if _pressure_pairs_dt and len(_pressure_pairs_dt) > 1:
+                # 多组：第一组填当前行，后续组找续行填充
+                import re as _re_dt
+                for _dt_off, _dt_pair in enumerate(_pressure_pairs_dt):
+                    _dt_pvals = _dt_pair.get('values') or []
+                    if _dt_pvals:
+                        try:
+                            _dt_nums = [float(str(v).strip()) for v in _dt_pvals if str(v).strip()]
+                            _dt_avg = sum(_dt_nums) / len(_dt_nums) if _dt_nums else None
+                            _dt_rv = (str(int(_dt_avg)) if _dt_avg == int(_dt_avg) else str(round(_dt_avg, 2))) if _dt_avg is not None else str(_dt_pvals[0])
+                        except (ValueError, TypeError):
+                            _dt_rv = str(_dt_pvals[0]) if _dt_pvals else ''
+                    else:
+                        _dt_rv = ''
+                    # 实时判定每组合格/不合格
+                    _dt_cv = _aj['conclusion'] if _aj and _aj.get('conclusion') else ''
+                    _dt_rng = str(_dt_pair.get('range') or '').strip()
+                    if _dt_rv and _dt_rng:
+                        try:
+                            _dt_vf = float(_dt_rv)
+                            _dt_m = _re_dt.match(r'^([+-]?[\d.]+)\s*[～~]\s*([+-]?[\d.]+)$', _dt_rng)
+                            if _dt_m:
+                                _dt_lo, _dt_hi = float(_dt_m.group(1)), float(_dt_m.group(2))
+                                _dt_cv = '合格' if _dt_lo <= _dt_vf <= _dt_hi else '不合格'
+                            else:
+                                _dt_ge = _re_dt.match(r'^[≥>=]\s*([+-]?[\d.]+)$', _dt_rng)
+                                _dt_le = _re_dt.match(r'^[≤<=]\s*([+-]?[\d.]+)$', _dt_rng)
+                                if _dt_ge:
+                                    _dt_cv = '合格' if _dt_vf >= float(_dt_ge.group(1)) else '不合格'
+                                elif _dt_le:
+                                    _dt_cv = '合格' if _dt_vf <= float(_dt_le.group(1)) else '不合格'
+                        except (ValueError, TypeError):
+                            pass
 
-            table_xml = table_xml.replace(_row_xml, _new_row, 1)
+                    if _dt_off == 0:
+                        # 第一组：填当前行
+                        if len(_tcs) > _value_idx:
+                            _old_tc3 = _tcs[_value_idx].group()
+                            _new_tc3 = _write_tc_value(_old_tc3, _dt_rv)
+                            _new_row = _new_row.replace(_old_tc3, _new_tc3, 1)
+                        _concl_idx = 4 + _cell_offset
+                        if _dt_cv and len(_tcs) > _concl_idx:
+                            _old_tc4 = _tcs[_concl_idx].group()
+                            _new_tc4 = _write_tc_value(_old_tc4, _dt_cv)
+                            _new_row = _new_row.replace(_old_tc4, _new_tc4, 1)
+                        table_xml = table_xml.replace(_row_xml, _new_row, 1)
+                    else:
+                        # 续行：在 table_xml 中找续行（紧接着的、第一格为空合并的行）
+                        # 先在当前 _row_xml 结束位置后找下一个 <w:tr>
+                        _cur_end = table_xml.find(_new_row) + len(_new_row)
+                        if _dt_off == 1:
+                            _cur_end = table_xml.find(_row_xml) + len(_row_xml)
+                        _next_row_m = _row_pat.search(table_xml, _cur_end)
+                        if _next_row_m:
+                            _next_row_xml = _next_row_m.group()
+                            _next_tcs = list(_tc_pat.finditer(_next_row_xml))
+                            _new_next_row = _next_row_xml
+                            if len(_next_tcs) > _value_idx:
+                                _ntc3 = _next_tcs[_value_idx].group()
+                                _new_next_row = _new_next_row.replace(_ntc3, _write_tc_value(_ntc3, _dt_rv), 1)
+                            _nconcl_idx = 4 + _cell_offset
+                            if _dt_cv and len(_next_tcs) > _nconcl_idx:
+                                _ntc4 = _next_tcs[_nconcl_idx].group()
+                                _new_next_row = _new_next_row.replace(_ntc4, _write_tc_value(_ntc4, _dt_cv), 1)
+                            table_xml = table_xml.replace(_next_row_xml, _new_next_row, 1)
+            else:
+                # 单组：原逻辑
+                if len(_tcs) > _value_idx:
+                    _old_tc3 = _tcs[_value_idx].group()
+                    # 单组压差：直接用 pair 的值，不用拼接字符串
+                    if _anchor == '静压差' and len(_pressure_pairs_dt) == 1:
+                        _sp = _pressure_pairs_dt[0]
+                        _sp_vals = _sp.get('values') or []
+                        if _sp_vals:
+                            try:
+                                _sp_nums = [float(str(v).strip()) for v in _sp_vals if str(v).strip()]
+                                _sp_avg = sum(_sp_nums) / len(_sp_nums) if _sp_nums else None
+                                _single_rv = (str(int(_sp_avg)) if _sp_avg == int(_sp_avg) else str(round(_sp_avg, 2))) if _sp_avg is not None else str(_sp_vals[0])
+                            except (ValueError, TypeError):
+                                _single_rv = str(_sp_vals[0]) if _sp_vals else (_value or '')
+                        else:
+                            _single_rv = _value or ''
+                        _new_tc3 = _write_tc_value(_old_tc3, _single_rv)
+                    elif _is_bact_anchor and not (_value or '').strip():
+                        # 细菌浓度行：fill_plan 里 bacteria_op_value 可能为空（字段名不匹配），
+                        # 空值不覆盖——由专项路径（_replace_result_table_cell_by_row_index）负责写入
+                        _new_tc3 = _old_tc3
+                    else:
+                        _new_tc3 = _write_tc_value(_old_tc3, _value or '')
+                    _new_row = _new_row.replace(_old_tc3, _new_tc3, 1)
+
+                # --- cell4+offset / cell5(细菌浓度): 单项结论（唯一来源=判定结果；按语义强制写入）---
+                _concl_idx = (5 + _cell_offset) if _is_bact_anchor else (4 + _cell_offset)
+                if _aj and _aj.get('conclusion') and len(_tcs) > _concl_idx:
+                    _old_tc4 = _tcs[_concl_idx].group()
+                    _new_tc4 = _write_tc_value(_old_tc4, _aj['conclusion'])
+                    _new_row = _new_row.replace(_old_tc4, _new_tc4, 1)
+
+                table_xml = table_xml.replace(_row_xml, _new_row, 1)
             break  # 每个 anchor 只匹配一次
 
     # 填充洁净度检测结果（多行）；BSL由下方专项块处理，跳过
@@ -6064,7 +6281,7 @@ def build_mixed_report_docx(export_payload: Dict[str, Any], output_path: str) ->
                     filled_table = _fill_data_table_xml(filled_table, room_export, export_payload)
                 except Exception:
                     filled_table = data_table_xml
-            # 追加分页符 + 标题段落 + 数据表（仅第一张表前加标题）
+            # 追加分页符 + 标题段落 + 报告编号段落 + 数据表（仅第一张表前加标题）
             if dt_idx == 0:
                 header_xml = (
                     '<w:p><w:pPr><w:jc w:val="center"/></w:pPr>'
@@ -6072,7 +6289,34 @@ def build_mixed_report_docx(export_payload: Dict[str, Any], output_path: str) ->
                     '<w:b/><w:sz w:val="28"/></w:rPr>'
                     f'<w:t xml:space="preserve">\u68c0 \u6d4b \u62a5 \u544a</w:t></w:r></w:p>'
                 )
-                additional_xml += _page_break_para_xml() + header_xml + filled_table
+                # 报告编号段落（格式与房间1一致：左缩进+编号标签+下划线加粗编号值）
+                _rno = ((room_export.get('report_context') or {}).get('project_context') or {}).get('report_number') or \
+                       (export_payload.get('project_context') or {}).get('report_number') or \
+                       export_payload.get('report_number') or ''
+                report_no_xml = (
+                    '<w:p>'
+                    '<w:pPr>'
+                    '<w:ind w:firstLine="2240" w:firstLineChars="800"/>'
+                    '<w:jc w:val="both"/>'
+                    '<w:textAlignment w:val="center"/>'
+                    '<w:rPr>'
+                    '<w:rFonts w:hint="default" w:ascii="Arial" w:hAnsi="Arial" w:eastAsia="\u5b8b\u4f53" w:cs="Arial"/>'
+                    '<w:b/><w:bCs/><w:color w:val="auto"/>'
+                    '<w:sz w:val="28"/><w:szCs w:val="28"/>'
+                    '<w:lang w:val="en-US" w:eastAsia="zh-CN"/>'
+                    '</w:rPr></w:pPr>'
+                    '<w:r><w:rPr>'
+                    '<w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:eastAsia="\u5b8b\u4f53" w:cs="Arial"/>'
+                    '<w:sz w:val="28"/><w:szCs w:val="28"/>'
+                    '</w:rPr><w:t>\u62a5\u544a\u7f16\u53f7\uff1a</w:t></w:r>'
+                    '<w:r><w:rPr>'
+                    '<w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:eastAsia="\u5b8b\u4f53" w:cs="Arial"/>'
+                    '<w:b/><w:bCs/><w:sz w:val="28"/><w:szCs w:val="28"/>'
+                    '<w:u w:val="single"/>'
+                    f'</w:rPr><w:t>{_rno}</w:t></w:r>'
+                    '</w:p>'
+                )
+                additional_xml += _page_break_para_xml() + header_xml + report_no_xml + filled_table
             else:
                 additional_xml += filled_table
 

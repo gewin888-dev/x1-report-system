@@ -601,6 +601,36 @@
           "range": "≤2"
         }
       }
+    },
+    "clean_function_room": {
+      "Ⅰ级（百级）": {
+        "particle": {
+          "range_05": "≤3520",
+          "range_5": "≤29",
+          "unit": "粒/m³"
+        }
+      },
+      "Ⅱ级（千级）": {
+        "particle": {
+          "range_05": "≤35200",
+          "range_5": "≤293",
+          "unit": "粒/m³"
+        }
+      },
+      "Ⅲ级（万级）": {
+        "particle": {
+          "range_05": "≤352000",
+          "range_5": "≤2930",
+          "unit": "粒/m³"
+        }
+      },
+      "Ⅳ级（十万级）": {
+        "particle": {
+          "range_05": "≤3520000",
+          "range_5": "≤29300",
+          "unit": "粒/m³"
+        }
+      }
     }
   },
   "GB 50591-2010": {
@@ -756,24 +786,44 @@
         "hepa_leak": {
           "range": "≤0.01%",
           "unit": "%"
+        },
+        "particle": {
+          "range_05": "≤3520",
+          "range_5": "≤29",
+          "unit": "粒/m³"
         }
       },
       "Ⅱ级（千级）": {
         "hepa_leak": {
           "range": "≤0.01%",
           "unit": "%"
+        },
+        "particle": {
+          "range_05": "≤35200",
+          "range_5": "≤293",
+          "unit": "粒/m³"
         }
       },
       "Ⅲ级（万级）": {
         "hepa_leak": {
           "range": "≤0.01%",
           "unit": "%"
+        },
+        "particle": {
+          "range_05": "≤352000",
+          "range_5": "≤2930",
+          "unit": "粒/m³"
         }
       },
       "Ⅳ级（十万级）": {
         "hepa_leak": {
           "range": "≤0.01%",
           "unit": "%"
+        },
+        "particle": {
+          "range_05": "≤3520000",
+          "range_5": "≤29300",
+          "unit": "粒/m³"
         }
       }
     },
