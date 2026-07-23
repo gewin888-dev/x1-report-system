@@ -1160,6 +1160,14 @@ def api_list_compat():
                             continue
                     except Exception:
                         pass
+                _raw_rooms = project.get('rooms', []) if isinstance(project.get('rooms', []), list) else []
+                _slim_rooms = [
+                    {k: rm.get(k, '') for k in ('type_id', 'type_name', 'room_name', 'name',
+                     'surgery_room_type', 'surgery_aux_room', 'surgery_aux_clean_class',
+                     'clean_function_subroom', 'barrier_room_class', 'barrier_aux_room',
+                     'bsl', 'clean_class', 'level_name', 'context')}
+                    for rm in _raw_rooms if isinstance(rm, dict)
+                ]
                 records.append({
                     'record_id': data.get('draft_id', draft_file.stem),
                     'project_name': project.get('project_name', ''),
@@ -1168,8 +1176,8 @@ def api_list_compat():
                     'detection_date': project.get('detection_date', ''),
                     'detection_type': project.get('detection_type', ''),
                     'detection_type_name': project.get('detection_type_name', ''),
-                    'rooms': project.get('rooms', []) if isinstance(project.get('rooms', []), list) else [],
-                    'room_count': len(project.get('rooms', []) if isinstance(project.get('rooms', []), list) else []),
+                    'rooms': _slim_rooms,
+                    'room_count': len(_raw_rooms),
                     'voided': bool(data.get('voided')),
                     'voided_at': data.get('voided_at', ''),
                     'voided_by': data.get('voided_by', ''),
@@ -1200,6 +1208,13 @@ def api_list_compat():
                 room_from_export = ep.get('room', {}) if isinstance(ep.get('room', {}), dict) else {}
                 rooms_from_project = proj.get('rooms', []) if isinstance(proj.get('rooms', []), list) else []
                 normalized_rooms = rooms_from_project if rooms_from_project else ([room_from_export] if room_from_export else [])
+                _slim_export_rooms = [
+                    {k: rm.get(k, '') for k in ('type_id', 'type_name', 'room_name', 'name',
+                     'surgery_room_type', 'surgery_aux_room', 'surgery_aux_clean_class',
+                     'clean_function_subroom', 'barrier_room_class', 'barrier_aux_room',
+                     'bsl', 'clean_class', 'level_name', 'context')}
+                    for rm in normalized_rooms if isinstance(rm, dict)
+                ]
                 detection_type = proj.get('detection_type', '') or ep.get('export_type', '') or room_from_export.get('type_id', '')
                 detection_type_name = proj.get('detection_type_name', '') or room_from_export.get('type_name', '')
                 if not _is_valid_export_record(export_id, proj):
@@ -1272,7 +1287,7 @@ def api_list_compat():
                     'detection_date': proj.get('detection_date', ''),
                     'detection_type': detection_type,
                     'detection_type_name': detection_type_name,
-                    'rooms': normalized_rooms,
+                    'rooms': _slim_export_rooms,
                     'room_count': len(normalized_rooms),
                     'voided': bool(data.get('voided')),
                     'voided_at': data.get('voided_at', ''),

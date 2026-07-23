@@ -1347,6 +1347,10 @@ def _build_placeholder_fill_plan(export_payload: Dict[str, Any]) -> List[Tuple[s
         detection_environment = ' / '.join([v for v in [food_grade, room_display_name] if str(v).strip()])
         air_velocity = _food_value('wind_speed', 'air_velocity', 'sectional_air_velocity', '截面风速')
         airchange_rate = _food_value('airchange_rate', 'air_change_rate', 'airchange', '换气次数')
+        # airchange_speed 类型 result 格式为"总风量Xm3/h ÷ 体积Ym3 = Z次/h"，只取数值Z
+        if airchange_rate and '=' in airchange_rate:
+            airchange_rate = re.sub(r'^.*=\s*', '', airchange_rate).strip()
+            airchange_rate = re.sub(r'\s*次/h\s*$', '', airchange_rate).strip()
         pressure_diff = _food_value('static_pressure_diff', 'pressure_diff', 'pressure', '静压差')
         hepa_leak = _food_value('hepa_leak', '送风高效过滤器检漏')
         temperature = _food_value('temperature', '温度')
