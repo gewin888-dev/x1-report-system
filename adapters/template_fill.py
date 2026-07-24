@@ -1127,6 +1127,9 @@ def _build_placeholder_fill_plan(export_payload: Dict[str, Any]) -> List[Tuple[s
         gmp_grade = context.get('gmp_grade', '') or room.get('clean_class', '') or room.get('level_name', '')
         detection_environment = ' / '.join([v for v in [gmp_grade, room_display_name] if str(v).strip()])
         airchange_rate = _gmp_value('airchange_rate', 'air_change_rate', 'airchange', '换气次数')
+        if airchange_rate and '=' in airchange_rate:
+            airchange_rate = re.sub(r'^.*=\s*', '', airchange_rate).strip()
+            airchange_rate = re.sub(r'\s*次/h\s*$', '', airchange_rate).strip()
         wind_speed = _gmp_value('wind_speed', 'air_velocity', 'sectional_air_velocity', '截面风速')
         wind_uniformity = _gmp_value('wind_speed_uniformity', 'wind_uniformity', 'speed_uniformity', '风速不均匀度')
         pressure_diff = _gmp_value('static_pressure_diff', 'pressure_diff', 'pressure', '静压差')
