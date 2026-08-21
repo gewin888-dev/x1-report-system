@@ -28,10 +28,10 @@ from flask_login import login_user, logout_user, login_required, current_user
 from adapters.export_docx import build_canonical_object_report
 from adapters.export_excel import build_canonical_excel_report
 from adapters.template_fill import build_template_bound_docx, build_mixed_report_docx
-from template_rules import resolve_template_rule
+from template_rules_safe import resolve_template_rule  # 使用安全包装版本，带异常处理
 from report_context_builder import build_report_context
 from clean_class_semantics import build_clean_class_semantics, _normalize_operating_room_context
-from judgement_engine import judge_room
+from judgement_engine_safe import judge_room  # 使用安全包装版本，带异常处理
 from template_resources import resolve_template_resource, apply_type_default_template, apply_semantic_default_template
 from config_loader import load_x1_config
 from feishu_utils import resolve_feishu_upload_folder, get_feishu_folder_meta, upload_file_to_feishu, get_feishu_config, get_feishu_token, download_file_from_feishu, download_file_content_from_feishu
@@ -1194,7 +1194,8 @@ def api_list_compat():
                     'export_info': None,
                     'report_info': None
                 })
-        except:
+        except (IOError, json.JSONDecodeError, KeyError) as e:
+            # 文件读取或JSON解析失败，跳过该文件
             pass
     
     # 2. 读取标准正式导出记录（以标准 export json 为准）
@@ -1310,7 +1311,8 @@ def api_list_compat():
                     'export_info': export_info,
                     'report_info': report_info,
                 })
-        except:
+        except (IOError, json.JSONDecodeError, KeyError) as e:
+            # 文件读取或JSON解析失败，跳过该文件
             pass
 
     records = [r for r in records if can_view_record(current_user, {'inspector_name': r.get('inspector', '')})]
