@@ -95,11 +95,16 @@ def admin_api_records():
     """报告管理 - 记录列表（v2优化版：导出记录从数据库查询）"""
     from helpers.records_api_v2 import admin_api_records_v2
     return admin_api_records_v2(BASE_DIR, RECORDS_DIR, _PATHS)
-    
-    # ===== 以下为旧版代码（已废弃，仅作备份）=====
-    records = []
 
-    def _draft_has_visible_content(project: dict, data: dict) -> bool:
+# ============================================================
+# 操作日志工具函数
+# ============================================================
+
+
+
+# ========== 记录摘要统计 ==========
+
+@records_bp.route('/admin/api/records/summary')
         if not isinstance(project, dict):
             return False
         rooms = project.get('rooms') or []
@@ -131,7 +136,8 @@ def admin_api_records():
             return False
         return any(str(proj.get(k, '')).strip() for k in ['project_name', 'client_name', 'report_number', 'detection_date'])
     
-    # 读取所有草稿
+    # 读取所有草稿（严格执行auto草稿7天过滤）
+    auto_draft_cutoff = time.time() - 7 * 24 * 3600
     for draft_file in RECORDS_DIR.glob('*.json'):
         try:
             with open(draft_file, 'r', encoding='utf-8') as f:
@@ -139,6 +145,14 @@ def admin_api_records():
                 project = data.get('project', {})
                 if not _draft_has_visible_content(project, data):
                     continue
+                
+                # 严格过滤auto类型草稿：超过7天的不显示
+                draft_kind = str(data.get('draft_kind', '')).strip().lower()
+                if draft_kind == 'auto':
+                    file_mtime = draft_file.stat().st_mtime
+                    if file_mtime < auto_draft_cutoff:
+                        continue  # 跳过超过7天的auto草稿
+                
                 save_time = data.get('updated_at', '') or data.get('created_at', '') or data.get('saved_at', '')
                 room_count = len(project.get('rooms', []) if isinstance(project.get('rooms', []), list) else data.get('rooms', []))
                 records.append({
@@ -147,6 +161,7 @@ def admin_api_records():
                     'project_name': project.get('project_name', ''),
                     'report_number': project.get('report_number', ''),
                     'client_name': project.get('client_name', ''),
+                    'inspection_area': project.get('inspection_area', ''),
                     'operator': project.get('operator', '') or project.get('inspector', ''),
                     'detection_date': project.get('detection_date', ''),
                     'detection_state': project.get('detection_state', ''),
@@ -157,6 +172,7 @@ def admin_api_records():
                     'created': data.get('created_at', '') or data.get('saved_at', ''),
                     'modified': data.get('updated_at', '') or data.get('saved_at', ''),
                     'status': 'draft',
+                    'draft_kind': draft_kind,
                     'has_report': False,
                     'has_export': False,
                     'report_info': {},
@@ -215,6 +231,7 @@ def admin_api_records():
                     'project_name': proj.get('project_name', ''),
                     'report_number': proj.get('report_number', ''),
                     'client_name': proj.get('client_name', ''),
+                    'inspection_area': proj.get('inspection_area', ''),
                     'operator': proj.get('operator', '') or proj.get('inspector', ''),
                     'detection_date': proj.get('detection_date', ''),
                     'detection_state': proj.get('detection_state', ''),
@@ -591,9 +608,6 @@ def admin_api_records_summary():
 
 # ========== 删除/作废/批量操作 ==========
 
-@records_bp.route('/admin/api/records/<record_id>', methods=['DELETE'])
-@login_required
-@require_permission('admin.records.delete')
 def admin_api_delete_record(record_id):
     """删除记录（软删除，移至 trash）"""
     if not _setting_enabled('security.allow_delete_record', True):
@@ -704,6 +718,7 @@ def api_void_export_record(record_id):
 @records_bp.route('/admin/api/records/batch_delete', methods=['POST'])
 @login_required
 @require_permission('admin.records.batch_delete')
+
 def admin_api_batch_delete_records():
     """批量删除记录（软删除，移至 trash）"""
     data = request.get_json(silent=True) or {}
@@ -721,9 +736,6 @@ def admin_api_batch_delete_records():
     return jsonify({'success': True, 'deleted_count': len(deleted), 'deleted_ids': deleted, 'failed': failed})
 
 
-@records_bp.route('/admin/api/trash/cleanup', methods=['POST'])
-@login_required
-@require_permission('admin.trash.cleanup')
 def admin_api_cleanup_trash():
     """清理过期的软删除文件"""
     if not _setting_enabled('security.allow_cleanup_trash', True):

@@ -59,6 +59,8 @@ def admin_api_business_projects():
     invoice_status = (request.args.get('invoice_status') or '').strip()
     payment_status = (request.args.get('payment_status') or '').strip()
     owner = (request.args.get('owner') or '').strip()
+    status_group = (request.args.get('status_group') or '').strip()  # 'active'/'receivable'/'done' 状态筛选器
+    
     try:
         page = max(1, int(request.args.get('page', 1)))
     except Exception:
@@ -67,6 +69,7 @@ def admin_api_business_projects():
         page_size = max(1, min(100, int(request.args.get('page_size', 20))))
     except Exception:
         page_size = 20
+    
     where = ['1=1']
     params = []
     if keyword:
@@ -94,15 +97,75 @@ def admin_api_business_projects():
     if owner:
         where.append('owner LIKE ?')
         params.append(f'%{owner}%')
+    
     where_sql = ' AND '.join(where)
-    offset = (page - 1) * page_size
     conn = get_x1_data_conn()
+    
     try:
+        # 如果启用status_group筛选，在后端过滤
+        if status_group in ['active', 'receivable', 'done']:
+            # 获取全部数据进行筛选
+            all_rows = conn.execute(
+                f'SELECT * FROM business_projects WHERE {where_sql} ORDER BY updated_at DESC, id DESC',
+                params
+            ).fetchall()
+            
+            # 筛选逻辑
+            filtered_items = []
+            for row in all_rows:
+                x = serialize_business_project(row)
+                ca = float(x.get('contract_amount') or 0)
+                pa = float(x.get('paid_amount') or 0)
+                ra = ca - pa
+                ins = x.get('inspection_stage', '')
+                rpt = x.get('report_status', '')
+                inv = x.get('invoice_status', '')
+                
+                done_ins = (ins == '检测完成')
+                done_rpt = (rpt in ['已出报告', '已出具', '已发送客户', '客户已确认'])
+                done_inv = (inv in ['已开票', '无需开票'])
+                done_work = done_ins and done_rpt and done_inv
+                
+                # 判断分组
+                if done_work and ra <= 0:
+                    group = 'done'
+                elif done_work and ra > 0:
+                    group = 'receivable'
+                else:
+                    group = 'active'
+                
+                if group == status_group:
+                    filtered_items.append(x)
+            
+            # 分页
+            total_filtered = len(filtered_items)
+            offset = (page - 1) * page_size
+            page_items = filtered_items[offset:offset + page_size]
+            
+            # 计算当前页合计
+            sum_contract = sum(float(x.get('contract_amount') or 0) for x in page_items)
+            sum_paid = sum(float(x.get('paid_amount') or 0) for x in page_items)
+            
+            return jsonify({
+                'success': True,
+                'items': page_items,
+                'total': total_filtered,
+                'page': page,
+                'page_size': page_size,
+                'summary': {
+                    'contract_amount': round(sum_contract, 2),
+                    'paid_amount': round(sum_paid, 2),
+                    'receivable_amount': round(sum_contract - sum_paid, 2),
+                }
+            })
+        
+        # 原有逻辑：普通分页
         total = conn.execute(f'SELECT COUNT(*) AS c FROM business_projects WHERE {where_sql}', params).fetchone()['c']
         agg = conn.execute(
             f'SELECT COALESCE(SUM(contract_amount),0) AS sum_contract, COALESCE(SUM(paid_amount),0) AS sum_paid FROM business_projects WHERE {where_sql}',
             params
         ).fetchone()
+        offset = (page - 1) * page_size
         rows = conn.execute(
             f'''SELECT * FROM business_projects WHERE {where_sql} ORDER BY updated_at DESC, id DESC LIMIT ? OFFSET ?''',
             params + [page_size, offset]
@@ -132,54 +195,67 @@ def admin_api_business_projects():
 @require_permission('admin.projects.view')
 def admin_api_business_projects_summary():
     """
-    项目统计汇总 - 修复版：从JSON文件扫描统计，不依赖business_projects表
+    项目统计汇总 - 从 business_projects 表统计
     """
-    records_dir = BASE_DIR / PATHS.get('records', 'records_x1')
-    
+    conn = get_x1_data_conn()
     try:
-        # 扫描所有JSON记录文件
-        json_files = list(records_dir.glob('*.json'))
+        # 基础统计
+        row = conn.execute('SELECT COUNT(*) AS total FROM business_projects').fetchone()
+        total_projects = row['total']
         
-        total_projects = len(json_files)
-        inspecting_projects = 0
-        pending_reports = 0
-        completed_projects = 0
+        # 检测阶段统计
+        inspecting = conn.execute(
+            "SELECT COUNT(*) AS c FROM business_projects WHERE inspection_stage='检测中'"
+        ).fetchone()['c']
         
-        for json_file in json_files:
-            try:
-                with open(json_file, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                
-                # 统计检测阶段
-                inspection_stage = data.get('inspection_stage', '')
-                if inspection_stage == '检测中':
-                    inspecting_projects += 1
-                elif inspection_stage == '检测完成':
-                    completed_projects += 1
-                
-                # 统计报告状态
-                report_status = data.get('report_status', '')
-                if report_status in ['编制中', '审核中', '待修改', '待出具', '未开始']:
-                    pending_reports += 1
-                    
-            except Exception as e:
-                # 单个文件读取失败不影响整体统计
-                continue
+        # 报告状态统计 - 报告编制中
+        pending_reports = conn.execute(
+            "SELECT COUNT(*) AS c FROM business_projects WHERE report_status='报告编制中'"
+        ).fetchone()['c']
+        
+        # 已完成项目：检测完成 + 已出报告
+        completed = conn.execute(
+            "SELECT COUNT(*) AS c FROM business_projects WHERE inspection_stage='检测完成' AND report_status='已出报告'"
+        ).fetchone()['c']
+        
+        # 开票情况统计
+        pending_invoices = conn.execute(
+            "SELECT COUNT(*) AS c FROM business_projects WHERE invoice_status='未开票'"
+        ).fetchone()['c']
+        
+        # 回款情况统计 - 有应收款的项目
+        pending_payments = conn.execute(
+            """SELECT COUNT(*) AS c FROM business_projects 
+               WHERE (contract_amount - COALESCE(paid_amount, 0)) > 0.01"""
+        ).fetchone()['c']
+        
+        # 财务汇总
+        financial = conn.execute(
+            """SELECT 
+                COALESCE(SUM(contract_amount), 0) AS contract_total,
+                COALESCE(SUM(paid_amount), 0) AS paid_total
+               FROM business_projects"""
+        ).fetchone()
+        
+        contract_total = round(financial['contract_total'], 2)
+        paid_total = round(financial['paid_total'], 2)
+        receivable_total = round(contract_total - paid_total, 2)
         
         return jsonify({'success': True, 'summary': {
             'total_projects': total_projects,
-            'inspecting_projects': inspecting_projects,
+            'inspecting_projects': inspecting,
             'pending_reports': pending_reports,
-            'completed_projects': completed_projects,
-            # 财务数据暂不统计（JSON文件中无此字段）
-            'pending_invoices': 0,
-            'pending_payments': 0,
-            'contract_total_amount': 0.0,
-            'paid_total_amount': 0.0,
-            'receivable_total_amount': 0.0,
+            'completed_projects': completed,
+            'pending_invoices': pending_invoices,
+            'pending_payments': pending_payments,
+            'contract_total_amount': contract_total,
+            'paid_total_amount': paid_total,
+            'receivable_total_amount': receivable_total,
         }})
     except Exception as e:
         return jsonify({'success': False, 'error': f'统计失败: {str(e)}'}), 500
+    finally:
+        conn.close()
 
 
 # ============================================================

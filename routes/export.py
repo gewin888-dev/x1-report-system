@@ -334,13 +334,47 @@ def api_x_submit_export():
     final_payload['pdf_preview'] = ''
     with open(json_target, 'w', encoding='utf-8') as f:
         json.dump(final_payload, f, ensure_ascii=False, indent=2)
-    draft_deleted = _delete_draft_file_if_exists(source_draft_id)
+    
+    # 草稿删除逻辑优化：不再立即删除，而是根据导出跟踪状态决定
+    # draft_deleted = _delete_draft_file_if_exists(source_draft_id)  # 旧逻辑已废弃
+    draft_deleted = False  # 暂时保留草稿，由后续跟踪逻辑决定
 
     # 自动同步项目信息到后台项目管理
     _auto_sync_project_and_task(export_payload, export_id)
 
     # 自动流转：导出报告成功 → 推进到"检测中"（不自动完成任务）
     _try_advance_on_export(export_payload)
+    
+    # 同步导出记录到数据库（v2优化）
+    from helpers.export_db_sync import sync_export_to_db
+    sync_result = sync_export_to_db(final_payload, BASE_DIR, PATHS)
+    if not sync_result.get('success'):
+        print(f"[WARN] 导出记录同步数据库失败: {sync_result.get('error')}")
+    
+    # 更新草稿导出跟踪状态（长期优化）
+    if source_draft_id:
+        from helpers.draft_tracking import update_draft_export_status, should_delete_draft
+        
+        # 推断当前导出的房间索引
+        # 因为X1系统一次只导出第一个房间，所以room_index = 0
+        # 未来如果支持多房间批量导出，需要前端传递room_index
+        room_index = data.get('room_index', 0)  # 从请求参数获取，默认0
+        
+        track_result = update_draft_export_status(source_draft_id, room_index, export_id, BASE_DIR, PATHS)
+        if track_result.get('success'):
+            all_exported = track_result.get('all_exported')
+            exported_count = track_result.get('exported_count')
+            total_count = track_result.get('total_count')
+            print(f"✅ 草稿跟踪已更新: {source_draft_id} [{exported_count}/{total_count}] 房间{room_index} -> {export_id}")
+            
+            # 如果所有房间都已导出，标记草稿可删除
+            if all_exported:
+                delete_check = should_delete_draft(source_draft_id, BASE_DIR, PATHS)
+                if delete_check.get('should_delete'):
+                    print(f"📌 草稿 {source_draft_id} 所有房间已导出完成 ({exported_count}/{total_count})，可以删除")
+                    # 注意：这里不自动删除文件，保留7天供用户查看历史
+        else:
+            print(f"[WARN] 草稿跟踪更新失败: {track_result.get('error')}")
 
     return jsonify({
         'success': True,

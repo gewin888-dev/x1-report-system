@@ -12,6 +12,7 @@ def register_blueprints(app):
     from routes.export import export_bp
     from routes.template_mgmt import template_mgmt_bp
     from routes.admin_misc import admin_misc_bp
+    from routes.merged import merged_bp, init_merged_routes
 
     app.register_blueprint(settings_bp)
     app.register_blueprint(projects_bp)
@@ -21,3 +22,12 @@ def register_blueprints(app):
     app.register_blueprint(export_bp)
     app.register_blueprint(template_mgmt_bp)
     app.register_blueprint(admin_misc_bp)
+    app.register_blueprint(merged_bp)
+    
+    # 初始化合并报告路由（注入配置）
+    from pathlib import Path
+    from config_loader import load_x1_config
+    BASE_DIR = Path(app.root_path)
+    CFG = load_x1_config(BASE_DIR)
+    PATHS = CFG.get('paths', {})
+    init_merged_routes(BASE_DIR, PATHS)

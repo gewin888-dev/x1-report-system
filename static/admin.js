@@ -1076,66 +1076,112 @@ function buildRecordAssetButton(label, ok, kind, target, failMessage, tone, perm
 }
 
 function renderRecords(filtered){
-  var h = '';
+  // 按项目分组（项目名称+报告编号作为key）
+  var groups = {};
   filtered.forEach(function(r){
-    var displayDate = r.save_time_min || (r.save_time ? String(r.save_time).replace('T',' ').slice(0,16) : '') || r.detection_date || r.created || r.updated || '-';
-    var statusTag = '';
-    if(r.type === 'draft') statusTag = '<span class="tag" style="background:#fff7e6;color:#d48806;border:1px solid #ffd591;">草稿记录</span> ';
-    if(r.type === 'export') statusTag = '<span class="tag" style="background:#f6ffed;color:#389e0d;border:1px solid #b7eb8f;">导出记录</span>';
-    var isVoided = !!r.voided;
-    var asset = r.asset_state || {};
-    var reportFile = asset.report_file || null;
-    var rawExcel = asset.raw_excel || null;
-    var localReportOk = !!asset.local_report_ok;
-    var localRecordOk = !!asset.local_record_ok;
-    var feishuReportOk = !!asset.feishu_report_ok;
-    var feishuRecordOk = !!asset.feishu_record_ok;
-    var issueTags = [];
-    (asset.issues || []).forEach(function(code){
-    });
-    h += '<div class="record-item">';
-    h += '<div class="record-check"><input type="checkbox" class="rec-check" value="'+r.id+'"></div>';
-    h += '<div class="record-main">';
-    h += '<div class="record-title">'+(r.project_name||'未命名项目')+' '+statusTag+(isVoided?' <span class="tag" style="background:#fff1f0;color:#cf1322;border:1px solid #ffa39e;">已作废</span>':'')+'</div>';
-    h += '<div class="record-meta">';
-    h += '<span><strong>委托单位：</strong>'+(r.client_name||'-')+'</span>';
-    h += '<span><strong>报告编号：</strong>'+(r.report_number||'-')+'</span>';
-    h += '<span><strong>日期：</strong>'+displayDate+'</span>';
-    h += '<span><strong>领域：</strong>'+(DOMAIN_MAP[r.domain]||r.domain||'-')+'</span>';
-    h += '<span><strong>检测员：</strong>'+(r.operator||'-')+'</span>';
-    h += '</div>';
-    if(issueTags.length){ h += '<div class="record-meta" style="margin-top:6px;gap:6px;">'+issueTags.join(' ')+'</div>'; }
-    if(isVoided){
-      h += '<div class="record-meta" style="margin-top:6px;color:#cf1322;gap:10px;">';
-      h += '<span><strong>作废时间：</strong>'+(r.voided_at ? String(r.voided_at).replace('T',' ').slice(0,16) : '-')+'</span>';
-      h += '<span><strong>作废人：</strong>'+(r.voided_by||'-')+'</span>';
-      h += '<span><strong>作废原因：</strong>'+(r.void_reason||'未填写')+'</span>';
-      h += '</div>';
+    var groupKey = (r.project_name||'未命名') + '___' + (r.report_number||'无编号');
+    if(!groups[groupKey]){
+      groups[groupKey] = {
+        project_name: r.project_name,
+        report_number: r.report_number,
+        client_name: r.client_name,
+        domain: r.domain,
+        records: []
+      };
     }
-    h += '</div>';
-    h += '<div class="record-actions">';
-    if(r.type === 'export'){
-      h += buildRecordAssetButton('查看本地报告', localReportOk, 'local', reportFile ? reportFile.name : '', '本地检测报告保存失败', 'local', 'admin.records.open_local');
-      h += buildRecordAssetButton('查看本地记录', localRecordOk, 'local', rawExcel ? rawExcel.name : '', '本地原始记录保存失败', 'local', 'admin.records.open_local');
-      h += buildRecordAssetButton('飞书报告', feishuReportOk, 'feishu', r.feishu_report_url || '', '飞书检测报告保存失败', 'feishu', 'admin.records.open_feishu');
-      h += buildRecordAssetButton('飞书记录', feishuRecordOk, 'feishu', r.feishu_export_url || '', '飞书原始记录保存失败', 'feishu', 'admin.records.open_feishu');
-      if(!isVoided){
-        if(currentUserCan('admin.records.void_export')){
-          h += '<button class="btn btn-sm" style="color:#cf1322;border-color:#ff7875" onclick="voidExportRecord(\''+r.id+'\')">作废</button>';
-        }else{
-          h += '<button class="btn btn-sm" disabled style="opacity:.45;cursor:not-allowed;">作废 🔒</button>';
-        }
-      }
-      if(currentUserCan('admin.feishu.retry')){
-        h += '<button class="btn btn-sm" style="color:#722ed1;border-color:#722ed1" onclick="retryFeishuUpload(\''+r.id+'\')">↻ 重传飞书</button>';
-      }else{
-        h += '<button class="btn btn-sm" disabled style="opacity:.45;cursor:not-allowed;">↻ 重传飞书 🔒</button>';
-      }
-    } else {
-      h += '<span class="tag" style="background:#f5f5f5;color:#8c8c8c;border:1px solid #d9d9d9;padding:6px 10px;">草稿未导出，成果按钮暂不可用</span>';
-    }
-    h += '</div></div>';
+    groups[groupKey].records.push(r);
   });
+  
+  var h = '';
+  Object.keys(groups).forEach(function(groupKey){
+    var group = groups[groupKey];
+    var records = group.records;
+    var isMulti = records.length > 1;
+    
+    // 分组标题（仅当有多条记录时显示）
+    if(isMulti){
+      var groupId = 'group_'+groupKey.replace(/[^a-zA-Z0-9]/g,'_');
+      h += '<div class="record-group-header" onclick="toggleRecordGroup(\''+groupId+'\')" style="background:#fafafa;padding:10px 15px;margin:10px 0 0 0;border:1px solid #d9d9d9;border-radius:4px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">';
+      h += '<div><strong>'+group.project_name+'</strong> <span style="color:#8c8c8c;">'+group.report_number+'</span> <span class="tag" style="background:#e6f7ff;color:#0958d9;border:1px solid #91d5ff;">'+records.length+'条记录</span></div>';
+      h += '<span id="'+groupId+'_arrow" style="color:#8c8c8c;">▼</span>';
+      h += '</div>';
+      h += '<div id="'+groupId+'" class="record-group-body" style="margin-left:20px;">';
+    }
+    
+    // 渲染每条记录
+    records.forEach(function(r){
+      var displayDate = r.save_time_min || (r.save_time ? String(r.save_time).replace('T',' ').slice(0,16) : '') || r.detection_date || r.created || r.updated || '-';
+      var statusTag = '';
+      if(r.type === 'draft') statusTag = '<span class="tag" style="background:#fff7e6;color:#d48806;border:1px solid #ffd591;">草稿记录</span> ';
+      if(r.type === 'export') statusTag = '<span class="tag" style="background:#f6ffed;color:#389e0d;border:1px solid #b7eb8f;">导出记录</span>';
+      var isVoided = !!r.voided;
+      var asset = r.asset_state || {};
+      var reportFile = asset.report_file || null;
+      var rawExcel = asset.raw_excel || null;
+      var localReportOk = !!asset.local_report_ok;
+      var localRecordOk = !!asset.local_record_ok;
+      var feishuReportOk = !!asset.feishu_report_ok;
+      var feishuRecordOk = !!asset.feishu_record_ok;
+      var issueTags = [];
+      (asset.issues || []).forEach(function(code){
+      });
+      h += '<div class="record-item">';
+      h += '<div class="record-check"><input type="checkbox" class="rec-check" value="'+r.id+'"></div>';
+      h += '<div class="record-main">';
+      // 如果是分组显示，标题只显示受检区域，否则显示完整项目名
+      if(isMulti){
+        h += '<div class="record-title">'+(r.inspection_area||'未指定区域')+' '+statusTag+(isVoided?' <span class="tag" style="background:#fff1f0;color:#cf1322;border:1px solid #ffa39e;">已作废</span>':'')+'</div>';
+      }else{
+        h += '<div class="record-title">'+(r.project_name||'未命名项目')+' '+statusTag+(isVoided?' <span class="tag" style="background:#fff1f0;color:#cf1322;border:1px solid#ffa39e;">已作废</span>':'')+'</div>';
+      }
+      h += '<div class="record-meta">';
+      if(!isMulti){
+        h += '<span><strong>委托单位：</strong>'+(r.client_name||'-')+'</span>';
+        h += '<span><strong>报告编号：</strong>'+(r.report_number||'-')+'</span>';
+      }
+      h += '<span><strong>受检区域：</strong>'+(r.inspection_area||'-')+'</span>';
+      h += '<span><strong>日期：</strong>'+displayDate+'</span>';
+      h += '<span><strong>领域：</strong>'+(DOMAIN_MAP[r.domain]||r.domain||'-')+'</span>';
+      h += '<span><strong>检测员：</strong>'+(r.operator||'-')+'</span>';
+      h += '</div>';
+      if(issueTags.length){ h += '<div class="record-meta" style="margin-top:6px;gap:6px;">'+issueTags.join(' ')+'</div>'; }
+      if(isVoided){
+        h += '<div class="record-meta" style="margin-top:6px;color:#cf1322;gap:10px;">';
+        h += '<span><strong>作废时间：</strong>'+(r.voided_at ? String(r.voided_at).replace('T',' ').slice(0,16) : '-')+'</span>';
+        h += '<span><strong>作废人：</strong>'+(r.voided_by||'-')+'</span>';
+        h += '<span><strong>作废原因：</strong>'+(r.void_reason||'未填写')+'</span>';
+        h += '</div>';
+      }
+      h += '</div>';
+      h += '<div class="record-actions">';
+      if(r.type === 'export'){
+        h += buildRecordAssetButton('查看本地报告', localReportOk, 'local', reportFile ? reportFile.name : '', '本地检测报告保存失败', 'local', 'admin.records.open_local');
+        h += buildRecordAssetButton('查看本地记录', localRecordOk, 'local', rawExcel ? rawExcel.name : '', '本地原始记录保存失败', 'local', 'admin.records.open_local');
+        h += buildRecordAssetButton('飞书报告', feishuReportOk, 'feishu', r.feishu_report_url || '', '飞书检测报告保存失败', 'feishu', 'admin.records.open_feishu');
+        h += buildRecordAssetButton('飞书记录', feishuRecordOk, 'feishu', r.feishu_export_url || '', '飞书原始记录保存失败', 'feishu', 'admin.records.open_feishu');
+        if(!isVoided){
+          if(currentUserCan('admin.records.void_export')){
+            h += '<button class="btn btn-sm" style="color:#cf1322;border-color:#ff7875" onclick="voidExportRecord(\''+r.id+'\')">作废</button>';
+          }else{
+            h += '<button class="btn btn-sm" disabled style="opacity:.45;cursor:not-allowed;">作废 🔒</button>';
+          }
+        }
+        if(currentUserCan('admin.feishu.retry')){
+          h += '<button class="btn btn-sm" style="color:#722ed1;border-color:#722ed1" onclick="retryFeishuUpload(\''+r.id+'\')">↻ 重传飞书</button>';
+        }else{
+          h += '<button class="btn btn-sm" disabled style="opacity:.45;cursor:not-allowed;">↻ 重传飞书 🔒</button>';
+        }
+      } else {
+        h += '<span class="tag" style="background:#f5f5f5;color:#8c8c8c;border:1px solid #d9d9d9;padding:6px 10px;">草稿未导出，成果按钮暂不可用</span>';
+      }
+      h += '</div></div>';
+    });
+    
+    if(isMulti){
+      h += '</div>'; // close record-group-body
+    }
+  });
+  
   if(filtered.length === 0){h = '<div class="empty">暂无记录</div>';}
   document.getElementById('record-list').innerHTML = h;
 }
@@ -1167,6 +1213,18 @@ function retryFeishuUpload(recordId){
         showToast('重传失败：'+(d.error||'未知错误'),'error');
       }
     }).catch(function(e){showToast('重传失败：'+e.message,'error')});
+}
+
+function toggleRecordGroup(groupId){
+  var body = document.getElementById(groupId);
+  var arrow = document.getElementById(groupId+'_arrow');
+  if(body.style.display === 'none'){
+    body.style.display = 'block';
+    arrow.textContent = '▼';
+  }else{
+    body.style.display = 'none';
+    arrow.textContent = '▶';
+  }
 }
 
 function voidExportRecord(recordId){
