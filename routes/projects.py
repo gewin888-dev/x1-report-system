@@ -241,17 +241,16 @@ def admin_api_business_projects_summary():
         paid_total = round(financial['paid_total'], 2)
         receivable_total = round(contract_total - paid_total, 2)
         
-        return jsonify({'success': True, 'summary': {
-            'total_projects': total_projects,
-            'inspecting_projects': inspecting,
-            'pending_reports': pending_reports,
-            'completed_projects': completed,
-            'pending_invoices': pending_invoices,
-            'pending_payments': pending_payments,
-            'contract_total_amount': contract_total,
-            'paid_total_amount': paid_total,
-            'receivable_total_amount': receivable_total,
-        }})
+        return jsonify({
+            'project_count': total_projects,
+            'detecting_count': inspecting,
+            'pending_report_count': pending_reports,
+            'done_count': completed,
+            'pending_invoice_count': pending_invoices,
+            'pending_payment_count': pending_payments,
+            'contract_total': contract_total,
+            'receivable_amount': receivable_total,
+        })
     except Exception as e:
         return jsonify({'success': False, 'error': f'统计失败: {str(e)}'}), 500
     finally:
