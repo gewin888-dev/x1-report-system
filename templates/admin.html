@@ -818,11 +818,26 @@ input[type="text"]:focus,input[type="password"]:focus,input[type="number"]:focus
 </div>
 </div>
 <div class="card section-card">
-  <div class="section-head"><div><div class="section-title">备份记录</div><div class="section-desc">展示所有自动和手动备份文件，按时间倒序排列。</div></div></div>
+  <div class="section-head">
+    <div>
+      <div class="section-title">备份记录</div>
+      <div class="section-desc">展示所有自动和手动备份文件，按时间倒序排列。</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;">
+      <button class="btn btn-sm" style="background:#fff;color:#cf1322;border:1px solid #ff7875;font-size:12px;padding:4px 12px;" onclick="batchDeleteBackups()" id="btn-batch-delete-backups">批量删除</button>
+    </div>
+  </div>
 <table style="width:100%;font-size:13px;border-collapse:collapse;table-layout:fixed;" id="mon-backup-table">
-<colgroup><col style="width:42%"><col style="width:18%"><col style="width:10%"><col style="width:10%"><col style="width:20%"></colgroup>
-<thead><tr style="background:#f8fafc"><th style="padding:10px 8px;text-align:left;border-bottom:2px solid #e5e7eb">文件名</th><th style="padding:10px 8px;text-align:left;border-bottom:2px solid #e5e7eb">时间</th><th style="padding:10px 8px;text-align:left;border-bottom:2px solid #e5e7eb">类型</th><th style="padding:10px 8px;text-align:right;border-bottom:2px solid #e5e7eb">大小</th><th style="padding:10px 8px;text-align:center;border-bottom:2px solid #e5e7eb">操作</th></tr></thead>
-<tbody id="mon-backup-tbody"><tr><td colspan="5" class="empty">加载中...</td></tr></tbody>
+<colgroup><col style="width:4%"><col style="width:38%"><col style="width:18%"><col style="width:10%"><col style="width:10%"><col style="width:20%"></colgroup>
+<thead><tr style="background:#f8fafc">
+<th style="padding:10px 8px;text-align:center;border-bottom:2px solid #e5e7eb"><input type="checkbox" id="backup-select-all" onchange="toggleAllBackupSelection()" style="cursor:pointer;"></th>
+<th style="padding:10px 8px;text-align:left;border-bottom:2px solid #e5e7eb">文件名</th>
+<th style="padding:10px 8px;text-align:left;border-bottom:2px solid #e5e7eb">时间</th>
+<th style="padding:10px 8px;text-align:left;border-bottom:2px solid #e5e7eb">类型</th>
+<th style="padding:10px 8px;text-align:right;border-bottom:2px solid #e5e7eb">大小</th>
+<th style="padding:10px 8px;text-align:center;border-bottom:2px solid #e5e7eb">操作</th>
+</tr></thead>
+<tbody id="mon-backup-tbody"><tr><td colspan="6" class="empty">加载中...</td></tr></tbody>
 </table>
 </div>
 </div>

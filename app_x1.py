@@ -1689,6 +1689,73 @@ def admin_api_delete_backup(filename):
         return jsonify({'success': False, 'error': f'删除失败: {e}'}), 500
 
 
+@app.route('/admin/api/backups/batch_delete', methods=['POST'])
+@login_required
+@require_permission('admin.maintenance.run')
+def admin_api_batch_delete_backups():
+    """批量删除备份文件"""
+    data = request.get_json(silent=True) or {}
+    filenames = data.get('filenames', [])
+    
+    if not isinstance(filenames, list) or len(filenames) == 0:
+        return jsonify({'success': False, 'error': '未提供文件名列表'}), 400
+    
+    if len(filenames) > 100:
+        return jsonify({'success': False, 'error': '单次最多删除100个文件'}), 400
+    
+    from helpers.settings_utils import _load_system_settings
+    settings_values = _load_system_settings()
+    backup_root = Path(str(settings_values.get('paths.backup_dir', {}).get('value', BASE_DIR / 'backups'))).expanduser().resolve()
+    search_roots = [backup_root] + [(backup_root / s).resolve() for s in ('code', 'data', 'full')]
+    
+    deleted_count = 0
+    failed_count = 0
+    failed_files = []
+    
+    for filename in filenames:
+        # 安全检查
+        if '..' in filename or '/' in filename or '\\' in filename:
+            failed_count += 1
+            failed_files.append(f"{filename}: 非法文件名")
+            continue
+        
+        # 查找文件
+        target_path = None
+        for root in search_roots:
+            try:
+                candidate = (root / filename).resolve(strict=False)
+                candidate.relative_to(root)
+            except Exception:
+                continue
+            if candidate.exists() and candidate.is_file():
+                target_path = candidate
+                break
+        
+        if not target_path:
+            # 文件不存在，视为删除成功（幂等操作）
+            deleted_count += 1
+            continue
+        
+        # 删除文件
+        try:
+            target_path.unlink()
+            deleted_count += 1
+        except Exception as e:
+            failed_count += 1
+            failed_files.append(f"{filename}: {str(e)}")
+    
+    # 记录操作日志
+    log_action(current_user.id, '批量删除备份文件', 'system_settings', 
+               json.dumps({'total': len(filenames), 'deleted': deleted_count, 'failed': failed_count}, ensure_ascii=False))
+    
+    return jsonify({
+        'success': True,
+        'deleted': deleted_count,
+        'failed': failed_count,
+        'failed_files': failed_files[:10]  # 最多返回前10个失败的
+    })
+
+
 # ==================== /api/x/health 健康检查 ====================
 @app.route('/api/x/health')
 def api_x_health():
@@ -1753,6 +1820,7 @@ def admin_standards():
 
 @app.route('/admin/monitor')
 @login_required
+@require_permission('admin.monitor.view')
 def admin_monitor():
     return render_template('monitor.html')
 

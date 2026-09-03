@@ -2775,7 +2775,7 @@ function loadMonitor(){
       document.getElementById('mon-drafts').textContent='0';
       var fullEl=document.getElementById('mon-full-backups');
       if(fullEl) fullEl.textContent='0';
-      tbody.innerHTML='<tr><td colspan="5" class="empty">暂无备份记录</td></tr>';
+      tbody.innerHTML='<tr><td colspan="6" class="empty">暂无备份记录</td></tr>';
       return;
     }
     var html='';
@@ -2789,6 +2789,7 @@ function loadMonitor(){
       var tone=toneMap[b.type]||toneMap['手动'];
       typeBadge='<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;background:'+tone+'">'+escapeHtml(b.type)+'</span>';
       html+='<tr>';
+      html+='<td style="padding:8px;border-bottom:1px solid #f0f0f0;text-align:center;"><input type="checkbox" class="backup-checkbox" data-filename="'+escapeHtml(b.filename)+'" onchange="updateBackupSelectAll()" style="cursor:pointer;"></td>';
       html+='<td style="padding:8px;border-bottom:1px solid #f0f0f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+escapeHtml(b.filename)+'">'+escapeHtml(b.filename)+'</td>';
       html+='<td style="padding:8px;border-bottom:1px solid #f0f0f0;white-space:nowrap;">'+escapeHtml(b.time)+'</td>';
       html+='<td style="padding:8px;border-bottom:1px solid #f0f0f0;">'+typeBadge+'</td>';
@@ -2803,7 +2804,7 @@ function loadMonitor(){
     tbody.innerHTML=html;
   }).catch(function(e){
     var tbody=document.getElementById('mon-backup-tbody');
-    if(tbody) tbody.innerHTML='<tr><td colspan="5" class="empty">加载备份记录失败</td></tr>';
+    if(tbody) tbody.innerHTML='<tr><td colspan="6" class="empty">加载备份记录失败</td></tr>';
   });
 }
 
@@ -3581,3 +3582,54 @@ ensureCurrentUserProfile().then(function(){
   applyNavPermissions();
   loadStats();
 });
+
+// 备份批量删除相关函数
+function toggleAllBackupSelection(){
+  var selectAll=document.getElementById('backup-select-all');
+  var checkboxes=document.querySelectorAll('.backup-checkbox');
+  checkboxes.forEach(function(cb){cb.checked=selectAll.checked;});
+}
+
+function updateBackupSelectAll(){
+  var checkboxes=document.querySelectorAll('.backup-checkbox');
+  var selectAll=document.getElementById('backup-select-all');
+  if(!selectAll || checkboxes.length===0) return;
+  var allChecked=true;
+  checkboxes.forEach(function(cb){if(!cb.checked) allChecked=false;});
+  selectAll.checked=allChecked;
+}
+
+function batchDeleteBackups(){
+  var checkboxes=document.querySelectorAll('.backup-checkbox:checked');
+  if(checkboxes.length===0){
+    showToast('请先选择要删除的备份文件','warning');
+    return;
+  }
+  var filenames=[];
+  checkboxes.forEach(function(cb){filenames.push(cb.getAttribute('data-filename'));});
+  
+  if(!confirm('确认批量删除 '+filenames.length+' 个备份文件？\n\n此操作不可逆！\n\n'+filenames.slice(0,5).join('\n')+(filenames.length>5?'\n...':''))){
+    return;
+  }
+  
+  var btn=document.getElementById('btn-batch-delete-backups');
+  if(btn){ btn.disabled=true; btn.textContent='删除中...'; }
+  
+  fetch('/admin/api/backups/batch_delete',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    credentials:'same-origin',
+    body:JSON.stringify({filenames:filenames})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(btn){ btn.disabled=false; btn.textContent='批量删除'; }
+    if(d.success){
+      showToast('已删除 '+d.deleted+' 个备份文件'+(d.failed>0?'，失败 '+d.failed+' 个':''),'success');
+      loadMonitor();
+    }else{
+      showToast(d.error||'批量删除失败','error');
+    }
+  }).catch(function(){
+    if(btn){ btn.disabled=false; btn.textContent='批量删除'; }
+    showToast('批量删除失败','error');
+  });
+}
