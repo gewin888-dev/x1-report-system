@@ -65,20 +65,66 @@ def _compute_record_asset_state(record: dict) -> dict:
 
 def _soft_delete_record(record_id):
     """软删除记录（移到 trash 目录）"""
-    trash_dir = BASE_DIR / 'trash'
-    trash_dir.mkdir(exist_ok=True)
-    # 草稿
-    draft_file = RECORDS_DIR / f"{record_id}.json"
-    if draft_file.exists():
-        shutil.move(str(draft_file), str(trash_dir / draft_file.name))
-        return True, '草稿已移至回收站'
-    # 导出记录
-    export_files = list(REPORTS_DIR.glob(f"{record_id}*"))
-    if not export_files:
-        return False, '记录不存在'
-    for ef in export_files:
-        shutil.move(str(ef), str(trash_dir / ef.name))
-    return True, f'导出记录已移至回收站（{len(export_files)}个文件）'
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        trash_dir = BASE_DIR / 'trash'
+        trash_dir.mkdir(exist_ok=True)
+        
+        # 草稿
+        draft_file = RECORDS_DIR / f"{record_id}.json"
+        if draft_file.exists():
+            target = trash_dir / draft_file.name
+            # 如果目标文件已存在，添加时间戳避免冲突
+            if target.exists():
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                target = trash_dir / f"{record_id}_{timestamp}.json"
+            shutil.move(str(draft_file), str(target))
+            logger.info(f"草稿已移至回收站: {record_id}")
+            return True, '草稿已移至回收站'
+        
+        # 导出记录
+        export_files = list(REPORTS_DIR.glob(f"{record_id}*"))
+        if not export_files:
+            # 文件不存在，视为已删除（删除操作是幂等的）
+            logger.info(f"记录文件不存在，视为已删除: {record_id}")
+            return True, '记录文件不存在，已视为删除成功'
+        
+        moved_count = 0
+        failed_files = []
+        for ef in export_files:
+            target = trash_dir / ef.name
+            # 如果目标文件已存在，添加时间戳避免冲突
+            if target.exists():
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                stem = ef.stem
+                suffix = ef.suffix
+                target = trash_dir / f"{stem}_{timestamp}{suffix}"
+            try:
+                shutil.move(str(ef), str(target))
+                moved_count += 1
+            except Exception as e:
+                # 单个文件移动失败不影响其他文件
+                failed_files.append(f"{ef.name}: {str(e)}")
+                logger.error(f"文件移动失败: {ef} -> {target}, 错误: {e}")
+                continue
+        
+        if moved_count == 0:
+            error_msg = f'所有文件移动失败: {"; ".join(failed_files[:3])}'
+            logger.error(f"记录删除完全失败: {record_id}, {error_msg}")
+            return False, error_msg
+        
+        if failed_files:
+            logger.warning(f"记录部分删除: {record_id}, 成功{moved_count}/{len(export_files)}, 失败: {failed_files}")
+        else:
+            logger.info(f"记录已完全删除: {record_id}, {moved_count}个文件")
+        
+        return True, f'导出记录已移至回收站（{moved_count}/{len(export_files)}个文件）'
+    
+    except Exception as e:
+        logger.error(f"删除记录异常: {record_id}, 错误: {e}", exc_info=True)
+        return False, f'删除失败: {str(e)}'
 
 
 # ---------- 访问控制辅助 ----------
