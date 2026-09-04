@@ -13,6 +13,7 @@ def register_blueprints(app):
     from routes.template_mgmt import template_mgmt_bp
     from routes.admin_misc import admin_misc_bp
     from routes.merged import merged_bp, init_merged_routes
+    from routes.health import health_bp
 
     app.register_blueprint(settings_bp)
     app.register_blueprint(projects_bp)
@@ -23,6 +24,7 @@ def register_blueprints(app):
     app.register_blueprint(template_mgmt_bp)
     app.register_blueprint(admin_misc_bp)
     app.register_blueprint(merged_bp)
+    app.register_blueprint(health_bp)
     
     # 初始化合并报告路由（注入配置）
     from pathlib import Path
